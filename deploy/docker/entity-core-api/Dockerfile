@@ -18,7 +18,7 @@ COPY ./entity-core-api/requirements.txt /app/requirements.txt
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
  && python -m pip install --no-cache-dir -r /app/requirements.txt
 
-COPY ./entiy-core-api /app
+COPY ./entity-core-api /app
 
 EXPOSE 8005
 
