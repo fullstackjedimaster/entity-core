@@ -10,13 +10,13 @@ DEPLOY_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # Prefer deploy/sql/ec.sql, but also allow deploy/ec.sql for flexibility.
 SQL_FILE="${SQL_FILE:-}"
 if [[ -z "${SQL_FILE}" ]]; then
-  if [[ -f "$DEPLOY_DIR/sql/ec.sql" ]]; then
-    SQL_FILE="$DEPLOY_DIR/sql/ec.sql"
+  if [[ -f "$DEPLOY_DIR/scripts/ec.sql" ]]; then
+    SQL_FILE="$DEPLOY_DIR/scripts/ec.sql"
   elif [[ -f "$DEPLOY_DIR/ec.sql" ]]; then
     SQL_FILE="$DEPLOY_DIR/ec.sql"
   else
     err "Could not find ec.sql. Expected one of:
-  - $DEPLOY_DIR/sql/ec.sql
+  - $DEPLOY_DIR/scripts/ec.sql
   - $DEPLOY_DIR/ec.sql
 You can also set SQL_FILE explicitly."
   fi
