@@ -1,0 +1,78 @@
+name: entity-core
+
+services:
+  postgres:
+    image: postgres:16
+    tmpfs:
+      - /var/lib/postgresql/data
+    env_file:
+      - ./env/postgres.env
+#    volumes:
+#      - iot-wireless-mesh-daq-pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\"" ]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+
+  # One-shot init: ALWAYS regenerates env files and ALWAYS hard-resets DB + applies rag.sql.
+  bootstrap:
+    build:
+      context: /opt/stacks/entity-coee
+      dockerfile: deploy/docker/bootstrap/Dockerfile
+    image: entity-core-api/bootstrap:local
+
+    env_file:
+      - ./env/postgres.env
+      - ./env/entity-core-api.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    command:
+      - bash
+      - -lc
+      - |
+        set -euxo pipefail
+        /deploy/scripts/init-postgres.sh
+    restart: "no"
+
+  entity-core-api:
+    build:
+      context: /opt/stacks/entity-core
+      dockerfile: deploy/docker/entity-core-api/Dockerfile
+    image: entity-core-api:local
+    env_file:
+      - ./env/entity-core-api.env
+      - ./env/postgres.env
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:8005:8005"
+
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8002/health', timeout=2).read()\""]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+
+  entity-corec:
+    build:
+      context: /opt/stacks/entity-core
+      dockerfile: deploy/docker/entity-core/Dockerfile
+    image: entity-core:local
+    env_file:
+      - ./env/entity-core.env
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:3005:3005"
