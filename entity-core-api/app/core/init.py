@@ -1,13 +1,14 @@
 # app/core/init.py
 import asyncpg
 from fastapi import FastAPI
+from app.core.settings import env
 
 
 # -----------------------------------------------------------------------------
 # JWKS preload helper
 # -----------------------------------------------------------------------------
 import asyncio, httpx
-from settings import env
+from app.core.settings import env
 
 async def preload_jwks(app):
     """

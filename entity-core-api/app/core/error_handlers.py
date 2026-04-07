@@ -2,7 +2,7 @@
 from __future__ import annotations
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from db_errors import translate_db_error
+from app.core.db_errors import translate_db_error
 
 def install_global_error_handlers(app: FastAPI) -> None:
     """
