@@ -12,14 +12,12 @@ RUN set -eux; \
       tini \
       ca-certificates \
       postgresql-client \
-      redis-tools \
       bash \
       openssl \
     ; \
     rm -rf /var/lib/apt/lists/*; \
     command -v psql; \
-    command -v pg_isready; \
-    command -v redis-cli
+    command -v pg_isready;
 
 # Copy deploy scripts (includes rag.sql)
 COPY deploy/scripts/ /deploy/scripts/

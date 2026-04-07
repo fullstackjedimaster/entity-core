@@ -14,12 +14,12 @@ RUN set -eux; \
 
 WORKDIR /app
 
-COPY ./mod-rag-api/requirements.txt /app/requirements.txt
+COPY ./entity-core-api/requirements.txt /app/requirements.txt
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
  && python -m pip install --no-cache-dir -r /app/requirements.txt
 
-COPY ./mod-rag-api /app
+COPY ./entiy-core-api /app
 
-EXPOSE 8002
+EXPOSE 8005
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8005"]
