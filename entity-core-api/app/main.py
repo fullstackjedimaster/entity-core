@@ -5,12 +5,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from core.init import preload_jwks
-from core.settings import env
-from core.error_handlers import install_global_error_handlers
+from app.core.init import preload_jwks
+from app.core.settings import env
+from app.core.error_handlers import install_global_error_handlers
 
 # Routers: only the ones that actually exist in ec-control.
-from routers import (
+from app.routers import (
     entities as entities_router,
     internal as internal_router,
     login as login_router,
@@ -19,9 +19,6 @@ from routers import (
 )
 
 
-# ---------------------------------------------------------------------------
-#  Lifespan
-# ---------------------------------------------------------------------------
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
