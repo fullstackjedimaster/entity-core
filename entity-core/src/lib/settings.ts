@@ -7,15 +7,15 @@ export interface AppSettings {
     AUTH0_AUDIENCE: string;
     AUTH0_NAMESPACE: string;
     API_BASE_URL: string;      // Public API base, e.g. https://fullstackjedi.dev/entity-core/api
-    CRUD_SERVER_URL: string;   // Service root, e.g. https://fullstackjedi.dev/entity-core
+    ENTITY_CORE_SERVER_URL: string;   // Service root, e.g. https://fullstackjedi.dev/entity-core
     CRUD_SERVER_API_KEY: string;
     AUTH0_SCOPE: string;
     DISABLE_AUTH: string;
 }
 
 // Small helpers so we can support either API_BASE_URL or API_BASE
-const DEFAULT_API_BASE = "https://fullstackjedi.dev/entity-core/api";
-const DEFAULT_CRUD_SERVER = "https://fullstackjedi.dev/entity-core";
+const DEFAULT_API_BASE = "https://entity-core.fullstackjedi.dev/api";
+const DEFAULT_CRUD_SERVER = "https://entity-core.fullstackjedi.dev/";
 
 const apiBaseFromEnv =
     process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -34,7 +34,7 @@ export const settings: AppSettings = {
     AUTH0_CLIENT_ID: process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || "",
     AUTH0_AUDIENCE:
         process.env.NEXT_PUBLIC_AUTH0_AUDIENCE ||
-        "https://fullstackjedi.dev/entity-core/api",
+        "https://entity-core.fullstackjedi.dev/api",
     AUTH0_NAMESPACE:
         process.env.NEXT_PUBLIC_AUTH0_NAMESPACE || "https://fullstackjedi.dev",
 

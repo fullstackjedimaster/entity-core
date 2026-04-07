@@ -63,7 +63,7 @@ function OnboardingInner() {
 
     // Wait for Auth0 app_metadata propagation
     const waitForAuth0Metadata = async (sub: string, org: string) => {
-        const url = `${settings.CRUD_SERVER_URL}/internal/wait_for_metadata?sub=${encodeURIComponent(
+        const url = `${settings.ENTITY_CORE_SERVER_URL}/internal/wait_for_metadata?sub=${encodeURIComponent(
             sub
         )}&org_id=${encodeURIComponent(org)}`;
 
@@ -102,7 +102,7 @@ function OnboardingInner() {
             };
 
             const provRes = await fetch(
-                `${settings.CRUD_SERVER_URL}/api/provision_tenant`,
+                `${settings.ENTITY_CORE_SERVER_URL}/api/provision_tenant`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
