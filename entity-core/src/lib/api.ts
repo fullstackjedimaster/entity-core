@@ -1,3 +1,5 @@
+import { settings } from '@/lib/settings';
+
 export async function apiFetchRaw(
     path: string,
     token?: string | null,
