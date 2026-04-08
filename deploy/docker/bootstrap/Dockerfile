@@ -20,8 +20,8 @@ RUN set -eux; \
     command -v pg_isready;
 
 # Copy deploy scripts (includes rag.sql)
-COPY deploy/scripts/ /deploy/scripts/
-RUN chmod +x /deploy/scripts/*.sh
+COPY scripts/ /scripts/
+RUN chmod +x /scripts/*.sh
 
 ENTRYPOINT ["/usr/bin/tini","--"]
 CMD ["bash", "-lc", "echo bootstrap ready"]
