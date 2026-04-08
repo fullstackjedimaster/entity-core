@@ -22,8 +22,10 @@ services:
   # One-shot init: ALWAYS regenerates env files and ALWAYS hard-resets DB + applies rag.sql.
   bootstrap:
     build:
-      context: /opt/stacks/entity-core
-      dockerfile: deploy/docker/bootstrap/Dockerfile
+      context: .
+      dockerfile: docker/bootstrap/Dockerfile
+      additional_contexts:
+        repo: ..
     image: entity-core-api/bootstrap:local
 
     env_file:
@@ -43,8 +45,10 @@ services:
 
   entity-core-api:
     build:
-      context: /opt/stacks/entity-core
-      dockerfile: deploy/docker/entity-core-api/Dockerfile
+      context: .
+      dockerfile: docker/entity-core-api/Dockerfile
+      additional_contexts:
+        repo: ..
     image: entity-core-api:local
     env_file:
       - ./env/entity-core-api.env
@@ -65,8 +69,10 @@ services:
 
   entity-core:
     build:
-      context: /opt/stacks/entity-core
-      dockerfile: deploy/docker/entity-core/Dockerfile
+      context: .
+      dockerfile: docker/entity-core/Dockerfile
+      additional_contexts:
+        repo: ..
     image: entity-core:local
     env_file:
       - ./env/entity-core.env

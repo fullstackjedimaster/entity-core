@@ -36,7 +36,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
                 redirect_uri: redirectUri,
                 audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE!,
                 scope:
-                    process.env.NEXT_PUBLIC_AUTH0_SCOPE ||
+                    process.env.NEXT_PUBLIC_AUTH0_SCOPE
                                                                                                                                                                                ,
             }}
             cacheLocation="localstorage"
