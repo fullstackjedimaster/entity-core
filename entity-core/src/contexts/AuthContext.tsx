@@ -35,7 +35,7 @@ type UserWithClaims = User & Record<string, unknown>;
 
 export const useAuth = (): AuthContextType => {
     const auth0 = useAuth0<User>();
-    const disableAuth = settings.DISABLE_AUTH === 'true';
+    const disableAuth = settings.DISABLE_AUTH;
 
     // 🔧 Dev mode bypass (DISABLE_AUTH=true)
     if (disableAuth) {
