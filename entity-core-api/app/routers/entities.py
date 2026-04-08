@@ -10,7 +10,7 @@ from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
 from app.schemas import UpsertTemplateBody, RequestEnvelope
 
-router = APIRouter()
+router = APIRouter(prefix="/entities", tags=["emtities"])
 
 
 def _extract_bearer_token(request: Request) -> str:
@@ -35,7 +35,7 @@ def _extract_bearer_token(request: Request) -> str:
 # NEW: List entity names (backed by ec.listTemplates in entity-server)
 # ---------------------------------------------------------------------------
 
-@router.get("/api/entities")
+@router.get("/entities")
 async def list_entities(request: Request):
     """
     List entity names that have templates.
@@ -56,7 +56,7 @@ async def list_entities(request: Request):
         target="ec.listTemplates",
         id=None,
         args={},  # schema is derived by entity-server from the JWT
-        meta={"source": "entity-core:/api/entities"},
+        meta={"source": "entity-core:/entities"},
     )
 
     data: Dict[str, Any] = await call_model_manage(envelope, token=token)
@@ -86,7 +86,7 @@ async def list_entities(request: Request):
 # Upsert template for an entity (backed by ec.insertTemplate)
 # ---------------------------------------------------------------------------
 
-@router.post("/api/entities/{entity}/upsert_template")
+@router.post("/entities/{entity}/upsert_template")
 async def upsert_template(
     request: Request,
     entity: str,
@@ -117,7 +117,7 @@ async def upsert_template(
             "entity_name": entity,
             "template": body.template,
         },
-        meta={"source": "entity-core:/api/entities/{entity}/upsert_template"},
+        meta={"source": "entity-core:/entities/{entity}/upsert_template"},
     )
 
     data: Dict[str, Any] = await call_model_manage(envelope, token=token)
@@ -135,7 +135,7 @@ async def upsert_template(
 # Get form metadata for entity (backed by ec.get_form_metadata)
 # ---------------------------------------------------------------------------
 
-@router.get("/api/entities/{entity}/form_metadata")
+@router.get("/entities/{entity}/form_metadata")
 async def get_form_metadata(
     request: Request,
     entity: str,
@@ -186,7 +186,7 @@ async def get_form_metadata(
 # Column option provider for cascading dropdowns (ec.get_column_options)
 # ---------------------------------------------------------------------------
 
-@router.get("/api/options/{entity}/{column}")
+@router.get("/options/{entity}/{column}")
 async def get_column_options(
     request: Request,
     entity: str,

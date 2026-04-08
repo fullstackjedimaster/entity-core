@@ -1,4 +1,4 @@
-# app/routers/provision.py
+# app/routers/onboarding.py
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
@@ -12,7 +12,7 @@ from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
 from app.schemas import RequestEnvelope
 
-router = APIRouter(prefix="/api", tags=["onboarding"])
+router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 
 
 def _stripped(v: Optional[str]) -> str:
@@ -82,7 +82,7 @@ async def provision_tenant(
             "roles": initial_roles,
             "permissions": initial_perms,
         },
-        meta={"source": "entity-core:/api/provision_tenant"},
+        meta={"source": "entity-core:/onboarding/provision_tenant"},
     )
 
     data: Dict[str, Any] = await call_model_manage(envelope, token=token)

@@ -102,7 +102,7 @@ function OnboardingInner() {
             };
 
             const provRes = await fetch(
-                `${settings.ENTITY_CORE_API_BASE_URL}/provision_tenant`,
+                `${settings.ENTITY_CORE_API_BASE_URL}/onboarding/provision_tenant`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
