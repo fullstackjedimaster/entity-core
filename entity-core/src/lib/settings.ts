@@ -7,7 +7,7 @@ function required(name: string, value?: string): string {
   return value;
 }
 
-export const env = {
+export const settings = {
   ENTITY_CORE_API_BASE_URL: required(
     "NEXT_PUBLIC_ENTITY_CORE_API_BASE_URL",
     process.env.NEXT_PUBLIC_ENTITY_CORE_API_BASE_URL
@@ -39,4 +39,4 @@ export const env = {
   DISABLE_AUTH: process.env.NEXT_PUBLIC_DISABLE_AUTH === "true",
 } as const;
 
-export default env;
+export default settings;
