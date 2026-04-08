@@ -37,7 +37,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
                 audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE!,
                 scope:
                     process.env.NEXT_PUBLIC_AUTH0_SCOPE ||
-                    'openid profile email crud:read crud:create crud:update crud:delete offline_access',
+                                                                                                                                                                               ,
             }}
             cacheLocation="localstorage"
             useRefreshTokens={true}

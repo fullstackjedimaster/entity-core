@@ -1,5 +1,3 @@
-import { settings } from "@/lib/settings";
-
 export async function apiFetchRaw(
     path: string,
     token?: string | null,
@@ -11,7 +9,7 @@ export async function apiFetchRaw(
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    return fetch(`${settings.API_BASE_URL}${path}`, {
+    return fetch(`${process.env.NEXT_PUBLIC_ENTITY_CORE_API_BASE_URL}${path}`, {
         ...options,
         headers,
         credentials: "include",

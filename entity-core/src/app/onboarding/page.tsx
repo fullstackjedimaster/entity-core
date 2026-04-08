@@ -63,7 +63,7 @@ function OnboardingInner() {
 
     // Wait for Auth0 app_metadata propagation
     const waitForAuth0Metadata = async (sub: string, org: string) => {
-        const url = `${settings.ENTITY_CORE_SERVER_URL}/internal/wait_for_metadata?sub=${encodeURIComponent(
+        const url = `${settings.ENTITY_CORE_API_BASE_URL}/internal/wait_for_metadata?sub=${encodeURIComponent(
             sub
         )}&org_id=${encodeURIComponent(org)}`;
 
@@ -102,7 +102,7 @@ function OnboardingInner() {
             };
 
             const provRes = await fetch(
-                `${settings.ENTITY_CORE_SERVER_URL}/api/provision_tenant`,
+                `${settings.ENTITY_CORE_API_BASE_URL}/provision_tenant`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -122,7 +122,7 @@ function OnboardingInner() {
             );
 
             // Now ask Auth0 to re-mint tokens with claims
-            window.location.href = `https://${process.env.NEXT_PUBLIC_AUTH0_DOMAIN}/continue?state=${stateParam}`;
+            window.location.href = `https://${settings.AUTH0_DOMAIN}/continue?state=${stateParam}`;
         } catch (err: any) {
             console.error("[Onboarding] Error:", err);
             setError(err.message || "Unknown error");

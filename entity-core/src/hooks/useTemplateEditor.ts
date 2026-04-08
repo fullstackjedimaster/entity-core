@@ -28,7 +28,7 @@ export function useTemplateEditor(entity: string) {
             const token = await getToken();
             if (!token) throw new Error("⚠️ Missing token (Auth0 not ready)");
 
-            const res = await fetch(`${settings.API_BASE_URL}/api/entities/${entity}`, {
+            const res = await fetch(`${settings.ENTITY_CORE_API_BASE_URL}/api/entities/${entity}`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json",
@@ -53,7 +53,7 @@ export function useTemplateEditor(entity: string) {
             const token = await getToken();
             if (!token) throw new Error("⚠️ Missing token (Auth0 not ready)");
 
-            const res = await fetch(`${settings.API_BASE_URL}/api/${entity}`, {
+            const res = await fetch(`${settings.ENTITY_CORE_API_BASE_URL}/api/${entity}`, {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
