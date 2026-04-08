@@ -12,7 +12,7 @@ from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
 from app.schemas import RequestEnvelope
 
-router = APIRouter(prefix="/onboarding", tags=["onboarding"])
+router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
 
 def _stripped(v: Optional[str]) -> str:
