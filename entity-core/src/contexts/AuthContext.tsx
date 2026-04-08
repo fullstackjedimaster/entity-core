@@ -102,7 +102,7 @@ export const useAuth = (): AuthContextType => {
         try {
             const token = await getAccessTokenSilently({
                 authorizationParams: {
-                    audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE!,
+                    audience: settings.AUTH0_AUDIENCE!,
                 },
             });
 

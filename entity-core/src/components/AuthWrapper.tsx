@@ -5,6 +5,7 @@ import {
     Auth0Provider,
     AppState,
 } from '@auth0/auth0-react';
+import { settings } from '@/lib/settings';
 
 /**
  * Top-level Auth0 provider for Entity Core.
@@ -14,8 +15,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
     const redirectUri =
         typeof window !== 'undefined'
             ? window.location.origin + '/callback'
-            : process.env.NEXT_PUBLIC_AUTH0_REDIRECT_URI ??
-            'http://localhost:3000/callback';
+            : settings.AUTH0_REDIRECT_URI ;
 
     const onRedirectCallback = (appState?: AppState) => {
         // Prefer explicit returnTo from appState, otherwise go to /template
@@ -30,13 +30,13 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
 
     return (
         <Auth0Provider
-            domain={process.env.NEXT_PUBLIC_AUTH0_DOMAIN!}
-            clientId={process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID!}
+            domain={settings.AUTH0_DOMAIN!}
+            clientId={settings.AUTH0_CLIENT_ID!}
             authorizationParams={{
                 redirect_uri: redirectUri,
-                audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE!,
+                audience: settings.AUTH0_AUDIENCE!,
                 scope:
-                    process.env.NEXT_PUBLIC_AUTH0_SCOPE
+                    settings.AUTH0_SCOPE
                                                                                                                                                                                ,
             }}
             cacheLocation="localstorage"

@@ -36,6 +36,10 @@ export const settings = {
     process.env.NEXT_PUBLIC_AUTH0_SCOPE ||
     "openid profile email crud:read crud:create crud:update crud:delete offline_access",
 
+  AUTH0_REDIRECT_URI:
+    process.env.NEXT_PUBLIC_AUTH0_REDIRECT_URI ||
+    "https://entity-core.fullstackjedi.dev/callback",
+
   DISABLE_AUTH: process.env.NEXT_PUBLIC_DISABLE_AUTH === "true",
 } as const;
 
