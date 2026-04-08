@@ -40,7 +40,7 @@ services:
       - -lc
       - |
         set -euxo pipefail
-        /deploy/scripts/init-postgres.sh
+        /scripts/init-postgres.sh
     restart: "no"
 
   entity-core-api:
