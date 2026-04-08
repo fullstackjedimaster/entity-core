@@ -520,7 +520,7 @@ END;
 $$;
 
 ALTER FUNCTION ec.provision_tenant(text, text, text, text, text, text, text, text, jsonb, text[])
-    OWNER TO postgres;
+    OWNER TO ec;
 
 
 
