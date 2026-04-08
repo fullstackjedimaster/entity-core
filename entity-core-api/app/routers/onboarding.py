@@ -12,7 +12,7 @@ from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
 from app.schemas import RequestEnvelope
 
-router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
+router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 
 
 def _stripped(v: Optional[str]) -> str:
@@ -33,7 +33,7 @@ def _extract_bearer_token(request: Request) -> str:
     return parts[1]
 
 
-@router.post("/provision_tenant")
+@router.post("/onboarding/provision_tenant")
 async def provision_tenant(
     payload: Dict[str, Any],
     request: Request,
