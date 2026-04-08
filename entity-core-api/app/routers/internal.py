@@ -17,7 +17,7 @@ from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
 from app.schemas import RequestEnvelope
 
-router = APIRouter(prefix="/internal", tags=["internal"])
+router = APIRouter(prefix="/api/internal", tags=["internal"])
 
 # This consumes the Authorization header but we only use it on the NO-AUTH endpoint
 no_auth = HTTPBearer(auto_error=False)

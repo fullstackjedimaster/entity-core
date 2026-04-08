@@ -10,7 +10,7 @@ from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
 from app.schemas import UpsertTemplateBody, RequestEnvelope
 
-router = APIRouter(prefix="/entities", tags=["emtities"])
+router = APIRouter(prefix="/api/entities", tags=["entities"])
 
 
 def _extract_bearer_token(request: Request) -> str:
