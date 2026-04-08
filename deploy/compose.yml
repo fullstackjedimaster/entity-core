@@ -13,13 +13,11 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\"" ]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 2s
       timeout: 3s
       retries: 60
 
-
-  # One-shot init: ALWAYS regenerates env files and ALWAYS hard-resets DB + applies rag.sql.
   bootstrap:
     build:
       context: .
@@ -27,14 +25,12 @@ services:
       additional_contexts:
         repo: ..
     image: entity-core-api/bootstrap:local
-
     env_file:
       - ./env/postgres.env
       - ./env/entity-core-api.env
     depends_on:
       postgres:
         condition: service_healthy
-
     command:
       - bash
       - -lc
@@ -57,10 +53,9 @@ services:
       bootstrap:
         condition: service_completed_successfully
     restart: unless-stopped
-
     ports:
       - "127.0.0.1:8005:8005"
-      -
+
   entity-core:
     build:
       context: .
@@ -80,6 +75,5 @@ services:
     env_file:
       - ./env/entity-core.env
     restart: unless-stopped
-
     ports:
       - "127.0.0.1:3006:3006"
