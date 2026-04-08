@@ -280,166 +280,311 @@ $$;
 
 ALTER FUNCTION ec.manage_entity(text, text, uuid, json) OWNER TO ec;
 
-
-  -- ================================================================
--- ec.seed_schema
---   Creates a new tenant schema, baseline tables, and root data
--- ================================================================
-CREATE OR REPLACE FUNCTION ec.seed_schema(
-    p_schema text,
-    p_sub text,
-    p_email text,
-    p_name text DEFAULT NULL,
-    p_picture text DEFAULT NULL
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
+CREATE OR REPLACE FUNCTION ec._ensure_tenant_tables(p_schema text)
+RETURNS void
+LANGUAGE 'plpgsql'
+VOLATILE SECURITY DEFINER PARALLEL UNSAFE
 AS $$
-DECLARE
-    v_root_org_id uuid;
-    v_user_id uuid;
 BEGIN
-    p_schema := lower(trim(p_schema));
+	EXECUTE format($ddl$ CREATE TABLE IF NOT EXISTS %1$I.organization (
+		id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+		org_key text UNIQUE NOT NULL,
+		name text NOT NULL,
+		parent_org_id uuid NULL REFERENCES %1$I.organization(id),
+		created_at timestamptz DEFAULT now(),
+		updated_at timestamptz DEFAULT now()
+	);
 
-    -- 1️⃣ Create schema if missing
-    EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION CURRENT_USER', p_schema);
+	CREATE TABLE IF NOT EXISTS %1$I."user" (
+		id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+		auth0_sub text UNIQUE NOT NULL,
+		email text NOT NULL,
+		name text,
+		picture_url text,
+		given_name text,
+		family_name text,
+		locale text,
+		last_login_at timestamptz DEFAULT now(),
+		created_at timestamptz DEFAULT now(),
+		updated_at timestamptz DEFAULT now()
+	);
 
-    -- 2️⃣ Create tables (if missing)
-    EXECUTE format($ddl$
-        CREATE TABLE IF NOT EXISTS %1$I.organization (
-            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-            org_key text UNIQUE NOT NULL,
-            name text NOT NULL,
-            parent_org_id uuid NULL REFERENCES %1$I.organization(id),
-            created_at timestamptz DEFAULT now(),
-            updated_at timestamptz DEFAULT now()
-        );
-        CREATE TABLE IF NOT EXISTS %1$I."user" (
-            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-            auth0_sub text UNIQUE NOT NULL,
-            email text NOT NULL,
-            name text,
-            picture_url text,
-            created_at timestamptz DEFAULT now(),
-            updated_at timestamptz DEFAULT now()
-        );
-        CREATE TABLE IF NOT EXISTS %1$I.role (
-            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-            org_id uuid REFERENCES %1$I.organization(id) ON DELETE CASCADE,
-            key text NOT NULL,
-            name text NOT NULL,
-            description text,
-            created_at timestamptz DEFAULT now(),
-            updated_at timestamptz DEFAULT now(),
-            UNIQUE (org_id, key)
-        );
-        CREATE TABLE IF NOT EXISTS %1$I.permission (
-            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-            key text UNIQUE NOT NULL,
-            description text,
-            created_at timestamptz DEFAULT now(),
-            updated_at timestamptz DEFAULT now()
-        );
-        CREATE TABLE IF NOT EXISTS %1$I.user_org (
-            user_id uuid REFERENCES %1$I."user"(id) ON DELETE CASCADE,
-            org_id uuid REFERENCES %1$I.organization(id) ON DELETE CASCADE,
-            PRIMARY KEY (user_id, org_id)
-        );
-        CREATE TABLE IF NOT EXISTS %1$I.user_org_role (
-            user_id uuid REFERENCES %1$I."user"(id) ON DELETE CASCADE,
-            org_id uuid REFERENCES %1$I.organization(id) ON DELETE CASCADE,
-            role_id uuid REFERENCES %1$I.role(id) ON DELETE CASCADE,
-            PRIMARY KEY (user_id, org_id, role_id)
-        );
-        CREATE TABLE IF NOT EXISTS %1$I.role_permission (
-            role_id uuid REFERENCES %1$I.role(id) ON DELETE CASCADE,
-            permission_id uuid REFERENCES %1$I.permission(id) ON DELETE CASCADE,
-            PRIMARY KEY (role_id, permission_id)
-        );
-    $ddl$, p_schema);
+	CREATE TABLE IF NOT EXISTS %1$I.role (
+		id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+		org_id uuid REFERENCES %1$I.organization(id) ON DELETE CASCADE,
+		key text NOT NULL,
+		name text NOT NULL,
+		description text,
+		created_at timestamptz DEFAULT now(),
+		updated_at timestamptz DEFAULT now(),
+		UNIQUE (org_id, key)
+	);
 
-    -- 3️⃣ Insert baseline permissions
-    EXECUTE format($ins$
-        INSERT INTO %1$I.permission (key, description)
-        VALUES
-            ('crud:create', 'Create records'),
-            ('crud:read',   'Read records'),
-            ('crud:update', 'Update records'),
-            ('crud:delete', 'Delete records')
-        ON CONFLICT (key) DO NOTHING;
-    $ins$, p_schema);
+	CREATE TABLE IF NOT EXISTS %1$I.permission (
+		id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+		key text UNIQUE NOT NULL, description text,
+		created_at timestamptz DEFAULT now(),
+		updated_at timestamptz DEFAULT now()
+	);
 
-    -- 4️⃣ Insert baseline roles
-    EXECUTE format($ins$
-        INSERT INTO %1$I.role (id, org_id, key, name, description)
-        VALUES
-            (uuid_generate_v4(), NULL, 'creator', 'Creator', 'Full access to tenant data'),
-            (uuid_generate_v4(), NULL, 'editor',  'Editor',  'Modify records'),
-            (uuid_generate_v4(), NULL, 'viewer',  'Viewer',  'Read-only access')
-        ON CONFLICT DO NOTHING;
-    $ins$, p_schema);
+	CREATE TABLE IF NOT EXISTS %1$I.user_org (
+		user_id uuid REFERENCES %1$I."user"(id) ON DELETE CASCADE,
+		org_id uuid REFERENCES %1$I.organization(id) ON DELETE CASCADE,
+		PRIMARY KEY (user_id, org_id)
+	);
 
-    -- 5️⃣ Map roles → permissions
-    EXECUTE format($map$
-        INSERT INTO %1$I.role_permission (role_id, permission_id)
-        SELECT r.id, p.id
-          FROM %1$I.role r, %1$I.permission p
-         WHERE (r.key = 'creator')
-            OR (r.key = 'editor' AND p.key IN ('crud:read','crud:update'))
-            OR (r.key = 'viewer' AND p.key = 'crud:read')
-        ON CONFLICT DO NOTHING;
-    $map$, p_schema);
+	CREATE TABLE IF NOT EXISTS %1$I.user_org_role (
+		user_id uuid REFERENCES %1$I."user"(id) ON DELETE CASCADE,
+		org_id uuid REFERENCES %1$I.organization(id) ON DELETE CASCADE,
+		role_id uuid REFERENCES %1$I.role(id) ON DELETE CASCADE,
+		PRIMARY KEY (user_id, org_id, role_id)
+	);
 
-    -- 6️⃣ Create root organization
-    EXECUTE format($ins$
-        INSERT INTO %1$I.organization (org_key, name)
-        VALUES (%2$L, %2$L)
-        ON CONFLICT (org_key) DO NOTHING;
-    $ins$, p_schema, p_schema);
-
-    EXECUTE format('SELECT id FROM %I.organization WHERE org_key = %L', p_schema, p_schema)
-    INTO v_root_org_id;
-
-    -- 7️⃣ Insert initial user
-    EXECUTE format($user$
-        INSERT INTO %1$I."user" (auth0_sub, email, name, picture_url)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (auth0_sub) DO UPDATE
-          SET email=$2, name=$3, picture_url=$4, updated_at=now()
-        RETURNING id;
-    $user$, p_schema)
-    USING p_sub, p_email, p_name, p_picture
-    INTO v_user_id;
-
-    -- 8️⃣ Link user → org → role (creator)
-    EXECUTE format($link$
-        INSERT INTO %1$I.user_org (user_id, org_id)
-        VALUES ($1, $2)
-        ON CONFLICT DO NOTHING;
-    $link$, p_schema)
-    USING v_user_id, v_root_org_id;
-
-    EXECUTE format($r$
-        INSERT INTO %1$I.user_org_role (user_id, org_id, role_id)
-        SELECT $1, $2, r.id FROM %1$I.role r
-         WHERE r.key = 'creator' LIMIT 1
-        ON CONFLICT DO NOTHING;
-    $r$, p_schema)
-    USING v_user_id, v_root_org_id;
-
-    -- ✅ Return summary JSON
-    RETURN jsonb_build_object(
-        'schema', p_schema,
-        'root_org_id', v_root_org_id,
-        'user_id', v_user_id,
-        'roles_seeded', 3,
-        'permissions_seeded', 4
-    );
+	CREATE TABLE IF NOT EXISTS %1$I.role_permission (
+		role_id uuid REFERENCES %1$I.role(id) ON DELETE CASCADE,
+		permission_id uuid REFERENCES %1$I.permission(id) ON DELETE CASCADE,
+		PRIMARY KEY (role_id, permission_id)
+	);
+	$ddl$, p_schema);
 END;
 $$;
 
--- DROP FUNCTION IF EXISTS ec.provision_tenant(text, text, text, text, text, text, text, text, jsonb, text[]);
+ALTER FUNCTION ec._ensure_tenant_tables(text) OWNER TO ec;
+
+CREATE OR REPLACE FUNCTION ec._seed_roles_and_permissions(
+		p_schema text
+	)
+RETURNS void
+LANGUAGE 'plpgsql'
+VOLATILE PARALLEL UNSAFE
+AS $$
+
+BEGIN
+
+	EXECUTE format($sql$ INSERT INTO %1$I.permission (
+		key,
+		description
+		)
+		VALUES ('crud:create', 'Create records'),
+			('crud:read', 'Read records'),
+			('crud:update', 'Update records'),
+			('crud:delete', 'Delete records')
+		ON CONFLICT (key) DO NOTHING;
+	$sql$, p_schema);
+
+	EXECUTE format($sql$ INSERT INTO %1$I.role (
+		org_id,
+		key,
+		name,
+		description
+		)
+		VALUES (NULL,'creator','Creator','Full access to tenant data'),
+			(NULL, 'editor', 'Editor', 'Modify records'),
+			(NULL, 'viewer', 'Viewer', 'Read-only access')
+		ON CONFLICT (org_id, key) DO NOTHING;
+	$sql$, p_schema);
+
+	EXECUTE format($sql$ INSERT INTO %1$I.role_permission (
+		role_id,
+		permission_id
+		)
+		SELECT r.id, p.id
+		FROM %1$I.role r, %1$I.permission p
+		WHERE (r.key = 'creator')
+		OR (r.key = 'editor' AND p.key IN ('crud:read','crud:update'))
+		OR (r.key = 'viewer' AND p.key = 'crud:read')
+		ON CONFLICT DO NOTHING;
+	$sql$, p_schema);
+END;
+$$;
+
+ALTER FUNCTION ec._seed_roles_and_permissions(text) OWNER TO ec;
+
+
+CREATE OR REPLACE FUNCTION ec._apply_memberships_and_permissions(
+    p_schema text,
+    p_user_id uuid,
+    p_root_org_id uuid,
+    p_memberships jsonb DEFAULT '[]'::jsonb,
+    p_permissions text[] DEFAULT '{}'::text[]
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+VOLATILE SECURITY DEFINER PARALLEL UNSAFE
+AS $$
+DECLARE
+  v_item jsonb;
+  v_org_key text;
+  v_parent_key text;
+  v_roles text[];
+  v_org_id uuid;
+  v_parent_id uuid;
+  v_sql text;
+  v_user jsonb;
+  v_root_org_key text;
+BEGIN
+  EXECUTE format(
+    'SELECT org_key FROM %I.organization WHERE id = $1',
+    p_schema
+  )
+  INTO v_root_org_key
+  USING p_root_org_id;
+
+  IF array_length(p_permissions, 1) IS NOT NULL THEN
+    EXECUTE format($fmt$
+      INSERT INTO %1$I.permission (key, description, updated_at)
+      SELECT DISTINCT p, NULL, now()
+      FROM unnest($1::text[]) p
+      ON CONFLICT (key) DO UPDATE
+        SET updated_at = now();
+    $fmt$, p_schema)
+    USING p_permissions;
+  END IF;
+
+  FOR v_item IN
+    SELECT *
+    FROM jsonb_array_elements(coalesce(p_memberships, '[]'::jsonb))
+  LOOP
+    v_org_key := coalesce(v_item->>'org_key', v_root_org_key);
+    v_parent_key := NULLIF(trim(v_item->>'parent_key'), '');
+    v_roles := ARRAY(
+      SELECT jsonb_array_elements_text(coalesce(v_item->'roles', '[]'::jsonb))
+    );
+
+    IF v_parent_key IS NOT NULL THEN
+      EXECUTE format($fmt$
+        INSERT INTO %1$I.organization (org_key, name)
+        VALUES (%2$L, %2$L)
+        ON CONFLICT (org_key) DO NOTHING;
+      $fmt$, p_schema, v_parent_key);
+
+      EXECUTE format(
+        'SELECT id FROM %I.organization WHERE org_key = %L',
+        p_schema,
+        v_parent_key
+      )
+      INTO v_parent_id;
+    ELSE
+      v_parent_id := p_root_org_id;
+    END IF;
+
+    EXECUTE format($fmt$
+      INSERT INTO %1$I.organization (org_key, name, parent_org_id)
+      VALUES (%2$L, %2$L, %3$L)
+      ON CONFLICT (org_key) DO UPDATE
+        SET parent_org_id = COALESCE(%3$L, %1$I.organization.parent_org_id),
+            updated_at = now();
+    $fmt$, p_schema, v_org_key, v_parent_id);
+
+    EXECUTE format(
+      'SELECT id FROM %I.organization WHERE org_key = %L',
+      p_schema,
+      v_org_key
+    )
+    INTO v_org_id;
+
+    EXECUTE format($fmt$
+      INSERT INTO %1$I.user_org (user_id, org_id)
+      VALUES ($1, $2)
+      ON CONFLICT DO NOTHING;
+    $fmt$, p_schema)
+    USING p_user_id, v_org_id;
+
+    IF array_length(v_roles, 1) IS NOT NULL THEN
+      EXECUTE format($fmt$
+        INSERT INTO %1$I.role (org_id, key, name, description, updated_at)
+        SELECT $1, r, r, NULL, now()
+        FROM unnest($2::text[]) r
+        ON CONFLICT (org_id, key) DO UPDATE
+          SET updated_at = now();
+      $fmt$, p_schema)
+      USING v_org_id, v_roles;
+
+      EXECUTE format($fmt$
+        INSERT INTO %1$I.user_org_role (user_id, org_id, role_id)
+        SELECT $1, $2, r.id
+        FROM %1$I.role r
+        WHERE r.org_id = $2
+          AND r.key = ANY($3::text[])
+        ON CONFLICT DO NOTHING;
+      $fmt$, p_schema)
+      USING p_user_id, v_org_id, v_roles;
+    END IF;
+  END LOOP;
+
+  v_sql := format($fmt$
+    WITH roles_by_org AS (
+      SELECT
+        uor.user_id,
+        o.org_key,
+        array_agg(DISTINCT r.key ORDER BY r.key) AS roles
+      FROM %1$I.user_org_role uor
+      JOIN %1$I.role r
+        ON r.id = uor.role_id
+      JOIN %1$I.organization o
+        ON o.id = uor.org_id
+      WHERE uor.user_id = $1
+      GROUP BY uor.user_id, o.org_key
+    )
+    SELECT jsonb_build_object(
+      'id', u.id,
+      'auth0_sub', u.auth0_sub,
+      'email', u.email,
+      'name', u.name,
+      'memberships', COALESCE(
+        (
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'org_key', org_key,
+              'roles', roles
+            )
+          )
+          FROM roles_by_org
+        ),
+        '[]'::jsonb
+      )
+    )
+    FROM %1$I."user" u
+    WHERE u.id = $1;
+  $fmt$, p_schema);
+
+  EXECUTE v_sql USING p_user_id INTO v_user;
+  RETURN v_user;
+END;
+$$;
+
+ALTER FUNCTION ec._apply_memberships_and_permissions(text, uuid, uuid, jsonb, text[])
+    OWNER TO ec;
+
+CREATE OR REPLACE FUNCTION ec._assign_role(
+	p_schema text,
+	p_user uuid,
+	p_org uuid,
+	p_role_key text
+	)
+RETURNS void
+LANGUAGE 'plpgsql'
+VOLATILE PARALLEL UNSAFE
+AS $$
+DECLARE v_role_id uuid;
+BEGIN
+	EXECUTE format('SELECT id FROM %I.role WHERE key=%L LIMIT 1', p_schema, p_role_key)
+	INTO v_role_id;
+	IF v_role_id IS NULL THEN
+		RAISE NOTICE 'Role % not found in %', p_role_key, p_schema;
+		RETURN;
+	END IF;
+
+	EXECUTE format('INSERT INTO %I.user_org(user_id, org_id) VALUES($1,$2) ON CONFLICT DO NOTHING', p_schema)
+	USING p_user, p_org;
+
+	EXECUTE format('INSERT INTO %I.user_org_role(user_id, org_id, role_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', p_schema)
+	USING p_user, p_org, v_role_id;
+END;
+$$;
+
+ALTER FUNCTION ec._assign_role(text, uuid, uuid,  text)
+    OWNER TO ec;
 
 CREATE OR REPLACE FUNCTION ec.provision_tenant(
     p_schema text,
