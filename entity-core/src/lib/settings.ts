@@ -10,7 +10,7 @@ function required(name: string, value?: string): string {
 export const settings = {
   ENTITY_CORE_API_BASE_URL:
     process.env.NEXT_PUBLIC_ENTITY_CORE_API_BASE_URL ? ""
-  ),
+ ,
 
   AUTH0_DOMAIN: required(
     "NEXT_PUBLIC_AUTH0_DOMAIN",
