@@ -77,60 +77,66 @@ function OnboardingInner() {
     };
 
     const submit = async () => {
-        try {
-            setError(null);
+  try {
+    setError(null);
 
-            if (!sessionToken) {
-                setError("Missing session token.");
-                return;
-            }
+    if (!sessionToken) {
+      setError("Missing session token.");
+      return;
+    }
 
-            const org = orgKey.trim().toLowerCase();
-            if (!org) {
-                setError("Please enter an organization name.");
-                return;
-            }
+    const org = orgKey.trim().toLowerCase();
+    if (!org) {
+      setError("Please enter an organization name.");
+      return;
+    }
 
-            setLoading(true);
+    setLoading(true);
 
-            const body = {
-                schema: org,
-                sub: decoded?.sub,
-                email: decoded?.email,
-                name: decoded?.name || decoded?.email?.split("@")[0],
-                picture: decoded?.picture || null,
-            };
+    // 🔥 GET TOKEN HERE
+    const token = await getToken();
 
-            const provRes = await fetch(
-                `${settings.ENTITY_CORE_API_BASE_URL}/onboarding/provision_tenant`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(body),
-                }
-            );
-            if (!provRes.ok) {
-                const t = await provRes.text().catch(() => "");
-                setError(`Provision failed (${provRes.status}): ${t}`);
-                return;
-            }
-            const prov = await provRes.json();
-            // Wait for Auth0 to reflect app_metadata (roles/perms/org_id)
-            await waitForAuth0Metadata(
-                decoded?.sub,
-                prov?.app_metadata?.org_id || org
-            );
-
-            // Now ask Auth0 to re-mint tokens with claims
-            window.location.href = `https://${settings.AUTH0_DOMAIN}/continue?state=${stateParam}`;
-        } catch (err: any) {
-            console.error("[Onboarding] Error:", err);
-            setError(err.message || "Unknown error");
-        } finally {
-            setLoading(false);
-        }
+    const body = {
+      schema: org,
+      sub: decoded?.sub,
+      email: decoded?.email,
+      name: decoded?.name || decoded?.email?.split("@")[0],
+      picture: decoded?.picture || null,
     };
 
+    const provRes = await fetch(
+      `${settings.ENTITY_CORE_API_BASE_URL}/onboarding/provision_tenant`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // 🔥 THIS IS THE FIX
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!provRes.ok) {
+      const t = await provRes.text().catch(() => "");
+      setError(`Provision failed (${provRes.status}): ${t}`);
+      return;
+    }
+
+    const prov = await provRes.json();
+
+    await waitForAuth0Metadata(
+      decoded?.sub,
+      prov?.app_metadata?.org_id || org
+    );
+
+    window.location.href = `https://${settings.AUTH0_DOMAIN}/continue?state=${stateParam}`;
+  } catch (err: any) {
+    console.error("[Onboarding] Error:", err);
+    setError(err.message || "Unknown error");
+  } finally {
+    setLoading(false);
+  }
+};
     return (
         <main className="p-6 max-w-md mx-auto space-y-6">
             <h1 className="text-2xl font-bold">Create Your Organization</h1>
