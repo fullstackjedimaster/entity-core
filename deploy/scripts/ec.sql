@@ -439,170 +439,90 @@ BEGIN
 END;
 $$;
 
+-- DROP FUNCTION IF EXISTS ec.provision_tenant(text, text, text, text, text, text, text, text, jsonb, text[]);
 
-
-CREATE OR REPLACE FUNCTION ec.provision_user_and_orgs(
-  p_schema     text,
-  p_sub        text,
-  p_email      text,
-  p_name       text DEFAULT NULL,
-  p_picture    text DEFAULT NULL,
-  p_given      text DEFAULT NULL,
-  p_family     text DEFAULT NULL,
-  p_locale     text DEFAULT NULL,
-  -- memberships: [{org_key:"acme", parent_key:null, roles:["creator","editor"]}, {...}]
-  p_memberships jsonb DEFAULT '[]'::jsonb,
-  -- global permissions (schema-wide)
-  p_permissions text[] DEFAULT '{}'
+CREATE OR REPLACE FUNCTION ec.provision_tenant(
+    p_schema text,
+    p_sub text,
+    p_email text,
+    p_name text DEFAULT NULL::text,
+    p_picture text DEFAULT NULL::text,
+    p_given text DEFAULT NULL::text,
+    p_family text DEFAULT NULL::text,
+    p_locale text DEFAULT 'en'::text,
+    p_memberships jsonb DEFAULT '[]'::jsonb,
+    p_permissions text[] DEFAULT '{}'::text[]
 )
 RETURNS jsonb
 LANGUAGE plpgsql
-SECURITY DEFINER
+VOLATILE SECURITY DEFINER PARALLEL UNSAFE
 AS $$
 DECLARE
+  v_root_org_id uuid;
   v_user_id uuid;
-  v_sql text;
   v_user jsonb;
-  v_org_key text;
-  v_parent_key text;
-  v_roles text[];
-  v_org_id uuid;
-  v_parent_id uuid;
-  v_root_id uuid;
-  v_item jsonb;
 BEGIN
-  p_schema := coalesce(nullif(trim(p_schema), ''), 'public');
+  -- 1️⃣ Normalize schema key
+  p_schema := lower(trim(coalesce(p_schema, 'public')));
   p_email  := lower(p_email);
 
-  -- 1) Ensure schema
+  -- 2️⃣ Ensure schema exists
   EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION CURRENT_USER', p_schema);
 
-  -- 2) Ensure root org (org_key = schema)
-  EXECUTE format($fmt$
+  -- 3️⃣ Ensure baseline tables
+  PERFORM ec._ensure_tenant_tables(p_schema);
+
+  -- 4️⃣ Seed baseline roles and permissions
+  PERFORM ec._seed_roles_and_permissions(p_schema);
+
+  -- 5️⃣ Root organization
+  EXECUTE format($org$
     INSERT INTO %1$I.organization (org_key, name)
     VALUES (%2$L, %2$L)
     ON CONFLICT (org_key) DO NOTHING;
-  $fmt$, p_schema, p_schema);
+  $org$, p_schema, p_schema);
 
-  -- Lookup root id
-  EXECUTE format('SELECT id FROM %I.organization WHERE org_key = %L', p_schema, p_schema)
-  INTO v_root_id;
+  EXECUTE format('SELECT id FROM %I.organization WHERE org_key=%L', p_schema, p_schema)
+    INTO v_root_org_id;
 
-  -- 3) Upsert user (no org coupling here)
-  v_sql := format($fmt$
+  -- 6️⃣ Upsert initial user
+  EXECUTE format($usr$
     INSERT INTO %1$I."user" (auth0_sub, email, name, picture_url, given_name, family_name, locale, last_login_at, updated_at)
-    VALUES ($1,$2,$3,$4,$5,$6,$7, now(), now())
-    ON CONFLICT (auth0_sub) DO UPDATE
-      SET email=$2, name=$3, picture_url=$4, given_name=$5, family_name=$6, locale=$7, last_login_at=now(), updated_at=now()
+    VALUES ($1,$2,$3,$4,$5,$6,$7,now(),now())
+    ON CONFLICT (auth0_sub)
+      DO UPDATE SET email=$2, name=$3, picture_url=$4, given_name=$5, family_name=$6, locale=$7, last_login_at=now(), updated_at=now()
     RETURNING id;
-  $fmt$, p_schema);
-  EXECUTE v_sql
-    USING p_sub, p_email, p_name, p_picture, p_given, p_family, p_locale
-    INTO v_user_id;
+  $usr$, p_schema)
+  USING p_sub, p_email, p_name, p_picture, p_given, p_family, p_locale
+  INTO v_user_id;
 
-  -- 4) Global permission upserts (schema-wide)
-  IF array_length(p_permissions,1) IS NOT NULL THEN
-    EXECUTE format($fmt$
-      INSERT INTO %1$I.permission (key, description, updated_at)
-      SELECT DISTINCT p, NULL, now() FROM unnest($1::text[]) p
-      ON CONFLICT (key) DO UPDATE SET updated_at=now();
-    $fmt$, p_schema)
-    USING p_permissions;
-  END IF;
+  -- 7️⃣ Assign creator role to root org
+  PERFORM ec._assign_role(p_schema, v_user_id, v_root_org_id, 'creator');
 
-  -- 5) Iterate memberships (orgs + roles)
-  FOR v_item IN SELECT * FROM jsonb_array_elements(coalesce(p_memberships,'[]'::jsonb))
-  LOOP
-    v_org_key    := coalesce((v_item->>'org_key'), p_schema); -- default root
-    v_parent_key := NULLIF(trim(v_item->>'parent_key'), '');
-    v_roles      := ARRAY(SELECT jsonb_array_elements_text(coalesce(v_item->'roles','[]'::jsonb)));
+  -- 8️⃣ Apply extended memberships and permissions (from Auth0)
+  v_user := ec._apply_memberships_and_permissions(
+      p_schema,
+      v_user_id,
+      v_root_org_id,
+      p_memberships,
+      p_permissions
+  );
 
-    -- 5.1 Ensure parent org first (if any)
-    IF v_parent_key IS NOT NULL THEN
-      -- upsert parent
-      EXECUTE format($fmt$
-        INSERT INTO %1$I.organization (org_key, name)
-        VALUES (%2$L, %2$L)
-        ON CONFLICT (org_key) DO NOTHING;
-      $fmt$, p_schema, v_parent_key);
-      EXECUTE format('SELECT id FROM %I.organization WHERE org_key = %L', p_schema, v_parent_key)
-      INTO v_parent_id;
-    ELSE
-      v_parent_id := v_root_id;
-    END IF;
-
-    -- 5.2 Upsert org and set its parent (if new)
-    EXECUTE format($fmt$
-      INSERT INTO %1$I.organization (org_key, name, parent_org_id)
-      VALUES (%2$L, %2$L, %3$L)
-      ON CONFLICT (org_key) DO UPDATE
-        SET parent_org_id = COALESCE(%3$L, %1$I.organization.parent_org_id),
-            updated_at = now();
-    $fmt$, p_schema, v_org_key, v_parent_id);
-
-    EXECUTE format('SELECT id FROM %I.organization WHERE org_key = %L', p_schema, v_org_key)
-    INTO v_org_id;
-
-    -- 5.3 Ensure membership (user ↔ org)
-    EXECUTE format($fmt$
-      INSERT INTO %1$I.user_org (user_id, org_id)
-      VALUES ($1, $2)
-      ON CONFLICT DO NOTHING;
-    $fmt$, p_schema)
-    USING v_user_id, v_org_id;
-
-    -- 5.4 Upsert roles for this org
-    IF array_length(v_roles,1) IS NOT NULL THEN
-      EXECUTE format($fmt$
-        INSERT INTO %1$I.role (org_id, key, name, description, updated_at)
-        SELECT $1, r, r, NULL, now() FROM unnest($2::text[]) r
-        ON CONFLICT (org_id, key) DO UPDATE SET updated_at=now();
-      $fmt$, p_schema)
-      USING v_org_id, v_roles;
-
-      -- 5.5 Link user ↔ org ↔ roles (many)
-      EXECUTE format($fmt$
-        INSERT INTO %1$I.user_org_role (user_id, org_id, role_id)
-        SELECT $1, $2, r.id
-          FROM %1$I.role r
-         WHERE r.org_id = $2 AND r.key = ANY($3::text[])
-        ON CONFLICT DO NOTHING;
-      $fmt$, p_schema)
-      USING v_user_id, v_org_id, v_roles;
-    END IF;
-
-    -- 5.6 (Optional) Map new roles to global permissions if you like:
-    -- INSERT INTO :"app_schema".role_permission ...
-  END LOOP;
-
-  -- 6) Return full user row JSON
-  v_sql := format($fmt$
-    WITH roles_by_org AS (
-      SELECT uor.user_id, o.org_key, array_agg(DISTINCT r.key ORDER BY r.key) AS roles
-        FROM %1$I.user_org_role uor
-        JOIN %1$I.role r ON r.id = uor.role_id
-        JOIN %1$I.organization o ON o.id = uor.org_id
-       GROUP BY uor.user_id, o.org_key
-    )
-    SELECT jsonb_build_object(
-      'id', u.id,
-      'auth0_sub', u.auth0_sub,
-      'email', u.email,
-      'name', u.name,
-      'memberships', COALESCE(
-        (SELECT jsonb_agg(jsonb_build_object('org_key', org_key, 'roles', roles))
-           FROM roles_by_org rb WHERE rb.user_id = u.id),
-        '[]'::jsonb
-      )
-    )
-    FROM %1$I."user" u
-   WHERE u.id = $1;
-  $fmt$, p_schema);
-
-  EXECUTE v_sql USING v_user_id INTO v_user;
-  RETURN v_user;
+  -- 9️⃣ Return unified summary
+  RETURN jsonb_build_object(
+    'schema', p_schema,
+    'root_org_id', v_root_org_id,
+    'user_id', v_user_id,
+    'user', v_user,
+    'status', 'initialized'
+  );
 END;
 $$;
+
+ALTER FUNCTION ec.provision_tenant(text, text, text, text, text, text, text, text, jsonb, text[])
+    OWNER TO postgres;
+
+
 
 CREATE OR REPLACE FUNCTION ec.create_entity_from_template(_schema TEXT, _entity TEXT, _template JSONB )
 RETURNS VOID
