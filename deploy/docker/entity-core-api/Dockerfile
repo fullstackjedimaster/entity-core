@@ -12,13 +12,15 @@ RUN set -eux; \
     ; \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /entity-core-api
 
-COPY ./entity-core-api/requirements.txt /app/requirements.txt
+RUN useradd -m -u 1001 -s /usr/sbin/nologin appuser
+
+COPY --from=repo entity-core-api/requirements.txt /entity-core-api/requirements.txt
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
- && python -m pip install --no-cache-dir -r /app/requirements.txt
+ && python -m pip install --no-cache-dir -r /entity-core-api/requirements.txt
 
-COPY ./entity-core-api /app
+COPY --from=repo entity-core-api/ /entity-core-api/
 
 EXPOSE 8005
 
