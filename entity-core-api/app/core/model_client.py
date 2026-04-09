@@ -40,7 +40,6 @@ def _build_internal_service_token() -> str:
     payload = {
         "iss": "entity-core",
         "sub": "entity-core",
-        "aud": "entity-server-internal",
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=5)).timestamp()),
     }
