@@ -76,7 +76,7 @@ function OnboardingInner() {
         return false;
     };
 
-    const submit = async () => {
+  const submit = async () => {
   try {
     setError(null);
 
@@ -93,9 +93,6 @@ function OnboardingInner() {
 
     setLoading(true);
 
-    // 🔥 GET TOKEN HERE
-    const token = await getToken();
-
     const body = {
       schema: org,
       sub: decoded?.sub,
@@ -110,7 +107,7 @@ function OnboardingInner() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // 🔥 THIS IS THE FIX
+          "X-Onboarding-Token": sessionToken, // ✅ THIS is the key change
         },
         body: JSON.stringify(body),
       }

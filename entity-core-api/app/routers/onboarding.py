@@ -12,12 +12,35 @@ from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
 from app.schemas import RequestEnvelope
 
+from jose import jwt, JWTError
+
+
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
 
 def _stripped(v: Optional[str]) -> str:
     return (v or "").strip()
 
+
+
+def verify_onboarding_token(request: Request) -> dict:
+    token = request.headers.get("X-Onboarding-Token")
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing onboarding token")
+
+    secret = env("AUTH0_REDIRECT_SECRET", required=True)
+
+    try:
+        payload = jwt.decode(
+            token,
+            secret,
+            algorithms=["HS256"],
+        )
+        return payload
+
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid onboarding token: {e}")
 
 def _extract_bearer_token(request: Request) -> str:
     auth_header = request.headers.get("Authorization")
@@ -62,7 +85,7 @@ async def provision_tenant(
     initial_roles = payload.get("roles") or ["creator"]
     initial_perms = payload.get("permissions") or ["crud:read", "crud:write", "crud:delete"]
 
-    token = _extract_bearer_token(request)
+    claims = verify_onboarding_token(request)
 
     # ---- DB call via entity-server --------------------------------------------
     envelope = RequestEnvelope(
@@ -84,7 +107,7 @@ async def provision_tenant(
         meta={"source": "entity-core:/onboarding/provision_tenant"},
     )
 
-    data: Dict[str, Any] = await call_model_manage(envelope, token=token)
+    data: Dict[str, Any] = await call_model_manage(envelope)
 
     if not data.get("ok", False):
         raise HTTPException(
