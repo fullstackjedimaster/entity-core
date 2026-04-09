@@ -36,8 +36,7 @@ def _extract_bearer_token(request: Request) -> str:
 @router.post("/provision_tenant")
 async def provision_tenant(
     payload: Dict[str, Any],
-    request: Request,
-    _claims: Dict[str, Any] = Depends(require_jwt([])),
+    request: Request
 ):
     """
     Provision a new tenant schema/org and seed the requesting user as creator.
