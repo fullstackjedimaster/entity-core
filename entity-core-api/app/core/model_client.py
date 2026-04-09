@@ -76,4 +76,4 @@ async def call_model_manage(
     """
     POST a RequestEnvelope to ec-model's /api/manage endpoint.
     """
-    return await _post("/api/manage", envelope.model_dump(), token)
+    return await _post("/api/manage", envelope.model_dump(),token)
