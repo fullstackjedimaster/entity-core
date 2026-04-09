@@ -12,7 +12,7 @@ from app.schemas import RequestEnvelope
 # Base URL for the ec-model service, e.g.:
 #   http://localhost:8001
 #   https://ec-model.fullstackjedi.dev
-EC_MODEL_BASE_URL = env("EC_MODEL_BASE_URL") or "http://localhost:8001"
+EC_MODEL_BASE_URL = env("EC_MODEL_BASE_URL") or "http://localhost:8003"
 
 
 def _build_url(path: str) -> str:

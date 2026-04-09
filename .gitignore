@@ -1,12 +1,12 @@
 # Python
 *.pyc
 __pycache__/
-.env
 
 # Node
 entity-core/node_modules/
 .next/
-.env.local
+node_modules/
+/node_modules/
 
 # OS
 .DS_Store
