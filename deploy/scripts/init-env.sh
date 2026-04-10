@@ -83,9 +83,6 @@ main() {
   local pg_file="${ENV_DIR}/postgres.env"
   local api_file="${ENV_DIR}/entity-core-api.env"
 
-  # ------------------------------------------------------------
-  # Read current values after copy
-  # ------------------------------------------------------------
   local host port
   local admin_db admin_user admin_pass
   local app_db app_user app_pass
@@ -107,9 +104,6 @@ main() {
   app_db="${app_db:-ec}"
   app_user="${app_user:-ec}"
 
-  # ------------------------------------------------------------
-  # Bootstrap/admin password may be generated
-  # ------------------------------------------------------------
   if is_placeholder "$admin_pass"; then
     admin_pass="$(gen_secret)"
     log "Generated bootstrap/admin POSTGRES_PASSWORD"
@@ -117,16 +111,10 @@ main() {
     log "Using existing bootstrap/admin POSTGRES_PASSWORD from postgres.env.example"
   fi
 
-  # ------------------------------------------------------------
-  # App/ec password must remain stable and come from API env example
-  # ------------------------------------------------------------
   if is_placeholder "$app_pass"; then
     err "entity-core-api.env.example must define a stable POSTGRES_PASSWORD for the ec app user (not CHANGE_ME...)."
   fi
 
-  # ------------------------------------------------------------
-  # Sync postgres.env from API app creds
-  # ------------------------------------------------------------
   replace_key "$pg_file" "POSTGRES_HOST" "$host"
   replace_key "$pg_file" "POSTGRES_PORT" "$port"
   replace_key "$pg_file" "POSTGRES_DB" "$admin_db"
@@ -137,29 +125,26 @@ main() {
   replace_key "$pg_file" "APP_POSTGRES_USER" "$app_user"
   replace_key "$pg_file" "APP_POSTGRES_PASSWORD" "$app_pass"
 
-  # ------------------------------------------------------------
-  # Normalize/sync API env DB values
-  # ------------------------------------------------------------
   replace_key "$api_file" "POSTGRES_HOST" "$host"
   replace_key "$api_file" "POSTGRES_PORT" "$port"
   replace_key "$api_file" "POSTGRES_DB" "$app_db"
   replace_key "$api_file" "POSTGRES_USER" "$app_user"
   replace_key "$api_file" "POSTGRES_PASSWORD" "$app_pass"
 
-  # ------------------------------------------------------------
-  # Deterministic DSNs
-  # ------------------------------------------------------------
-  local admin_dsn
+  local postgres_dsn
   local app_dsn
 
-  admin_dsn="postgresql://${admin_user}:${admin_pass}@${host}:${port}/${admin_db}?sslmode=disable"
+  postgres_dsn="postgresql://${admin_user}:${admin_pass}@${host}:${port}/${admin_db}?sslmode=disable"
   app_dsn="postgresql://${app_user}:${app_pass}@${host}:${port}/${app_db}?sslmode=disable"
 
-  replace_key "$pg_file" "DATABASE_URL" "$admin_dsn"
+  replace_key "$pg_file" "POSTGRES_DATABASE_URL" "$postgres_dsn"
   replace_key "$pg_file" "APP_DATABASE_URL" "$app_dsn"
+
+  # Keep API env explicit and app-only.
+  replace_key "$api_file" "APP_DATABASE_URL" "$app_dsn"
   replace_key "$api_file" "DATABASE_URL" "$app_dsn"
 
-  log "Wrote admin/app DATABASE_URL values deterministically"
+  log "Wrote POSTGRES_DATABASE_URL and APP_DATABASE_URL deterministically"
   log "Synced stable ec password from entity-core-api.env.example into postgres.env"
   log "Environment initialization complete ✔"
 }

@@ -23,49 +23,57 @@ You can also set SQL_FILE explicitly."
 fi
 
 # -------------------------------------------------------------------
-# Admin/bootstrap connection (must exist before app DB/user are created)
+# Bootstrap/admin connection inputs
 # -------------------------------------------------------------------
-DATABASE_URL="${DATABASE_URL:-}"
-POSTGRES_HOST="${POSTGRES_HOST:-${DATABASE_HOST:-}}"
+POSTGRES_HOST="${POSTGRES_HOST:-${DATABASE_HOST:-postgres}}"
 POSTGRES_PORT="${POSTGRES_PORT:-${DATABASE_PORT:-5432}}"
 POSTGRES_DB="${POSTGRES_DB:-postgres}"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
 
 # -------------------------------------------------------------------
-# App connection targets (what entity-core will actually use)
+# App connection inputs
 # -------------------------------------------------------------------
 APP_POSTGRES_DB="${APP_POSTGRES_DB:-ec}"
 APP_POSTGRES_USER="${APP_POSTGRES_USER:-ec}"
-APP_POSTGRES_PASSWORD="${APP_POSTGRES_PASSWORD:-${POSTGRES_PASSWORD:-}}"
+APP_POSTGRES_PASSWORD="${APP_POSTGRES_PASSWORD:-}"
 
-if [[ -z "$DATABASE_URL" ]]; then
+# Explicit DSNs only. No shared/ambiguous DATABASE_URL.
+POSTGRES_DATABASE_URL="${POSTGRES_DATABASE_URL:-}"
+APP_DATABASE_URL="${APP_DATABASE_URL:-}"
+
+if [[ -z "$POSTGRES_DATABASE_URL" ]]; then
   : "${POSTGRES_HOST:?POSTGRES_HOST is required}"
   : "${POSTGRES_PORT:?POSTGRES_PORT is required}"
   : "${POSTGRES_DB:?POSTGRES_DB is required}"
   : "${POSTGRES_USER:?POSTGRES_USER is required}"
   : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
 
-  export PGPASSWORD="$POSTGRES_PASSWORD"
-  DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable"
-else
-  export PGPASSWORD="${POSTGRES_PASSWORD:-}"
+  POSTGRES_DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable"
 fi
 
-APP_DATABASE_URL="${APP_DATABASE_URL:-postgresql://${APP_POSTGRES_USER}:${APP_POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${APP_POSTGRES_DB}?sslmode=disable}"
+if [[ -z "$APP_DATABASE_URL" ]]; then
+  : "${POSTGRES_HOST:?POSTGRES_HOST is required}"
+  : "${POSTGRES_PORT:?POSTGRES_PORT is required}"
+  : "${APP_POSTGRES_DB:?APP_POSTGRES_DB is required}"
+  : "${APP_POSTGRES_USER:?APP_POSTGRES_USER is required}"
+  : "${APP_POSTGRES_PASSWORD:?APP_POSTGRES_PASSWORD is required}"
+
+  APP_DATABASE_URL="postgresql://${APP_POSTGRES_USER}:${APP_POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${APP_POSTGRES_DB}?sslmode=disable"
+fi
 
 WAIT_RETRIES="${WAIT_RETRIES:-60}"
 WAIT_SECONDS="${WAIT_SECONDS:-2}"
 RESET_EC_SCHEMA="${RESET_EC_SCHEMA:-0}"
 
-log "Using admin DATABASE_URL=$DATABASE_URL"
-log "Using app   APP_DATABASE_URL=$APP_DATABASE_URL"
+log "Using POSTGRES_DATABASE_URL=$POSTGRES_DATABASE_URL"
+log "Using APP_DATABASE_URL=$APP_DATABASE_URL"
 log "Using SQL_FILE=$SQL_FILE"
-log "Waiting for Postgres admin connection..."
+log "Waiting for Postgres bootstrap/admin connection..."
 
 ready=0
 for ((i=1; i<=WAIT_RETRIES; i++)); do
-  if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT 1" >/dev/null 2>&1; then
+  if PGPASSWORD="$POSTGRES_PASSWORD" psql "$POSTGRES_DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT 1" >/dev/null 2>&1; then
     ready=1
     break
   fi
@@ -73,12 +81,12 @@ for ((i=1; i<=WAIT_RETRIES; i++)); do
 done
 
 if [[ "$ready" -ne 1 ]]; then
-  err "Postgres never became ready for admin connection."
+  err "Postgres never became ready for bootstrap/admin connection."
 fi
 
 log "Ensuring app role/database exist: role=${APP_POSTGRES_USER}, db=${APP_POSTGRES_DB}"
 
-psql "$DATABASE_URL" \
+PGPASSWORD="$POSTGRES_PASSWORD" psql "$POSTGRES_DATABASE_URL" \
   -v ON_ERROR_STOP=1 \
   --set=app_db="$APP_POSTGRES_DB" \
   --set=app_user="$APP_POSTGRES_USER" \
