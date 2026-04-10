@@ -27,7 +27,7 @@ services:
     image: entity-core-api/bootstrap:local
     env_file:
       - ./env/postgres.env
-      - ./env/entity-core-api.env
+
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,7 +48,7 @@ services:
     image: entity-core-api:local
     env_file:
       - ./env/entity-core-api.env
-      - ./env/postgres.env
+
     depends_on:
       bootstrap:
         condition: service_completed_successfully
