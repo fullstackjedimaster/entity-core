@@ -14,7 +14,7 @@ from app.schemas import RequestEnvelope
 
 from jose import jwt, JWTError
 
-
+AUTH0_REDIRECT_SECRET = env("AUTH0_REDIRECT_SECRET", required=True)
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
 
@@ -29,7 +29,7 @@ def verify_onboarding_token(request: Request) -> dict:
     if not token:
         raise HTTPException(status_code=401, detail="Missing onboarding token")
 
-    secret = env("AUTH0_REDIRECT_SECRET", required=True)
+    secret = AUTH0_REDIRECT_SECRET
 
     try:
         payload = jwt.decode(
