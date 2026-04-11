@@ -24,8 +24,9 @@ echo "[up] Starting stack"
 docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml up -d entity-core-postgres
 
 
-echo "[up] Waiting for postgres..."
-until docker exec entity-core-postgres pg_isready -U postgres >/dev/null 2>&1; do
+
+until PGPASSWORD="$POSTGRES_PASSWORD" psql "$POSTGRES_DATABASE_URL" -c "SELECT 1" >/dev/null 2>&1; do
+  echo "[up] Waiting for real Postgres readiness..."
   sleep 1
 done
 

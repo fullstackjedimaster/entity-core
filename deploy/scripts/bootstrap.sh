@@ -6,7 +6,7 @@ log() { echo -e "\033[1;32m[bootstrap] $*\033[0m"; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-POSTGRES_HOST="${POSTGRES_HOST:-entity-core-postgres}"
+POSTGRES_HOST=localhost
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 POSTGRES_DB="${POSTGRES_DB:-postgres}"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
