@@ -16,11 +16,10 @@ WORKDIR /entity-core-api
 
 RUN useradd -m -u 1001 -s /usr/sbin/nologin appuser
 
-COPY --from=repo entity-core-api/requirements.txt /entity-core-api/requirements.txt
+COPY entity-core-api/ /entity-core-api/
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
  && python -m pip install --no-cache-dir -r /entity-core-api/requirements.txt
 
-COPY --from=repo entity-core-api/ /entity-core-api/
 
 EXPOSE 8004
 
