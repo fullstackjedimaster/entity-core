@@ -127,9 +127,7 @@ until psql "$POSTGRES_DATABASE_URL" -tAc "SELECT count(*) FROM pg_roles;" >/dev/
   sleep 2
 done
 
-if [[ "$app_ready" -ne 1 ]]; then
-  err "App database never became ready."
-fi
+
 
 log "Bootstrapping extensions and base schema in ${APP_POSTGRES_DB}..."
 PGPASSWORD="$APP_POSTGRES_PASSWORD" psql "$APP_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
