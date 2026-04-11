@@ -40,7 +40,7 @@ services:
       - -lc
       - |
         set -euxo pipefail
-        /scripts/bootstrap.sh
+        /scripts/init-postgres.sh
     restart: "no"
     networks:
       - shared-net
@@ -56,12 +56,6 @@ services:
     depends_on:
       bootstrap:
         condition: service_completed_successfully
-    command:
-      - bash
-      - -lc
-      - |
-        set -euxo pipefail
-        /scripts/init-postgres.sh
     restart: unless-stopped
     ports:
       - "127.0.0.1:8004:8004"
