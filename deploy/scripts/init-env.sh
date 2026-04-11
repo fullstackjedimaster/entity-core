@@ -93,9 +93,9 @@ main() {
   admin_user="$(get_key "$pg_file" "POSTGRES_USER")"
   admin_pass="$(get_key "$pg_file" "POSTGRES_PASSWORD")"
 
-  app_db="$(get_key "$api_file" "POSTGRES_DB")"
-  app_user="$(get_key "$api_file" "POSTGRES_USER")"
-  app_pass="$(get_key "$api_file" "POSTGRES_PASSWORD")"
+  app_db="$(get_key "$api_file" "APP_POSTGRES_DB")"
+  app_user="$(get_key "$api_file" "APP_POSTGRES_USER")"
+  app_pass="$(get_key "$api_file" "APP_POSTGRES_PASSWORD")"
 
   host="${host:-postgres}"
   port="${port:-5432}"
