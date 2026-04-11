@@ -1,25 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Resolve deploy dir from this script's location
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# hard pin compose identity
 COMPOSE_PROJECT_NAME="$(basename "$(dirname "$DEPLOY_DIR")")"
 
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
-
 docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml down -v --remove-orphans
 
 echo "[up] Generating env + secrets"
-bash -x "$DEPLOY_DIR/scripts/init-env.sh"
-bash -x "$DEPLOY_DIR/scripts/bootstrap.sh"
+bash "$DEPLOY_DIR/scripts/init-env.sh"
 
-docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml  build --no-cache
+echo "[up] Loading env into shell"
+set -a
+source "$DEPLOY_DIR/env/postgres.env"
+source "$DEPLOY_DIR/env/entity-core-api.env"
+set +a
 
-echo "[up] Building + starting stack"
-docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml  up -d --force-recreate --renew-anon-volumes --remove-orphans
+docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml build
+
+echo "[up] Starting stack"
+docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml up -d entity-core-postgres
+
+
+echo "[up] Waiting for postgres..."
+until docker exec entity-core-postgres pg_isready -U postgres >/dev/null 2>&1; do
+  sleep 1
+done
+
+echo "[up] Running bootstrap (host-side)"
+bash "$DEPLOY_DIR/scripts/bootstrap.sh"
+
+
+docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml up -d --build
 
 echo "[up] Done"
