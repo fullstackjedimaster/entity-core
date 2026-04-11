@@ -116,14 +116,15 @@ WHERE NOT EXISTS (
 )\gexec
 SQL
 
-log "Waiting for app database connection..."
-app_ready=0
-for ((i=1; i<=WAIT_RETRIES; i++)); do
-  if PGPASSWORD="$APP_POSTGRES_PASSWORD" psql "$APP_DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT 1" >/dev/null 2>&1; then
-    app_ready=1
-    break
-  fi
-  sleep "$WAIT_SECONDS"
+until psql "$POSTGRES_DATABASE_URL" -c "SELECT 1" >/dev/null 2>&1; do
+  echo "Waiting for fully initialized Postgres..."
+  sleep 2
+done
+
+# Wait until pg_catalog is stable
+until psql "$POSTGRES_DATABASE_URL" -tAc "SELECT count(*) FROM pg_roles;" >/dev/null 2>&1; do
+  echo "Waiting for system catalogs..."
+  sleep 2
 done
 
 if [[ "$app_ready" -ne 1 ]]; then
