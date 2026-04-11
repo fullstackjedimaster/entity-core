@@ -1,8 +1,13 @@
 name: entity-core
 
+networks:
+  shared-net:
+    external: true
+
 services:
   postgres:
     image: postgres:16
+    container_name: entity-core-postgres
     tmpfs:
       - /var/lib/postgresql/data
     env_file:
@@ -17,17 +22,16 @@ services:
       interval: 2s
       timeout: 3s
       retries: 60
+    networks:
+      - shared-net
 
   bootstrap:
     build:
-      context: .
-      dockerfile: docker/bootstrap/Dockerfile
-      additional_contexts:
-        repo: ..
+      context: ..
+      dockerfile: deploy/docker/bootstrap/Dockerfile
     image: entity-core-api/bootstrap:local
     env_file:
       - ./env/postgres.env
-
     depends_on:
       postgres:
         condition: service_healthy
@@ -38,13 +42,13 @@ services:
         set -euxo pipefail
         /scripts/init-postgres.sh
     restart: "no"
+    networks:
+      - shared-net
 
   entity-core-api:
     build:
-      context: .
-      dockerfile: docker/entity-core-api/Dockerfile
-      additional_contexts:
-        repo: ..
+      context: ..
+      dockerfile: deploy/docker/entity-core-api/Dockerfile
     image: entity-core-api:local
     env_file:
       - ./env/entity-core-api.env
@@ -54,11 +58,13 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8004:8004"
+    networks:
+      - shared-net
 
   entity-core:
     build:
-      context: .
-      dockerfile: docker/entity-core/Dockerfile
+      context: ..
+      dockerfile: deploy/docker/entity-core/Dockerfile
       args:
         NEXT_PUBLIC_ENTITY_CORE_API_BASE_URL: "https://entity-core.fullstackjedi.dev/api"
         NEXT_PUBLIC_AUTH0_DOMAIN: "dev-gttnobig6h3trkvm.us.auth0.com"
@@ -68,11 +74,11 @@ services:
         NEXT_PUBLIC_AUTH0_SCOPE: "openid profile email crud:read crud:create crud:update crud:delete offline_access"
         NEXT_PUBLIC_AUTH0_REDIRECT_URI: "https://entity-core.fullstackjedi.dev/callback"
         NEXT_PUBLIC_DISABLE_AUTH: "false"
-      additional_contexts:
-        repo: ..
     image: entity-core:local
     env_file:
       - ./env/entity-core.env
     restart: unless-stopped
     ports:
       - "127.0.0.1:3006:3006"
+    networks:
+      - shared-net
