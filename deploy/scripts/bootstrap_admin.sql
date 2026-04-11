@@ -1,0 +1,13 @@
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ec') THEN
+    CREATE ROLE ec LOGIN PASSWORD '5R8BirEpENNOISGJl8qEG-fgMAGyX6J3vhJ9bh_rkZ-75_wsyr1fEaY7xLuPfTNL';
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ec') THEN
+    CREATE DATABASE ec OWNER ec;
+  END IF;
+END $$;

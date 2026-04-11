@@ -63,7 +63,7 @@ if [[ -z "$APP_DATABASE_URL" ]]; then
 fi
 
 WAIT_RETRIES="${WAIT_RETRIES:-60}"
-WAIT_SECONDS="${WAIT_SECONDS:-2}"
+WAIT_SECONDS="${WAIT_SECONDS:-2}"-
 RESET_EC_SCHEMA="${RESET_EC_SCHEMA:-0}"
 
 log "Using POSTGRES_DATABASE_URL=$POSTGRES_DATABASE_URL"
@@ -86,65 +86,8 @@ fi
 
 log "Ensuring app role/database exist: role=${APP_POSTGRES_USER}, db=${APP_POSTGRES_DB}"
 
-PGPASSWORD="$POSTGRES_PASSWORD" psql "$POSTGRES_DATABASE_URL" \
-  -v ON_ERROR_STOP=1 \
-  --set=app_db="$APP_POSTGRES_DB" \
-  --set=app_user="$APP_POSTGRES_USER" \
-  --set=app_password="$APP_POSTGRES_PASSWORD" <<'SQL'
-SELECT format(
-  'CREATE ROLE %I LOGIN PASSWORD %L',
-  :'app_user',
-  :'app_password'
-)
-WHERE NOT EXISTS (
-  SELECT 1 FROM pg_roles WHERE rolname = :'app_user'
-)\gexec
+psql "$POSTGRES_DATABASE_URL" -f /scripts/bootstrap_admin.sql
+psql "$APP_DATABASE_URL" -f /scripts/ec.sql
 
-SELECT format(
-  'ALTER ROLE %I WITH LOGIN PASSWORD %L',
-  :'app_user',
-  :'app_password'
-)\gexec
-
-SELECT format(
-  'CREATE DATABASE %I OWNER %I',
-  :'app_db',
-  :'app_user'
-)
-WHERE NOT EXISTS (
-  SELECT 1 FROM pg_database WHERE datname = :'app_db'
-)\gexec
-SQL
-
-until psql "$POSTGRES_DATABASE_URL" -c "SELECT 1" >/dev/null 2>&1; do
-  echo "Waiting for fully initialized Postgres..."
-  sleep 2
-done
-
-# Wait until pg_catalog is stable
-until psql "$POSTGRES_DATABASE_URL" -tAc "SELECT count(*) FROM pg_roles;" >/dev/null 2>&1; do
-  echo "Waiting for system catalogs..."
-  sleep 2
-done
-
-
-
-log "Bootstrapping extensions and base schema in ${APP_POSTGRES_DB}..."
-PGPASSWORD="$APP_POSTGRES_PASSWORD" psql "$APP_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE SCHEMA IF NOT EXISTS ec;
-SQL
-
-
-  log " dropping and recreating ec schema..."
-PGPASSWORD="$APP_POSTGRES_PASSWORD" psql "$APP_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
-DROP SCHEMA IF EXISTS ec CASCADE;
-CREATE SCHEMA ec;
-SQL
-
-
-log "Applying $SQL_FILE ..."
-PGPASSWORD="$APP_POSTGRES_PASSWORD" psql "$APP_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$SQL_FILE"
 
 log "Done."
