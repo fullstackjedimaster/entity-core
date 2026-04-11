@@ -27,9 +27,7 @@ fi
 # -------------------------------------------------------------------
 POSTGRES_HOST="${POSTGRES_HOST:-${DATABASE_HOST:-postgres}}"
 POSTGRES_PORT="${POSTGRES_PORT:-${DATABASE_PORT:-5432}}"
-POSTGRES_DB="${POSTGRES_DB:-postgres}"
-POSTGRES_USER="${POSTGRES_USER:-postgres}"
-POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
+
 
 # -------------------------------------------------------------------
 # App connection inputs
@@ -38,19 +36,7 @@ APP_POSTGRES_DB="${APP_POSTGRES_DB:-ec}"
 APP_POSTGRES_USER="${APP_POSTGRES_USER:-ec}"
 APP_POSTGRES_PASSWORD="${APP_POSTGRES_PASSWORD:-}"
 
-# Explicit DSNs only. No shared/ambiguous DATABASE_URL.
-POSTGRES_DATABASE_URL="${POSTGRES_DATABASE_URL:-}"
 APP_DATABASE_URL="${APP_DATABASE_URL:-}"
-
-if [[ -z "$POSTGRES_DATABASE_URL" ]]; then
-  : "${POSTGRES_HOST:?POSTGRES_HOST is required}"
-  : "${POSTGRES_PORT:?POSTGRES_PORT is required}"
-  : "${POSTGRES_DB:?POSTGRES_DB is required}"
-  : "${POSTGRES_USER:?POSTGRES_USER is required}"
-  : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
-
-  POSTGRES_DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable"
-fi
 
 if [[ -z "$APP_DATABASE_URL" ]]; then
   : "${POSTGRES_HOST:?POSTGRES_HOST is required}"
@@ -62,35 +48,14 @@ if [[ -z "$APP_DATABASE_URL" ]]; then
   APP_DATABASE_URL="postgresql://${APP_POSTGRES_USER}:${APP_POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${APP_POSTGRES_DB}?sslmode=disable"
 fi
 
-WAIT_RETRIES="${WAIT_RETRIES:-60}"
-WAIT_SECONDS="${WAIT_SECONDS:-2}"-
-RESET_EC_SCHEMA="${RESET_EC_SCHEMA:-0}"
 
-log "Using POSTGRES_DATABASE_URL=$POSTGRES_DATABASE_URL"
+
 log "Using APP_DATABASE_URL=$APP_DATABASE_URL"
 log "Using SQL_FILE=$SQL_FILE"
-log "Waiting for Postgres bootstrap/admin connection..."
 
-ready=0
-for ((i=1; i<=WAIT_RETRIES; i++)); do
-  if PGPASSWORD="$POSTGRES_PASSWORD" psql "$POSTGRES_DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT 1" >/dev/null 2>&1; then
-    ready=1
-    break
-  fi
-  sleep "$WAIT_SECONDS"
-done
 
-if [[ "$ready" -ne 1 ]]; then
-  err "Postgres never became ready for bootstrap/admin connection."
-fi
 
-log "Ensuring app role/database exist: role=${APP_POSTGRES_USER}, db=${APP_POSTGRES_DB}"
 
-psql "$POSTGRES_DATABASE_URL" \
-  -v app_user="$APP_POSTGRES_USER" \
-  -v app_password="$APP_POSTGRES_PASSWORD" \
-  -v app_db="$APP_POSTGRES_DB" \
-  -f /scripts/bootstrap_admin.sql
 psql "$APP_DATABASE_URL" -f /scripts/ec.sql
 
 

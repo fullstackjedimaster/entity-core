@@ -18,7 +18,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      test: ["CMD-SHELL", "pg_isready -U \"$${APP_POSTGRES_USER}\" -d \"$${APP_POSTGRES_DB}\""]
       interval: 2s
       timeout: 3s
       retries: 60
@@ -40,7 +40,7 @@ services:
       - -lc
       - |
         set -euxo pipefail
-        /scripts/init-postgres.sh
+        /scripts/bootstrap.sh
     restart: "no"
     networks:
       - shared-net
@@ -52,9 +52,16 @@ services:
     image: entity-core-api:local
     env_file:
       - ./env/entity-core-api.env
+      - ./env/postgres.env
     depends_on:
       bootstrap:
         condition: service_completed_successfully
+    command:
+      - bash
+      - -lc
+      - |
+        set -euxo pipefail
+        /scripts/init-postgres.sh
     restart: unless-stopped
     ports:
       - "127.0.0.1:8004:8004"
