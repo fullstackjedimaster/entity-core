@@ -48,7 +48,6 @@ services:
     image: entity-core-api:local
     env_file:
       - ./env/entity-core-api.env
-
     depends_on:
       bootstrap:
         condition: service_completed_successfully
