@@ -86,7 +86,11 @@ fi
 
 log "Ensuring app role/database exist: role=${APP_POSTGRES_USER}, db=${APP_POSTGRES_DB}"
 
-psql "$POSTGRES_DATABASE_URL" -f /scripts/bootstrap_admin.sql
+psql "$POSTGRES_DATABASE_URL" \
+  -v app_user="$APP_POSTGRES_USER" \
+  -v app_password="$APP_POSTGRES_PASSWORD" \
+  -v app_db="$APP_POSTGRES_DB" \
+  -f /scripts/bootstrap_admin.sql
 psql "$APP_DATABASE_URL" -f /scripts/ec.sql
 
 
