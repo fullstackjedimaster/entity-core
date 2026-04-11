@@ -5,10 +5,10 @@
 FROM node:22-alpine AS build
 WORKDIR /entity-core
 
-COPY --from=repo entity-core/package*.json ./
+COPY  entity-core/package*.json ./
 RUN npm ci
 
-COPY --from=repo entity-core/ ./
+COPY  entity-core/ ./
 
 RUN chmod -R a+x node_modules/.bin || true
 
