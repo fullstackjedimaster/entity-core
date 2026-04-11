@@ -25,10 +25,6 @@ docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml up -d ent
 
 
 
-until PGPASSWORD="$POSTGRES_PASSWORD" psql "$POSTGRES_DATABASE_URL" -c "SELECT 1" >/dev/null 2>&1; do
-  echo "[up] Waiting for real Postgres readiness..."
-  sleep 1
-done
 
 echo "[up] Running bootstrap (host-side)"
 bash "$DEPLOY_DIR/scripts/bootstrap.sh"
