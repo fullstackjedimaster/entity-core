@@ -20,7 +20,7 @@ RUN set -eux; \
     command -v pg_isready;
 
 # Copy deploy scripts (includes rag.sql)
-COPY scripts/ /scripts/
+COPY /deploy/scripts/ /scripts/
 RUN chmod +x /scripts/*.sh
 
 ENTRYPOINT ["/usr/bin/tini","--"]
