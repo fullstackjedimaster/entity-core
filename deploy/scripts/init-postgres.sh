@@ -136,13 +136,13 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE SCHEMA IF NOT EXISTS ec;
 SQL
 
-if [[ "$RESET_EC_SCHEMA" == "1" ]]; then
-  log "RESET_EC_SCHEMA=1, dropping and recreating ec schema..."
-  PGPASSWORD="$APP_POSTGRES_PASSWORD" psql "$APP_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+
+  log " dropping and recreating ec schema..."
+PGPASSWORD="$APP_POSTGRES_PASSWORD" psql "$APP_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
 DROP SCHEMA IF EXISTS ec CASCADE;
 CREATE SCHEMA ec;
 SQL
-fi
+
 
 log "Applying $SQL_FILE ..."
 PGPASSWORD="$APP_POSTGRES_PASSWORD" psql "$APP_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$SQL_FILE"
