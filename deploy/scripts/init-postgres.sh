@@ -25,7 +25,7 @@ fi
 # -------------------------------------------------------------------
 # Bootstrap/admin connection inputs
 # -------------------------------------------------------------------
-POSTGRES_HOST="${POSTGRES_HOST:-${DATABASE_HOST:-postgres}}"
+POSTGRES_HOST=localhost
 POSTGRES_PORT="${POSTGRES_PORT:-${DATABASE_PORT:-5432}}"
 
 

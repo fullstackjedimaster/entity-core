@@ -14,7 +14,7 @@ POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
 
 BOOTSTRAP_DATABASE_URL="${BOOTSTRAP_DATABASE_URL:-}"
 
-if [[ -z "BOOTSTRAP_DATABASE_URL" ]]; then
+if [[ -z "BOOTSTRAP_DATABASE_URL" ]]; then                                                                                                                                                                                                                                             vvvbvbbvbvbvvbnnnnnbbbbvvvvvvvv
   BOOTSTRAP_DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable"
 fi
 
