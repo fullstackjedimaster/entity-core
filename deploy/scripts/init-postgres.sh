@@ -36,7 +36,7 @@ APP_POSTGRES_DB=ec
 APP_POSTGRES_USER=ec
 APP_POSTGRES_PASSWORD=5R8BirEpENNOISGJl8qEG-fgMAGyX6J3vhJ9bh_rkZ-75_wsyr1fEaY7xLuPfTNL
 
-APP_DATABASE_URL=postgresql://ec:5R8BirEpENNOISGJl8qEG-fgMAGyX6J3vhJ9bh_rkZ-75_wsyr1fEaY7xLuPfTNL@host.docker.internal:5432/ec?sslmode=disable
+APP_DATABASE_URL=postgresql://ec:5R8BirEpENNOISGJl8qEG-fgMAGyX6J3vhJ9bh_rkZ-75_wsyr1fEaY7xLuPfTNL@localhost:5432/ec?sslmode=disable
 
 
 psql "$APP_DATABASE_URL" -f /scripts/ec.sql
