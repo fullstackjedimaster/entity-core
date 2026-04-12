@@ -26,34 +26,17 @@ fi
 # Bootstrap/admin connection inputs
 # -------------------------------------------------------------------
 POSTGRES_HOST=localhost
-POSTGRES_PORT="${POSTGRES_PORT:-${DATABASE_PORT:-5432}}"
+POSTGRES_PORT=5432
 
 
 # -------------------------------------------------------------------
 # App connection inputs
 # -------------------------------------------------------------------
-APP_POSTGRES_DB="${APP_POSTGRES_DB:-ec}"
-APP_POSTGRES_USER="${APP_POSTGRES_USER:-ec}"
-APP_POSTGRES_PASSWORD="${APP_POSTGRES_PASSWORD:-}"
+APP_POSTGRES_DB=ec
+APP_POSTGRES_USER=ec
+APP_POSTGRES_PASSWORD=5R8BirEpENNOISGJl8qEG-fgMAGyX6J3vhJ9bh_rkZ-75_wsyr1fEaY7xLuPfTNL
 
-APP_DATABASE_URL="${APP_DATABASE_URL:-}"
-
-if [[ -z "$APP_DATABASE_URL" ]]; then
-  : "${POSTGRES_HOST:?POSTGRES_HOST is required}"
-  : "${POSTGRES_PORT:?POSTGRES_PORT is required}"
-  : "${APP_POSTGRES_DB:?APP_POSTGRES_DB is required}"
-  : "${APP_POSTGRES_USER:?APP_POSTGRES_USER is required}"
-  : "${APP_POSTGRES_PASSWORD:?APP_POSTGRES_PASSWORD is required}"
-
-  APP_DATABASE_URL="postgresql://${APP_POSTGRES_USER}:${APP_POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${APP_POSTGRES_DB}?sslmode=disable"
-fi
-
-
-
-log "Using APP_DATABASE_URL=$APP_DATABASE_URL"
-log "Using SQL_FILE=$SQL_FILE"
-
-
+APP_DATABASE_URL=postgresql://ec:5R8BirEpENNOISGJl8qEG-fgMAGyX6J3vhJ9bh_rkZ-75_wsyr1fEaY7xLuPfTNL@host.docker.internal:5432/ec?sslmode=disable
 
 
 psql "$APP_DATABASE_URL" -f /scripts/ec.sql
