@@ -49,15 +49,5 @@ psql "POSTGRES_DATABASE_URL" \
 
 
 
-psql "$APP_DATABASE_URL" -c "CREATE SCHEMA IF NOT EXISTS ec AUTHORIZATION ec;"
-log  "CREATE SCHEMA IF NOT EXISTS ec AUTHORIZATION ec;"
-
-
-
-psql "$APP_DATABASE_URL" -c "ALTER ROLE ec SET search_path = ec, public;"
-log "ALTER ROLE ec SET search_path = ec, public;"
-
-log  "$APP_DATABASE_URL" -f "$DEPLOY_DIR/scripts/ec.sql"
-psql "$APP_DATABASE_URL" -f "$DEPLOY_DIR/scripts/ec.sql"
 
 log "Done."

@@ -1,3 +1,8 @@
+CREATE SCHEMA IF NOT EXISTS ec AUTHORIZATION ec;
+
+ALTER ROLE ec SET search_path = ec, public;
+
+
 CREATE TABLE IF NOT EXISTS ec.entity_config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   schema_name TEXT NOT NULL,
