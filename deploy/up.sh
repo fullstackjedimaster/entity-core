@@ -21,15 +21,8 @@ set +a
 docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml build --no-cache
 
 echo "[up] Starting stack"
-docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml up -d entity-core-postgres
+docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml up -d --force-rebuild --remove-orphans
 
 
-
-#
-#echo "[up] Running bootstrap (host-side)"
-#bash "$DEPLOY_DIR/scripts/bootstrap.sh"
-
-
-docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml up -d --build
 
 echo "[up] Done"
