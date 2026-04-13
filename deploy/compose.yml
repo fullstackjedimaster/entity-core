@@ -2,7 +2,7 @@ name: entity-core
 
 networks:
   shared-net:
-    external: true
+    driver: bridge
 
 services:
   entity-core-postgres:
@@ -39,7 +39,6 @@ services:
       - bash
       - -lc
       - |
-        set -euxo pipefail
         /scripts/bootstrap.sh
     restart: "no"
     networks:

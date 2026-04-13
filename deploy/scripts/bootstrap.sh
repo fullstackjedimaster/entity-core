@@ -10,14 +10,14 @@ POSTGRES_HOST=entity-core-postgres
 POSTGRES_PORT=5432
 POSTGRES_DB="${POSTGRES_DB:-postgres}"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
-POSTGRES_PASSWORD="Ub5ZOJU7MjR5spe5D98geul-4kKtJfBItTNyQ2e9mChRc8P6rHXG7IvhOX81PGwL"
+POSTGRES_PASSWORD="${POSTGRES_DATABASE_URL:-}"
 
 POSTGRES_DATABASE_URL="${POSTGRES_DATABASE_URL:-}"
 
-if [[ -z "POSTGRES_DATABASE_URL" ]]; then
+#if [[ -z "POSTGRES_DATABASE_URL" ]]; then
 
   POSTGRES_DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable"
-fi
+#fi
 
 # -------------------------------------------------------------------
 # App connection inputs
@@ -40,6 +40,11 @@ fi
 
 
 log "Using POSTGRES_DATABASE_URL=$POSTGRES_DATABASE_URL"
+
+until psql "POSTGRES_DATABASE_URL" -c '\q' >/dev/null 2>&1; do
+  sleep 1
+done
+
 
 psql "POSTGRES_DATABASE_URL" \
   -v app_user="$APP_POSTGRES_USER" \
