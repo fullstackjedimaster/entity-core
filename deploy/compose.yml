@@ -33,7 +33,7 @@ services:
     env_file:
       - ./env/postgres.env
     depends_on:
-      postgres:
+      entity-core-postgres:
         condition: service_healthy
     command:
       - bash
