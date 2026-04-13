@@ -60,11 +60,6 @@ get_key() {
   awk -F= -v k="$key" '$1 == k {print substr($0, index($0, "=")+1)}' "$file" | tail -n 1 | tr -d '\r'
 }
 
-is_placeholder() {
-  local v="${1:-}"
-  [[ -z "$v" || "$v" == CHANGE_ME* ]]
-}
-
 main() {
   local files=(
     "postgres.env"
@@ -81,51 +76,59 @@ main() {
   done
 
   local pg_file="${ENV_DIR}/postgres.env"
+  local entity_core_api_file="${ENV_DIR}/entity-core-api.env"
 
+  local pg_pass
+  pg_pass="$(get_key "$pg_file" "POSTGRES_PASSWORD")"
+  if [[ -z "$pg_pass" || "$pg_pass" == "CHANGE_ME" || "$pg_pass" == "CHANGE_ME_STRONG_PASSWORD" ]]; then
+    pg_pass="$(gen_secret)"
+    replace_key "$pg_file" "POSTGRES_PASSWORD" "$pg_pass"
+    log "Generated POSTGRES_PASSWORD in $(basename "$pg_file")"
+  else
+    log "POSTGRES_PASSWORD already set in $(basename "$pg_file")"
+  fi
 
-  local host port
-  local admin_db admin_user admin_pass
+  local app_pg_pass
+  app_pg_pass="$(get_key "$pg_file" "APP_POSTGRES_PASSWORD")"
+  if [[ -z "$app_pg_pass" || "$app_pg_pass" == "CHANGE_ME" || "$app_pg_pass" == "CHANGE_ME_STRONG_PASSWORD" ]]; then
+    app_pg_pass="$pg_pass"
+    replace_key "$pg_file" "APP_POSTGRES_PASSWORD" "$app_pg_pass"
+    log "Set APP_POSTGRES_PASSWORD in $(basename "$pg_file")"
+  fi
 
-
+  local host port admin_db admin_user app_db app_user
   host="$(get_key "$pg_file" "POSTGRES_HOST")"
   port="$(get_key "$pg_file" "POSTGRES_PORT")"
   admin_db="$(get_key "$pg_file" "POSTGRES_DB")"
   admin_user="$(get_key "$pg_file" "POSTGRES_USER")"
-  admin_pass="$(get_key "$pg_file" "POSTGRES_PASSWORD")"
-
+  app_db="$(get_key "$pg_file" "APP_POSTGRES_DB")"
+  app_user="$(get_key "$pg_file" "APP_POSTGRES_USER")"
 
   host="${host:-postgres}"
   port="${port:-5432}"
   admin_db="${admin_db:-postgres}"
   admin_user="${admin_user:-postgres}"
+  app_db="${app_db:-ec}"
+  app_user="${app_user:-ec}"
 
+  local admin_dsn
+  local app_dsn
 
-  if is_placeholder "$admin_pass"; then
-    admin_pass="$(gen_secret)"
-    log "Generated bootstrap/admin POSTGRES_PASSWORD"
-  else
-    log "Using existing bootstrap/admin POSTGRES_PASSWORD from postgres.env.example"
-  fi
+  admin_dsn="postgresql://${admin_user}:${pg_pass}@${host}:${port}/${admin_db}?sslmode=disable"
+  app_dsn="postgresql://${app_user}:${app_pg_pass}@${host}:${port}/${app_db}?sslmode=disable"
 
+  replace_key "$pg_file" "POSTGRES_DATABASE_URL" "$admin_dsn"
+  replace_key "$pg_file" "APP_DATABASE_URL" "$app_dsn"
 
-  replace_key "$pg_file" "POSTGRES_HOST" "$host"
-  replace_key "$pg_file" "POSTGRES_PORT" "$port"
-  replace_key "$pg_file" "POSTGRES_DB" "$admin_db"
-  replace_key "$pg_file" "POSTGRES_USER" "$admin_user"
-  replace_key "$pg_file" "POSTGRES_PASSWORD" "$admin_pass"
+#  # Make the API env point at the app DB/user, not the bootstrap admin DB/user.
+#  replace_key "$entity_core_api_file" "POSTGRES_HOST" "$host"
+#  replace_key "$entity_core_api_file" "POSTGRES_PORT" "$port"
+#  replace_key "$entity_core_api_file" "POSTGRES_DB" "$app_db"
+#  replace_key "$entity_core_api_file" "POSTGRES_USER" "$app_user"
+#  replace_key "$entity_core_api_file" "POSTGRES_PASSWORD" "$app_pg_pass"
+#  replace_key "$entity_core_api_file" "DATABASE_URL" "$app_dsn"
 
-
-  local postgres_dsn
-
-
-  postgres_dsn="postgresql://${admin_user}:${admin_pass}@${host}:${port}/${admin_db}?sslmode=disable"
-
-
-  replace_key "$pg_file" "POSTGRES_DATABASE_URL" "$postgres_dsn"
-
-
-  log "Wrote POSTGRES_DATABASE_URL and APP_DATABASE_URL deterministically"
-  log "Synced stable ec password from entity-core-api.env.example into postgres.env"
+  log "Wrote admin/app DATABASE_URL values deterministically"
   log "Environment initialization complete ✔"
 }
 
