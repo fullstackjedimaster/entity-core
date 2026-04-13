@@ -15,6 +15,11 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     restart: unless-stopped
+    command:
+      - bash
+      - -lc
+      - |
+        /scripts/bootstrap.sh
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -39,7 +44,7 @@ services:
       - bash
       - -lc
       - |
-        /scripts/bootstrap.sh
+        /scripts/init-postgres.sh
     restart: "no"
     networks:
       - shared-net
@@ -51,6 +56,7 @@ services:
     image: entity-core-api:local
     env_file:
       - ./env/entity-core-api.env
+      - ./env/postgres.env
     depends_on:
       bootstrap:
         condition: service_completed_successfully
