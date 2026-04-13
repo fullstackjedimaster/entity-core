@@ -53,7 +53,7 @@ services:
     env_file:
       - ./env/entity-core-api.env
       - ./env/postgres.env
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "127.0.0.1:8004:8004"
     networks:
@@ -75,9 +75,7 @@ services:
     image: entity-core:local
     env_file:
       - ./env/entity-core.env
-    depends_on:
-      entity-core-api:
-        condition: service_completed_successfully
+
     restart: unless-stopped
     ports:
       - "127.0.0.1:3006:3006"
