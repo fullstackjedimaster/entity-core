@@ -14,10 +14,10 @@ POSTGRES_PASSWORD="${POSTGRES_DATABASE_URL:-}"
 
 POSTGRES_DATABASE_URL="${POSTGRES_DATABASE_URL:-}"
 
-#if [[ -z "POSTGRES_DATABASE_URL" ]]; then
+if [[ -z "POSTGRES_DATABASE_URL" ]]; then
 
   POSTGRES_DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable"
-#fi
+fi
 
 # -------------------------------------------------------------------
 # App connection inputs
