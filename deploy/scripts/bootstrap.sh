@@ -10,7 +10,7 @@ POSTGRES_HOST=entity-core-postgres
 POSTGRES_PORT=5432
 POSTGRES_DB="${POSTGRES_DB:-postgres}"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
-POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
+POSTGRES_PASSWORD="Ub5ZOJU7MjR5spe5D98geul-4kKtJfBItTNyQ2e9mChRc8P6rHXG7IvhOX81PGwL"
 
 POSTGRES_DATABASE_URL="${POSTGRES_DATABASE_URL:-}"
 
@@ -52,13 +52,19 @@ until psql "$APP_DATABASE_URL" -c '\q' >/dev/null 2>&1; do
 done
 
 psql "$APP_DATABASE_URL" -c "CREATE SCHEMA IF NOT EXISTS ec AUTHORIZATION ec;"
-
-psql "$APP_DATABASE_URL" -c "ALTER ROLE ec SET search_path = ec, public;"
+log  "CREATE SCHEMA IF NOT EXISTS ec AUTHORIZATION ec;"
 
 until psql "$APP_DATABASE_URL" -c '\q' >/dev/null 2>&1; do
   sleep 1
 done
 
+psql "$APP_DATABASE_URL" -c "ALTER ROLE ec SET search_path = ec, public;"
+log "ALTER ROLE ec SET search_path = ec, public;"
+until psql "$APP_DATABASE_URL" -c '\q' >/dev/null 2>&1; do
+  sleep 1
+done
+
+log  "$APP_DATABASE_URL" -f "$DEPLOY_DIR/scripts/ec.sql"
 psql "$APP_DATABASE_URL" -f "$DEPLOY_DIR/scripts/ec.sql"
 
 log "Done."
