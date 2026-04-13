@@ -15,12 +15,10 @@ RUN set -eux; \
       bash \
       openssl \
     ; \
-    rm -rf /var/lib/apt/lists/*; \
-    command -v psql; \
-    command -v pg_isready;
+    rm -rf /var/lib/apt/lists/*
 
-# Copy deploy scripts (includes rag.sql)
-COPY /deploy/scripts/ /scripts/
+# ✅ FIXED
+COPY deploy/scripts/ /scripts/
 RUN chmod +x /scripts/*.sh
 
 ENTRYPOINT ["/usr/bin/tini","--"]
