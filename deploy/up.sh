@@ -25,9 +25,9 @@ docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml up -d ent
 
 
 
-
-echo "[up] Running bootstrap (host-side)"
-bash "$DEPLOY_DIR/scripts/bootstrap.sh"
+#
+#echo "[up] Running bootstrap (host-side)"
+#bash "$DEPLOY_DIR/scripts/bootstrap.sh"
 
 
 docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml up -d --build

@@ -1,6 +1,50 @@
 name: entity-core
 
+networks:
+  shared-net:
+    external: true
+
 services:
+  entity-core-postgres:
+    image: postgres:16
+    container_name: entity-core-postgres
+    tmpfs:
+      - /var/lib/postgresql/data
+    env_file:
+      - ./env/postgres.env
+    ports:
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    networks:
+      - shared-net
+
+  bootstrap:
+    build:
+      context: ..
+      dockerfile: deploy/docker/bootstrap/Dockerfile
+    image: entity-core-api/bootstrap:local
+    env_file:
+      - ./env/postgres.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - bash
+      - -lc
+      - |
+        set -euxo pipefail
+        /scripts/bootstrap.sh
+    restart: "no"
+    networks:
+      - shared-net
+
   entity-core-api:
     build:
       context: ..
@@ -8,7 +52,9 @@ services:
     image: entity-core-api:local
     env_file:
       - ./env/entity-core-api.env
-      - ./env/postgres.env
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
     restart: unless-stopped
     ports:
       - "127.0.0.1:8004:8004"
@@ -19,6 +65,15 @@ services:
     build:
       context: ..
       dockerfile: deploy/docker/entity-core/Dockerfile
+      args:
+        NEXT_PUBLIC_ENTITY_CORE_API_BASE_URL: "https://entity-core.fullstackjedi.dev/api"
+        NEXT_PUBLIC_AUTH0_DOMAIN: "dev-gttnobig6h3trkvm.us.auth0.com"
+        NEXT_PUBLIC_AUTH0_CLIENT_ID: "9J5htp4HKGaUV58ZX9E8FQ2ldot7SnkO"
+        NEXT_PUBLIC_AUTH0_AUDIENCE: "https://entity-core.fullstackjedi.dev/api"
+        NEXT_PUBLIC_AUTH0_NAMESPACE: "https://fullstackjedi.dev"
+        NEXT_PUBLIC_AUTH0_SCOPE: "openid profile email crud:read crud:create crud:update crud:delete offline_access"
+        NEXT_PUBLIC_AUTH0_REDIRECT_URI: "https://entity-core.fullstackjedi.dev/callback"
+        NEXT_PUBLIC_DISABLE_AUTH: "false"
     image: entity-core:local
     env_file:
       - ./env/entity-core.env

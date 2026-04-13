@@ -17,3 +17,12 @@ SELECT format(
 WHERE NOT EXISTS (
   SELECT 1 FROM pg_database WHERE datname = :'app_db'
 )\gexec
+
+SELECT format(
+  'GRANT ALL PRIVILEGES ON DATABASE %I OWNER %I',
+  :'app_db',
+  :'app_user'
+)
+WHERE NOT EXISTS (
+  SELECT 1 FROM pg_database WHERE datname = :'app_db'
+)\gexec
