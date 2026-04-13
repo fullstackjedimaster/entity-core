@@ -39,8 +39,8 @@ services:
       - bash
       - -lc
       - |
-        deploy/scripts/bootstrap.sh
-        deploy/scripts/init_postgres.sh
+        scripts/bootstrap.sh
+        scripts/init_postgres.sh
     restart: "no"
     networks:
       - shared-net
