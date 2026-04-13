@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
 log() { echo -e "\033[1;32m[bootstrap] $*\033[0m"; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,9 +39,6 @@ fi
 
 log "Using POSTGRES_DATABASE_URL=$POSTGRES_DATABASE_URL"
 
-until psql "POSTGRES_DATABASE_URL" -c '\q' >/dev/null 2>&1; do
-  sleep 1
-done
 
 
 psql "POSTGRES_DATABASE_URL" \
