@@ -47,22 +47,15 @@ psql "POSTGRES_DATABASE_URL" \
   -v app_db="$APP_POSTGRES_DB" \
   -f "$DEPLOY_DIR/scripts/bootstrap_admin.sql"
 
-until psql "$APP_DATABASE_URL" -c '\q' >/dev/null 2>&1; do
-  sleep 1
-done
+
 
 psql "$APP_DATABASE_URL" -c "CREATE SCHEMA IF NOT EXISTS ec AUTHORIZATION ec;"
 log  "CREATE SCHEMA IF NOT EXISTS ec AUTHORIZATION ec;"
 
-until psql "$APP_DATABASE_URL" -c '\q' >/dev/null 2>&1; do
-  sleep 1
-done
+
 
 psql "$APP_DATABASE_URL" -c "ALTER ROLE ec SET search_path = ec, public;"
 log "ALTER ROLE ec SET search_path = ec, public;"
-until psql "$APP_DATABASE_URL" -c '\q' >/dev/null 2>&1; do
-  sleep 1
-done
 
 log  "$APP_DATABASE_URL" -f "$DEPLOY_DIR/scripts/ec.sql"
 psql "$APP_DATABASE_URL" -f "$DEPLOY_DIR/scripts/ec.sql"
