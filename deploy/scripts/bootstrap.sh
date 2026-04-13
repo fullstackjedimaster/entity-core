@@ -14,9 +14,7 @@ POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
 
 POSTGRES_DATABASE_URL="${POSTGRES_DATABASE_URL:-}"
 
-if [[ -z "POSTGRES_DATABASE_URL" ]]; then                                                                                                                                                                                                                                             vvvbvbbvbvbvvbnnnnnbbbbvvvvvvvv-------------
-
-
+if [[ -z "POSTGRES_DATABASE_URL" ]]; then
 
   POSTGRES_DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable"
 fi
@@ -56,5 +54,11 @@ done
 psql "$APP_DATABASE_URL" -c "CREATE SCHEMA IF NOT EXISTS ec AUTHORIZATION ec;"
 
 psql "$APP_DATABASE_URL" -c "ALTER ROLE ec SET search_path = ec, public;"
+
+until psql "$APP_DATABASE_URL" -c '\q' >/dev/null 2>&1; do
+  sleep 1
+done
+
+psql "$APP_DATABASE_URL" -f "$DEPLOY_DIR/scripts/ec.sql"
 
 log "Done."
