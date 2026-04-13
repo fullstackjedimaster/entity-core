@@ -53,9 +53,6 @@ services:
     env_file:
       - ./env/entity-core-api.env
       - ./env/postgres.env
-    depends_on:
-      bootstrap:
-        condition: service_completed_successfully
     restart: "no"
     ports:
       - "127.0.0.1:8004:8004"
