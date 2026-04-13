@@ -41,11 +41,12 @@ log "Using POSTGRES_DATABASE_URL=$POSTGRES_DATABASE_URL"
 
 
 
-psql "POSTGRES_DATABASE_URL" \
+psql "$POSTGRES_DATABASE_URL" \
   -v app_user="$APP_POSTGRES_USER" \
   -v app_password="$APP_POSTGRES_PASSWORD" \
   -v app_db="$APP_POSTGRES_DB" \
   -f "$DEPLOY_DIR/scripts/bootstrap_admin.sql"
+
 
 
 
