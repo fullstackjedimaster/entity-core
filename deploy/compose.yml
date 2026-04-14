@@ -2,7 +2,7 @@ name: entity-core
 
 networks:
   shared-net:
-    driver: bridge
+    external: true
 
 services:
   entity-core-postgres:
