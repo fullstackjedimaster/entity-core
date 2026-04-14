@@ -56,7 +56,7 @@ def _extract_bearer_token(request: Request) -> str:
     return parts[1]
 
 
-@router.post("/provision_tenant")
+@router.post("/onboarding/provision_tenant")
 async def provision_tenant(
     payload: Dict[str, Any],
     request: Request
