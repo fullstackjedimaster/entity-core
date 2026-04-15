@@ -41,7 +41,7 @@ services:
       - |
         /scripts/bootstrap.sh
         /scripts/init-postgres.sh
-    restart: unless-stopped
+    restart: no
     networks:
       - shared-net
 
