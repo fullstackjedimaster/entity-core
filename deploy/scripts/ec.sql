@@ -597,10 +597,10 @@ CREATE OR REPLACE FUNCTION ec.provision_tenant(
     p_email text,
     p_name text DEFAULT NULL::text,
     p_picture text DEFAULT NULL::text,
-    p_given text DEFAULT NULL::text,
-    p_family text DEFAULT NULL::text,
+    p_given_name text DEFAULT NULL::text,
+    p_family_name text DEFAULT NULL::text,
     p_locale text DEFAULT 'en'::text,
-    p_roles jsonb DEFAULT '[]'::jsonb,
+    p_roles text[] DEFAULT '{}'::text[],
     p_permissions text[] DEFAULT '{}'::text[]
 )
 RETURNS jsonb
@@ -654,7 +654,7 @@ BEGIN
       p_schema,
       v_user_id,
       v_root_org_id,
-      p_roles,
+      to_jsonb(p_roles),
       p_permissions
   );
 
@@ -669,7 +669,7 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION ec.provision_tenant(text, text, text, text, text, text, text, text, jsonb, text[])
+ALTER FUNCTION ec.provision_tenant(text, text, text, text, text, text, text, text, text[], text[])
     OWNER TO ec;
 
 
