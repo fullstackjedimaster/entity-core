@@ -406,11 +406,11 @@ $$;
 ALTER FUNCTION ec._seed_roles_and_permissions(text) OWNER TO ec;
 
 
-CREATE OR REPLACE FUNCTION ec._apply_memberships_and_permissions(
+CREATE OR REPLACE FUNCTION ec._apply_roles_and_permissions(
     p_schema text,
     p_user_id uuid,
     p_root_org_id uuid,
-    p_memberships jsonb DEFAULT '[]'::jsonb,
+    p_roles jsonb DEFAULT '[]'::jsonb,
     p_permissions text[] DEFAULT '{}'::text[]
 )
 RETURNS jsonb
@@ -448,7 +448,7 @@ BEGIN
 
   FOR v_item IN
     SELECT *
-    FROM jsonb_array_elements(coalesce(p_memberships, '[]'::jsonb))
+    FROM jsonb_array_elements(coalesce(p_roles, '[]'::jsonb))
   LOOP
     v_org_key := coalesce(v_item->>'org_key', v_root_org_key);
     v_parent_key := NULLIF(trim(v_item->>'parent_key'), '');
@@ -536,7 +536,7 @@ BEGIN
       'auth0_sub', u.auth0_sub,
       'email', u.email,
       'name', u.name,
-      'memberships', COALESCE(
+      'roles', COALESCE(
         (
           SELECT jsonb_agg(
             jsonb_build_object(
@@ -558,7 +558,7 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION ec._apply_memberships_and_permissions(text, uuid, uuid, jsonb, text[])
+ALTER FUNCTION ec._apply_roles_and_permissions(text, uuid, uuid, jsonb, text[])
     OWNER TO ec;
 
 CREATE OR REPLACE FUNCTION ec._assign_role(
@@ -600,7 +600,7 @@ CREATE OR REPLACE FUNCTION ec.provision_tenant(
     p_given text DEFAULT NULL::text,
     p_family text DEFAULT NULL::text,
     p_locale text DEFAULT 'en'::text,
-    p_memberships jsonb DEFAULT '[]'::jsonb,
+    p_roles jsonb DEFAULT '[]'::jsonb,
     p_permissions text[] DEFAULT '{}'::text[]
 )
 RETURNS jsonb
@@ -649,12 +649,12 @@ BEGIN
   -- 7️⃣ Assign creator role to root org
   PERFORM ec._assign_role(p_schema, v_user_id, v_root_org_id, 'creator');
 
-  -- 8️⃣ Apply extended memberships and permissions (from Auth0)
-  v_user := ec._apply_memberships_and_permissions(
+  -- 8️⃣ Apply extended roles and permissions (from Auth0)
+  v_user := ec._apply_roles_and_permissions(
       p_schema,
       v_user_id,
       v_root_org_id,
-      p_memberships,
+      p_roles,
       p_permissions
   );
 
