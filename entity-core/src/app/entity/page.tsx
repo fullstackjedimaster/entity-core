@@ -44,7 +44,7 @@ export default function EntityIndexPage() {
             {loading && <p>Loading…</p>}
             {error && <p className="text-red-600">Error: {error}</p>}
 
-            {!loading && !error && templates.length === 0 && (
+            {!loading && !error && entities.length === 0 && (
                 <p className="text-gray-600">No entities found.</p>
             )}
 
