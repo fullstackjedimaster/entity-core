@@ -645,7 +645,7 @@ BEGIN
       DO UPDATE SET email=$2, name=$3, picture_url=$4, given_name=$5, family_name=$6, locale=$7, last_login_at=now(), updated_at=now()
     RETURNING id;
   $usr$, p_schema)
-  USING p_sub, p_email, p_name, p_picture, p_given, p_family, p_locale
+  USING p_sub, p_email, p_name, p_picture, p_given_name, p_family_name, p_locale
   INTO v_user_id;
 
   -- 7️⃣ Assign creator role to root org
