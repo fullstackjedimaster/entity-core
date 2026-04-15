@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/internal", tags=["internal"])
 
 # This consumes the Authorization header but we only use it on the NO-AUTH endpoint
 no_auth = HTTPBearer(auto_error=False)
-
+domain = env("AUTH0_DOMAIN")
 
 def _extract_bearer_token(request: Request) -> str:
     auth_header = request.headers.get("Authorization")
@@ -50,12 +50,12 @@ async def wait_for_metadata(
     Poll Auth0 Management API until app_metadata shows the desired org_id/schema.
     This remains an entity-core concern; no DB involved.
     """
-    domain = env("AUTH0_DOMAIN")
+
     token = await get_management_token()
     url = f"https://{domain}/api/v2/users/{sub}"
 
     async with httpx.AsyncClient(timeout=10.0) as client:
-        for attempt in range(24):
+        for attempt in range(50):
             await asyncio.sleep(0.5)
             resp = await client.get(url, headers={"Authorization": f"Bearer {token}"})
             if not resp.is_success:
