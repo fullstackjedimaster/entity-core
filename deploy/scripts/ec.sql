@@ -2,6 +2,8 @@ CREATE SCHEMA IF NOT EXISTS ec AUTHORIZATION ec;
 
 ALTER ROLE ec SET search_path = ec, public;
 
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 
 CREATE TABLE IF NOT EXISTS ec.entity_config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -292,7 +294,7 @@ VOLATILE SECURITY DEFINER PARALLEL UNSAFE
 AS $$
 BEGIN
 	EXECUTE format($ddl$ CREATE TABLE IF NOT EXISTS %1$I.organization (
-		id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+		id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 		org_key text UNIQUE NOT NULL,
 		name text NOT NULL,
 		parent_org_id uuid NULL REFERENCES %1$I.organization(id),
@@ -301,7 +303,7 @@ BEGIN
 	);
 
 	CREATE TABLE IF NOT EXISTS %1$I."user" (
-		id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+		id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 		auth0_sub text UNIQUE NOT NULL,
 		email text NOT NULL,
 		name text,
@@ -315,7 +317,7 @@ BEGIN
 	);
 
 	CREATE TABLE IF NOT EXISTS %1$I.role (
-		id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+		id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 		org_id uuid REFERENCES %1$I.organization(id) ON DELETE CASCADE,
 		key text NOT NULL,
 		name text NOT NULL,
@@ -326,7 +328,7 @@ BEGIN
 	);
 
 	CREATE TABLE IF NOT EXISTS %1$I.permission (
-		id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+		id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 		key text UNIQUE NOT NULL, description text,
 		created_at timestamptz DEFAULT now(),
 		updated_at timestamptz DEFAULT now()
