@@ -17,7 +17,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_idx
 
 
 -- 2. Insert/update function with full JSON payload (meta-wrapped)
-CREATE OR REPLACE FUNCTION ec.upsert_entity(
+CREATE OR REPLACE FUNCTION ec._upsert_entity(
   schema_name TEXT,
   entity_name TEXT,
   entity_json    JSONB
@@ -46,7 +46,7 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION ec.upsert_entity(TEXT, TEXT, JSONB) OWNER TO ec;
+ALTER FUNCTION ec._upsert_entity(TEXT, TEXT, JSONB) OWNER TO ec;
 
 
 CREATE OR REPLACE FUNCTION ec.get_entity(
@@ -691,7 +691,7 @@ ALTER FUNCTION ec.provision_tenant(text, text, text, text, text, text, text, tex
 
 
 
-CREATE OR REPLACE FUNCTION ec.deploy_entity(_schema TEXT, _entity TEXT, _entity_json JSONB )
+CREATE OR REPLACE FUNCTION ec.create_entity(_schema TEXT, _entity TEXT, _entity_json JSONB )
 RETURNS VOID
 LANGUAGE plpgsql
 AS
@@ -729,8 +729,8 @@ BEGIN
      			EXECUTE format('ALTER TABLE %I.%I ADD COLUMN %I %s', _schema, _entity, k, coltype);
      		END IF;
      	   END LOOP;
-	PERFORM ec.upsert_entity(_schema, _entity, _entity_json);
+	PERFORM ec._upsert_entity(_schema, _entity, _entity_json);
 END;
 $$;
 
-ALTER FUNCTION ec.deploy_entity(TEXT, TEXT, JSONB) OWNER TO ec;
+ALTER FUNCTION ec.create_entity(TEXT, TEXT, JSONB) OWNER TO ec;
