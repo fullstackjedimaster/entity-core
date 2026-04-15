@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import { useState , useCallback} from "react";
 
 export function useEntityEditor(entityName: string) {
     const { getToken, isAuthenticated, loading: authLoading } = useAuth();
