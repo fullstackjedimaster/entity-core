@@ -16,12 +16,12 @@ export default function HomePage() {
             return;
         }
         // ✅ Redirect authenticated users to default entity list
-        router.push("/template");
+        router.push("/entity");
     }, [loading, isAuthenticated, router]);
 
     return (
         <main className="min-h-screen flex items-center justify-center text-gray-600 dark:text-gray-300">
-            <p>Redirecting to templates…</p>
+            <p>Redirecting to entities...…</p>
         </main>
     );
 }

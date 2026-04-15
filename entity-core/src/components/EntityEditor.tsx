@@ -33,7 +33,7 @@ export default function EntityEditor({ entityName: initialName }: { entityName?:
             // 👇 THIS is the magic
             const finalName = saved.entity_name || entityName;
 
-            router.push(`/entities/${finalName}/edit`);
+            router.push(`/entities/${finalName}`);
 
         } catch {
             alert("⚠️ Invalid JSON or save failed.");

@@ -4,6 +4,6 @@ export interface ObjectShape {
     [key: string]: Primitive | ObjectShape | ObjectShape[];
 }
 
-export type TemplateShape = ObjectShape;
+export type EntityJsonShape = ObjectShape;
 
 export type FormState = Record<string, unknown>;

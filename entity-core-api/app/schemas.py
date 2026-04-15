@@ -67,12 +67,9 @@ class ProvisionPayload(BaseModel):
     picture: Optional[str] = None
 
 
-# ------------------------------------------------------------
-# Form / Template Metadata
-# ------------------------------------------------------------
 class FormMetadataResponse(BaseModel):
     entity_name: str
-    template: Dict[str, Any]
+    entity_json: Dict[str, Any]
 
 
 class CreateEntityBody(BaseModel):

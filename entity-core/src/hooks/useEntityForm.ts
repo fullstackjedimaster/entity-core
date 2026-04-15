@@ -1,19 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import type { TemplateShape, FormState, Primitive } from "@/types/form";
+import type { EntityJsonShape, FormState, Primitive } from "@/types/form";
 
 export interface UseEntityFormResult {
     form: FormState;
     updateField: (path: string[], value: Primitive) => void;
-    addArrayRow: (path: string[], templateRow: TemplateShape) => void;
+    addArrayRow: (path: string[], entityJsonRow: EntityJsonShape) => void;
     removeArrayRow: (path: string[], index: number) => void;
 }
 
-export function useEntityForm(shape: TemplateShape | null): UseEntityFormResult {
+export function useEntityForm(shape: EntityJsonShape | null): UseEntityFormResult {
     const [form, setForm] = useState<FormState>(() => (shape ? buildInitial(shape) : {}));
 
-    function buildInitial(shape: TemplateShape): FormState {
+    function buildInitial(shape: EntityJsonShape): FormState {
         const result: FormState = {};
 
         for (const key of Object.keys(shape)) {
@@ -22,7 +22,7 @@ export function useEntityForm(shape: TemplateShape | null): UseEntityFormResult 
             if (Array.isArray(val)) {
                 result[key] = [];
             } else if (val && typeof val === "object") {
-                result[key] = buildInitial(val as TemplateShape);
+                result[key] = buildInitial(val as EntityJsonShape);
             } else {
                 result[key] = defaultPrimitive(val as Primitive);
             }
@@ -52,13 +52,13 @@ export function useEntityForm(shape: TemplateShape | null): UseEntityFormResult 
         });
     }
 
-    function addArrayRow(path: string[], templateRow: TemplateShape) {
+    function addArrayRow(path: string[], entityJsonRow: EntityJsonShape) {
         setForm((prev) => {
             const next = structuredClone(prev);
 
             let ref: any = next;
             for (let i = 0; i < path.length; i++) ref = ref[path[i]];
-            ref.push(buildInitial(templateRow));
+            ref.push(buildInitial(entityJsonRow));
 
             return next;
         });

@@ -18,12 +18,12 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
             : settings.AUTH0_REDIRECT_URI ;
 
     const onRedirectCallback = (appState?: AppState) => {
-        // Prefer explicit returnTo from appState, otherwise go to /template
+
         if (typeof window === 'undefined') return;
 
         const target =
             (appState?.returnTo as string | undefined) ??
-            '/template';
+            '/entity';
 
         window.location.replace(target);
     };

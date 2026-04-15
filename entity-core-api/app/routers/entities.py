@@ -1,4 +1,4 @@
-# app/routers/entities.py
+# app/routers/entity.py
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -10,7 +10,7 @@ from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
 from app.schemas import CreateEntityBody, RequestEnvelope
 
-router = APIRouter(prefix="/api/entities", tags=["entities"])
+router = APIRouter(prefix="/api/entity", tags=["entity"])
 
 
 def _extract_bearer_token(request: Request) -> str:
@@ -31,11 +31,7 @@ def _extract_bearer_token(request: Request) -> str:
     return parts[1]
 
 
-# ---------------------------------------------------------------------------
-# NEW: List entity names (backed by ec.listTemplates in entity-server)
-# ---------------------------------------------------------------------------
-
-@router.get("/entities")
+@router.get("/entity")
 async def list_entities(request: Request):
     """
     List entity names that have templates.
@@ -56,7 +52,7 @@ async def list_entities(request: Request):
         target="ec.list_entities",
         id=None,
         args={},  # schema is derived by entity-server from the JWT
-        meta={"source": "entity-core:/entities"},
+        meta={"source": "entity-core:/entity"},
     )
 
     data: Dict[str, Any] = await call_model_manage(envelope, token=token)
@@ -79,14 +75,11 @@ async def list_entities(request: Request):
         if isinstance(row, dict) and "entity_name" in row:
             entities.append(str(row["entity_name"]))
 
-    return {"entities": entities}
+    return {"entity": entities}
 
 
-# ---------------------------------------------------------------------------
-# Upsert entity for an entity (backed by ec.insertTemplate)
-# ---------------------------------------------------------------------------
 
-@router.post("/entities/{entity}")
+@router.post("/entity/{entityName}")
 async def create_entity(
     request: Request,
     entity: str,
@@ -108,7 +101,7 @@ async def create_entity(
             "entity_name": entity,
             "entity_json": body.entity_jsom,
         },
-        meta={"source": "entity-core:/entities/{entity}"},
+        meta={"source": "entity-core:/entity/{entity}"},
     )
 
     data: Dict[str, Any] = await call_model_manage(envelope, token=token)
@@ -126,7 +119,7 @@ async def create_entity(
 # Get form metadata for entity (backed by ec.get_form_metadata)
 # ---------------------------------------------------------------------------
 
-@router.get("/entities/{entity}/form_metadata")
+@router.get("/entity/{entity}/form_metadata")
 async def get_form_metadata(
     request: Request,
     entity: str,
@@ -149,7 +142,7 @@ async def get_form_metadata(
         target="ec.get_form_metadata",
         id=None,
         args={"entity_name": entity},
-        meta={"source": "entity-core:/api/entities/{entity}/form_metadata"},
+        meta={"source": "entity-core:/api/entity/{entity}/form_metadata"},
     )
 
     data: Dict[str, Any] = await call_model_manage(envelope, token=token)
