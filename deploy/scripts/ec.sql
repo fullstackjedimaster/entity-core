@@ -72,14 +72,14 @@ ALTER FUNCTION ec.get_entity(TEXT, TEXT, TEXT) OWNER TO ec;
 CREATE OR REPLACE FUNCTION ec.list_entities(
   _schema_name TEXT
 )
-RETURNS TABLE (entity_name TEXT, emtity_json JSONB)
+RETURNS TABLE (entity_name TEXT)
 LANGUAGE sql AS $$
-  SELECT entity_name, entity_json
+  SELECT entity_name
   FROM ec.entity
   WHERE schema_name = _schema_name;
 $$;
 
-ALTER FUNCTION ec.list_entities(TEXT, JSONB) OWNER TO ec;
+ALTER FUNCTION ec.list_entities(TEXT) OWNER TO ec;
 
 
 CREATE OR REPLACE FUNCTION ec.get_column_options(
