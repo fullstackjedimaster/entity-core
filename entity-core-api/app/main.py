@@ -14,8 +14,7 @@ from app.routers import (
     entities as entities_router,
     internal as internal_router,
     login as login_router,
-    onboarding as onboarding_router,
-    template as template_router,
+    onboarding as onboarding_router
 )
 
 
@@ -57,7 +56,6 @@ install_global_error_handlers(app)
 app.include_router(login_router.router)
 app.include_router(onboarding_router.router)
 app.include_router(entities_router.router)
-app.include_router(template_router.router)
 app.include_router(internal_router.router)
 
 
