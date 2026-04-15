@@ -1,3 +1,5 @@
+import { useAuth } from "@/contexts/AuthContext";
+
 export function useEntityEditor(entityName: string) {
     const { getToken, isAuthenticated, loading: authLoading } = useAuth();
     const [entity, setEntity] = useState<any>(null);
