@@ -7,15 +7,15 @@ import { settings } from "@/lib/settings";
  * Manages loading/saving entity templates without polling or auto-fetching.
  * The caller decides when to trigger loadTemplate().
  */
-export function useTemplateEditor(entity: string) {
+export function useEntityEditor(entityName: string) {
     const { getToken, isAuthenticated, loading: authLoading } = useAuth();
-    const [template, setTemplate] = useState<any>(null);
+    const [entity, setEntity] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Explicitly load template (only called by user action)
-    const loadTemplate = useCallback(async () => {
-        if (!entity) return;
+    const loadEntity = useCallback(async () => {
+        if (!entityName) return;
         if (authLoading) return;
         if (!isAuthenticated) {
             console.warn("⚠️ Auth not ready or user not logged in.");
@@ -37,39 +37,39 @@ export function useTemplateEditor(entity: string) {
 
             if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
             const data = await res.json();
-            setTemplate(data);
+            setEntity(data);
         } catch (err: any) {
-            console.error("⚠️ Error loading template:", err);
-            setError(err.message || "Unknown error loading template");
+            console.error("⚠️ Error loading entity:", err);
+            setError(err.message || "Unknown error loading entity");
         } finally {
             setIsLoading(false);
         }
-    }, [entity, getToken, authLoading, isAuthenticated]);
+    }, [entityName, getToken, authLoading, isAuthenticated]);
 
     // Save current template back to server
-    const saveTemplate = useCallback(
-        async (newTemplate: any) => {
-            if (!entity) throw new Error("No entity provided");
+    const saveEntity = useCallback(
+        async (newEntity: any) => {
+            if (!entityName) throw new Error("No entity provided");
             const token = await getToken();
             if (!token) throw new Error("⚠️ Missing token (Auth0 not ready)");
 
-            const res = await fetch(`${settings.ENTITY_CORE_API_BASE_URL}/api/${entity}`, {
+            const res = await fetch(`${settings.ENTITY_CORE_API_BASE_URL}/api/entities`, {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(newTemplate),
+                body: JSON.stringify(newEntity),
             });
 
             if (!res.ok) throw new Error(`Save failed: ${res.status} ${await res.text()}`);
             const data = await res.json();
-            setTemplate(data);
+            setEntity(data);
             return data;
         },
-        [entity, getToken]
+        [entityName, getToken]
     );
 
     // ✅ No automatic loading here — only manual
-    return { template, loadTemplate, saveTemplate, isLoading, error };
+    return { entity, loadTemplate, saveTemplate, isLoading, error };
 }

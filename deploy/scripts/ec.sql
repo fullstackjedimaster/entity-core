@@ -5,23 +5,22 @@ ALTER ROLE ec SET search_path = ec, public;
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 
-CREATE TABLE IF NOT EXISTS ec.entity_config (
+CREATE TABLE IF NOT EXISTS ec.entity(
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   schema_name TEXT NOT NULL,
   entity_name TEXT NOT NULL,
-  template JSONB NOT NULL
+  entity_json JSONB NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS entity_config_schema_entity_idx
-  ON ec.entity_config (lower(schema_name), lower(entity_name));
-
+CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_idx
+  ON ec.entity(lower(schema_name), lower(entity_name));
 
 
 -- 2. Insert/update function with full JSON payload (meta-wrapped)
-CREATE OR REPLACE FUNCTION ec.insert_template(
+CREATE OR REPLACE FUNCTION ec.upsert_entity(
   schema_name TEXT,
   entity_name TEXT,
-  template    JSONB
+  entity_json    JSONB
 )
 RETURNS VOID
 LANGUAGE plpgsql
@@ -29,43 +28,59 @@ SECURITY DEFINER
 AS $$
 BEGIN
   IF schema_name IS NULL OR trim(schema_name) = '' THEN
-    RAISE EXCEPTION 'insert_template: schema_name is required';
+    RAISE EXCEPTION 'upsert_entity: schema_name is required';
   END IF;
 
   IF entity_name IS NULL OR trim(entity_name) = '' THEN
-    RAISE EXCEPTION 'insert_template: entity_name is required';
+    RAISE EXCEPTION 'upsert_entity: entity_name is required';
   END IF;
 
-  IF template IS NULL OR template::text = '{}' THEN
-    RAISE EXCEPTION 'insert_template: template must be a non-empty JSON object';
+  IF entity_json IS NULL OR entity_json::text = '{}' THEN
+    RAISE EXCEPTION 'upsert_entity: entity_json must be a non-empty JSON object';
   END IF;
 
-  INSERT INTO ec.entity_config (schema_name, entity_name, template)
-  VALUES (schema_name, entity_name, template)
+  INSERT INTO ec.entity(schema_name, entity_name, entity_json)
+  VALUES (schema_name, entity_name, entity_json)
   ON CONFLICT (entity_name)
-  DO UPDATE SET template = EXCLUDED.template;
+  DO UPDATE SET entity_json = EXCLUDED.entity_json;
 END;
 $$;
 
-ALTER FUNCTION ec.insert_template(TEXT, TEXT, JSONB) OWNER TO ec;
+ALTER FUNCTION ec.upsert_entity(TEXT, TEXT, JSONB) OWNER TO ec;
 
 
-CREATE OR REPLACE FUNCTION ec.get_entity_template(
-  schema_name TEXT,
-  entity_name TEXT,
-  template TEXT
+CREATE OR REPLACE FUNCTION ec.get_entity(
+  p_schema_name TEXT,
+  p_entity_name TEXT,
+  p_entity_json TEXT
 ) RETURNS JSONB AS $$
 DECLARE
   result JSONB;
 BEGIN
-  SELECT t.template INTO result
-  FROM ec.entity_config t
-  WHERE t.entity_name = get_table_name(entity_name)
-    AND t.json_column = json_column;
+  SELECT entity_json INTO result
+  FROM ec.entity
+  WHERE entity_name = p_entity_name
+    AND schema_name = p_schema_name;
 
   RETURN COALESCE(result, '{}'::jsonb);
 END;
 $$ LANGUAGE plpgsql;
+
+
+ALTER FUNCTION ec.get_entity(TEXT, TEXT, TEXT) OWNER TO ec;
+
+CREATE OR REPLACE FUNCTION ec.list_entities(
+  _schema_name TEXT
+)
+RETURNS TABLE (entity_name TEXT. emtity_json JSONB)
+LANGUAGE sql AS $$
+  SELECT entity_name, entity_json
+  FROM ec.entity
+  WHERE schema_name = _schema_name;
+$$;
+
+ALTER FUNCTION ec.list_entities(TEXT, JSONB) OWNER TO ec;
+
 
 CREATE OR REPLACE FUNCTION ec.get_column_options(
   _schema_name TEXT,
@@ -78,18 +93,18 @@ LANGUAGE plpgsql AS $$
 DECLARE
   tmpl JSONB;
 BEGIN
-  -- Fetch template for schema + entity
-  SELECT template INTO tmpl
-  FROM ec.entity_config
+  -- Fetch entity for schema + entity
+  SELECT entity_json INTO tmpl
+  FROM ec.entity
   WHERE schema_name = _schema_name AND entity_name = _entity_name;
 
   IF tmpl IS NULL THEN
-    RAISE EXCEPTION 'No template found for %.%', _schema_name, _entity_name;
+    RAISE EXCEPTION 'No entity_json found for %.%', _schema_name, _entity_name;
   END IF;
 
   RETURN QUERY EXECUTE format(
     'SELECT DISTINCT j->>%L AS value
-     FROM jsonb_array_elements($1->''template''->%L->%L) AS j
+     FROM jsonb_array_elements($1->''entity_json''->%L->%L) AS j
      WHERE j->>%L IS NOT NULL %s
      ORDER BY value',
      _column_name, _entity_name, _column_name, _column_name,
@@ -106,10 +121,10 @@ CREATE OR REPLACE FUNCTION ec.get_form_metadata(
   _schema_name TEXT,
   _entity_name TEXT
 )
-RETURNS TABLE (template JSONB)
+RETURNS TABLE (entity_json JSONB)
 LANGUAGE sql AS $$
-  SELECT template
-  FROM ec.entity_config
+  SELECT entity_json
+  FROM ec.entity
   WHERE schema_name = _schema_name AND entity_name = _entity_name;
 $$;
 
@@ -676,7 +691,7 @@ ALTER FUNCTION ec.provision_tenant(text, text, text, text, text, text, text, tex
 
 
 
-CREATE OR REPLACE FUNCTION ec.create_entity_from_template(_schema TEXT, _entity TEXT, _template JSONB )
+CREATE OR REPLACE FUNCTION ec.deploy_entity(_schema TEXT, _entity TEXT, _entity_json JSONB )
 RETURNS VOID
 LANGUAGE plpgsql
 AS
@@ -697,7 +712,7 @@ BEGIN
      		EXECUTE format( 'CREATE TABLE %I.%I ( id uuid PRIMARY KEY DEFAULT gen_random_uuid(), created_at timestamptz DEFAULT now(),
 			 updated_at timestamptz DEFAULT now() )', _schema, _entity);
      	END IF;
-     	FOR k, v IN SELECT key, value FROM jsonb_each(_template -> _entity)
+     	FOR k, v IN SELECT key, value FROM jsonb_each(_entity_json -> _entity)
      	    LOOP
      	    	coltype := CASE jsonb_typeof(v)
      	    			WHEN 'number' THEN 'numeric'
@@ -714,8 +729,8 @@ BEGIN
      			EXECUTE format('ALTER TABLE %I.%I ADD COLUMN %I %s', _schema, _entity, k, coltype);
      		END IF;
      	   END LOOP;
-	PERFORM ec.insert_template(_schema, _entity, _template);
+	PERFORM ec.upsert_entity(_schema, _entity, _entity_json);
 END;
 $$;
 
-ALTER FUNCTION ec.create_entity_from_template(TEXT, TEXT, JSONB) OWNER TO ec;
+ALTER FUNCTION ec.deploy_entity(TEXT, TEXT, JSONB) OWNER TO ec;

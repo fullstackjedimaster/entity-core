@@ -75,6 +75,6 @@ class FormMetadataResponse(BaseModel):
     template: Dict[str, Any]
 
 
-class UpsertTemplateBody(BaseModel):
+class CreateEntityBody(BaseModel):
     schema_name: str
-    template: Dict[str, Any]
+    entity_json: Dict[str, Any]

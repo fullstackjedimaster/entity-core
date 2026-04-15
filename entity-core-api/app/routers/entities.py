@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
-from app.schemas import UpsertTemplateBody, RequestEnvelope
+from app.schemas import CreateEntityBody, RequestEnvelope
 
 router = APIRouter(prefix="/api/entities", tags=["entities"])
 
@@ -53,7 +53,7 @@ async def list_entities(request: Request):
 
     envelope = RequestEnvelope(
         operation="execute",
-        target="ec.listTemplates",
+        target="ec.list_entities",
         id=None,
         args={},  # schema is derived by entity-server from the JWT
         meta={"source": "entity-core:/entities"},
@@ -83,41 +83,32 @@ async def list_entities(request: Request):
 
 
 # ---------------------------------------------------------------------------
-# Upsert template for an entity (backed by ec.insertTemplate)
+# Upsert entity for an entity (backed by ec.insertTemplate)
 # ---------------------------------------------------------------------------
 
-@router.post("/entities/{entity}/upsert_template")
-async def upsert_template(
+@router.post("/entities/{entity}")
+async def create_entity(
     request: Request,
     entity: str,
-    body: UpsertTemplateBody,
+    body: CreateEntityBody,
 ):
-    """
-    Upsert a template for the given entity.
 
-    Old behavior:
-      - Direct SELECT ec.insert_template(schema_name, entity, template) on DB.
-
-    New behavior:
-      - entity-core builds a RequestEnvelope and calls entity-server, which
-        is responsible for calling ec.insertTemplate(schema_name, entity, template).
-    """
-    if not body.template or entity.strip() == "":
-        raise HTTPException(status_code=400, detail="Missing template or entity")
+    if not body.entity_json or entity.strip() == "":
+        raise HTTPException(status_code=400, detail="Missing  entity_json")
 
     _claims = await require_jwt([])(request)  # any authenticated user for now
     token = _extract_bearer_token(request)
 
     envelope = RequestEnvelope(
         operation="execute",
-        target="ec.insertTemplate",
+        target="ec.create_entity",
         id=None,
         args={
             "schema_name": body.schema_name,
             "entity_name": entity,
-            "template": body.template,
+            "entity_json": body.entity_jsom,
         },
-        meta={"source": "entity-core:/entities/{entity}/upsert_template"},
+        meta={"source": "entity-core:/entities/{entity}"},
     )
 
     data: Dict[str, Any] = await call_model_manage(envelope, token=token)
