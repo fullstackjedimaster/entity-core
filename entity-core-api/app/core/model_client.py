@@ -104,4 +104,4 @@ async def call_model_manage(
     """
     POST a RequestEnvelope to entity-server's /api/manage endpoint.
     """
-    return await _post("/", envelope.model_dump(), token)
+    return await _post("/api/manage", envelope.model_dump(), token)
