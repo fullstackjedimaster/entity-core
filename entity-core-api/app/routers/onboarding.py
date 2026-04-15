@@ -15,7 +15,7 @@ from app.schemas import RequestEnvelope
 from jose import jwt, JWTError
 
 AUTH0_REDIRECT_SECRET = env("AUTH0_REDIRECT_SECRET", required=True)
-router = APIRouter(prefix="/onboarding", tags=["onboarding"])
+router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
 
 def _stripped(v: Optional[str]) -> str:
