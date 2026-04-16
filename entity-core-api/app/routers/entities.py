@@ -31,7 +31,7 @@ def _extract_bearer_token(request: Request) -> str:
     return parts[1]
 
 
-@router.get("/")
+@router.get("")
 async def list_entities(request: Request):
     """
     List entity names that have templates.
