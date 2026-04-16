@@ -62,7 +62,7 @@ async def wait_for_metadata(
                 continue
 
             meta = resp.json().get("app_metadata", {})
-            print(f"[wait_for_metadata] Attempt {attempt}: {meta}")
+            print(f"[wait_for_metadata] Attempt {attempt}: {meta}{url}{token}")
 
             if meta.get("org_id") == org_id and meta.get("schema") == org_id:
                 print(f"[wait_for_metadata] ✅ Metadata propagated for {sub}")

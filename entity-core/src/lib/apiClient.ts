@@ -21,7 +21,7 @@ export function useApi() {
             const resp = await authedFetch('/api/entities');
             return handle(resp);
           },
-    
+
           get: async (entityName: string) => {
             const resp = await authedFetch(`/api/entities/${entityName}`);
             return handle(resp);
