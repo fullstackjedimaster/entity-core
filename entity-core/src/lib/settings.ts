@@ -8,8 +8,8 @@ function required(name: string, value?: string): string {
 }
 
 export const settings = {
-  ENTITY_CORE_API_BASE_URL:
-    process.env.NEXT_PUBLIC_ENTITY_CORE_API_BASE_URL ||
+  API_BASE_URL:
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
      "https://entity-core.fullstackjedi.dev/api",
 
   AUTH0_DOMAIN:

@@ -5,9 +5,9 @@ import httpx
 from app.core.settings import env
 
 AUTH0_DOMAIN = env("AUTH0_DOMAIN")
-CLIENT_ID = env("AUTH0_MGMT_CLIENT_ID")
-CLIENT_SECRET = env("AUTH0_MGMT_CLIENT_SECRET")
-AUDIENCE = f"https://{AUTH0_DOMAIN}/api/v2/"
+AUTH0_M2M_CLIENT_ID = env("AUTH0_M2M_CLIENT_ID")
+AUTH0_M2M_CLIENT_SECRET = env("AUTH0_M2M_CLIENT_SECRET")
+AUTH0_MANAGEMENT_AUDIENCE = env("AUTH0_MANAGEMENT_AUDIENCE")
 
 _cached_token = None
 _cached_expiry = 0  # UNIX timestamp when token expires
@@ -30,9 +30,9 @@ async def get_management_token() -> str:
 
     payload = {
         "grant_type": "client_credentials",
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "audience": AUDIENCE,
+        "client_id": AUTH0_M2M_CLIENT_ID,
+        "client_secret": AUTH0_M2M_CLIENT_SECRET,
+        "audience": AUTH0_MANAGEMENT_AUDIENCE,
     }
 
     async with httpx.AsyncClient(timeout=10.0) as client:
