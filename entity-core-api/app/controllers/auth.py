@@ -18,7 +18,7 @@ AUTH0_DOMAIN = env("AUTH0_DOMAIN")
 AUTH0_AUDIENCE = env("AUTH0_AUDIENCE")
 AUTH0_ISSUER = env("AUTH0_ISSUER") or (f"https://{AUTH0_DOMAIN}/" if AUTH0_DOMAIN else None)
 ALGORITHMS = ["RS256"]
-
+EC_SHARED_JWT_SECRET = env("EC_SHARED_JWT_SECRET")
 if not AUTH0_DOMAIN or not AUTH0_AUDIENCE or not AUTH0_ISSUER:
     raise RuntimeError(
         "[ec-control] AUTH0_DOMAIN, AUTH0_AUDIENCE, and AUTH0_ISSUER must be set "
@@ -95,9 +95,25 @@ def _get_rsa_key(request: Request, token: str) -> Dict[str, Any]:
 
 def decode_token(request: Request, token: str) -> Dict[str, Any]:
     """
-    Decode and verify an incoming Auth0 JWT using RS256 and the preloaded JWKS.
-    Enforces audience and issuer.
+    Supports:
+      - Auth0 RS256 tokens (external users)
+      - HS256 internal service tokens (entity-core → entity-server)
     """
+
+    # --- Try HS256 (internal service) FIRST ---
+    try:
+        claims = jwt.decode(
+            token,
+            EC_SHARED_JWT_SECRET,
+            algorithms=["HS256"],
+        )
+        if isinstance(claims, dict):
+            claims["_internal"] = True
+            return claims
+    except Exception:
+        pass  # fall through to Auth0
+
+    # --- Fallback to Auth0 RS256 ---
     rsa_key = _get_rsa_key(request, token)
 
     try:
@@ -131,7 +147,6 @@ def decode_token(request: Request, token: str) -> Dict[str, Any]:
         )
 
     return claims
-
 
 def claims_have_scopes(
     claims: Dict[str, Any],

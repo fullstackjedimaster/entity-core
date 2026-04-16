@@ -2,70 +2,48 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import {useAuthInfo} from '@/hooks/useAuthInfo';
+import { useApi } from '@/lib/apiClient';
 
 interface EntityInfo {
-  entityName: string;
+  entity_name: string;
 }
 
 export default function EntityIndexPage() {
+  const api = useApi();
+
   const [entities, setEntities] = useState<EntityInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { disableAuth, token, isAuthenticated, login } = useAuthInfo();
-
   useEffect(() => {
-      async function fetchEntities() {
-        try {
-          setLoading(true);
-          setError(null);
+    async function load() {
+      try {
+        setLoading(true);
+        setError(null);
 
-          if (!disableAuth && !isAuthenticated) {
-            login();
-            return;
-          }
-
-          const resp = await fetch('/api/entities', {
-            headers: token
-              ? {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                }
-              : undefined,
-          });
-
-          if (!resp.ok) {
-            const text = await resp.text();
-            throw new Error(`Server ${resp.status}: ${text}`);
-          }
-
-          const data = await resp.json();
-          setEntities(data);
-        } catch (err: any) {
-          console.error(err);
-          setError(err.message);
-        } finally {
-          setLoading(false);
-        }
+        const data = await api.entities.list();
+        setEntities(data);
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
+    }
 
-      fetchEntities();
-    }, [disableAuth, isAuthenticated, token]);
+    load();
+  }, []);
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
       <h1 className="text-2xl font-semibold">Entities</h1>
 
-      <div>
-        <Link
-          href="/entity/new"
-          className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          + Create New Entity
-        </Link>
-      </div>
+      <Link
+        href="/entity/new"
+        className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+      >
+        + Create New Entity
+      </Link>
 
       {loading && <p>Loading…</p>}
       {error && <p className="text-red-600">Error: {error}</p>}
@@ -76,10 +54,10 @@ export default function EntityIndexPage() {
 
       <ul className="border divide-y rounded">
         {entities.map((ent) => (
-          <li key={ent.entityName} className="p-4 flex justify-between">
-            <span>{ent.entityName}</span>
+          <li key={ent.entity_name} className="p-4 flex justify-between">
+            <span>{ent.entity_name}</span>
             <Link
-              href={`/entity/${ent.entityName}`}
+              href={`/entity/${ent.entity_name}`}
               className="text-blue-600 hover:underline"
             >
               View / Edit →
