@@ -17,54 +17,56 @@ interface AuthContextType {
     getToken: () => Promise<string | null>;
     getIdClaims: () => Promise<Record<string, unknown> | null>;
     getSchema: () => string | null;
+    getOrgId: () => string | null;
+    getRoles: () => string[];
     auth0: Auth0ContextInterface<User> | null;
     loading: boolean;
 }
 
 /**
- * Legacy-compatible pass-through provider.
- * We no longer need a real React context here, but we keep AuthProvider for
- * any existing imports. It simply renders {children}.
+ * Legacy-compatible provider (no-op wrapper)
  */
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return <>{children}</>;
 };
 
-// Internal helper to read schema/org from Auth0 user claims
+// Internal helper
 type UserWithClaims = User & Record<string, unknown>;
 
 export const useAuth = (): AuthContextType => {
     const auth0 = useAuth0<User>();
     const disableAuth = settings.DISABLE_AUTH;
 
-    // 🔧 Dev mode bypass (DISABLE_AUTH=true)
+    // --------------------------------------------------
+    // DEV MODE (DISABLE_AUTH=true)
+    // --------------------------------------------------
     if (disableAuth) {
         return {
             disableAuth: true,
             user: null,
             isAuthenticated: true,
-            login: async () => {
-                // no-op
-            },
+            login: async () => {},
             logout: () => {
-                // clear local caches if any
                 if (typeof window !== 'undefined') {
                     try {
                         localStorage.clear();
                         sessionStorage.clear();
-                    } catch {
-                        /* ignore */
-                    }
+                    } catch {}
                 }
             },
             getToken: async () => null,
             getIdClaims: async () => null,
             getSchema: () => null,
+            getOrgId: () => null,
+            getRoles: () => [],
             auth0: null,
             loading: false,
         };
     }
 
+    // --------------------------------------------------
+    // AUTH0 MODE
+    // --------------------------------------------------
     const {
         isAuthenticated,
         isLoading,
@@ -84,10 +86,9 @@ export const useAuth = (): AuthContextType => {
             try {
                 localStorage.clear();
                 sessionStorage.clear();
-            } catch {
-                /* ignore */
-            }
+            } catch {}
         }
+
         auth0Logout({
             logoutParams: {
                 returnTo:
@@ -101,19 +102,19 @@ export const useAuth = (): AuthContextType => {
     const getToken = async (): Promise<string | null> => {
         try {
             const token = await getAccessTokenSilently({
-                authorizationParams: {
-                    audience: settings.AUTH0_AUDIENCE!,
-                },
+                authorizationParams: settings.AUTH0_AUDIENCE
+                    ? { audience: settings.AUTH0_AUDIENCE }
+                    : undefined,
             });
 
             return token ?? null;
-        } catch (err: unknown) {
-            console.error('[Auth] token error:', err);
-            const error = err as { error?: string };
+        } catch (err: any) {
+            console.warn('[Auth] token error:', err?.error || err);
 
+            // ⚠️ Only redirect if truly required
             if (
-                error.error === 'login_required' ||
-                error.error === 'consent_required'
+                err?.error === 'login_required' ||
+                err?.error === 'consent_required'
             ) {
                 await login();
             }
@@ -126,25 +127,47 @@ export const useAuth = (): AuthContextType => {
         try {
             const claims = await getIdTokenClaims();
             return (claims as unknown as Record<string, unknown>) ?? null;
-        } catch (err: unknown) {
-            console.error('[Auth] getIdClaims error:', err);
+        } catch (err) {
+            console.warn('[Auth] getIdClaims error:', err);
             return null;
         }
     };
 
+    // --------------------------------------------------
+    // CLAIM HELPERS (CRITICAL FOR MULTI-TENANT)
+    // --------------------------------------------------
     const getSchema = (): string | null => {
         if (!user) return null;
-
         const claims = user as UserWithClaims;
 
-        const schemaClaim =
-            (claims['https://fullstackjedi.dev/schema'] as
-                | string
-                | undefined) ??
-            (claims['schema'] as string | undefined) ??
-            (claims['org_id'] as string | undefined);
+        return (
+            (claims['https://fullstackjedi.dev/schema'] as string) ||
+            (claims['schema'] as string) ||
+            (claims['org_id'] as string) ||
+            null
+        );
+    };
 
-        return schemaClaim ?? null;
+    const getOrgId = (): string | null => {
+        if (!user) return null;
+        const claims = user as UserWithClaims;
+
+        return (
+            (claims['https://fullstackjedi.dev/org_id'] as string) ||
+            (claims['org_id'] as string) ||
+            null
+        );
+    };
+
+    const getRoles = (): string[] => {
+        if (!user) return [];
+        const claims = user as UserWithClaims;
+
+        return (
+            (claims['https://fullstackjedi.dev/roles'] as string[]) ||
+            (claims['roles'] as string[]) ||
+            []
+        );
     };
 
     return {
@@ -156,6 +179,8 @@ export const useAuth = (): AuthContextType => {
         getToken,
         getIdClaims,
         getSchema,
+        getOrgId,
+        getRoles,
         auth0,
         loading: isLoading,
     };

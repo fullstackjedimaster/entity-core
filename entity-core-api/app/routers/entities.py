@@ -1,10 +1,8 @@
-# app/routers/entity.py
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Request
 
 from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
@@ -13,11 +11,11 @@ from app.schemas import CreateEntityBody, RequestEnvelope, EntityResponse
 router = APIRouter(prefix="/api/entities", tags=["entities"])
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
 def _extract_bearer_token(request: Request) -> str:
-    """
-    Reuse the incoming Authorization header so entity-server can
-    validate the same JWT. We do NOT re-sign anything here.
-    """
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
@@ -26,64 +24,54 @@ def _extract_bearer_token(request: Request) -> str:
     if len(parts) != 2 or parts[0].lower() != "bearer":
         raise HTTPException(
             status_code=401,
-            detail="Authorization header must be in the format: Bearer <token>",
+            detail="Authorization header must be: Bearer <token>",
         )
     return parts[1]
 
 
+def _unwrap_result(data: Dict[str, Any], error_msg: str):
+    if not data.get("ok", False):
+        raise HTTPException(status_code=502, detail=data.get("message") or error_msg)
+    return data.get("result")
+
+
+# ---------------------------------------------------------------------------
+# List entities
+# ---------------------------------------------------------------------------
+
 @router.get("")
 async def list_entities(request: Request):
-    """
-    List entity names that have templates.
-
-    Old behavior:
-      - Direct SELECT ec.listTemplates(schema) FROM DB.
-
-    New behavior:
-      - Build a RequestEnvelope and call entity-server via call_model_manage.
-      - entity-server is responsible for resolving schema/org and hitting ec.listTemplates.
-    """
-    # 🔐 Require any authenticated user (no specific scopes)
-    _claims = await require_jwt([])(request)
+    await require_jwt([])(request)
     token = _extract_bearer_token(request)
 
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.list_entities",
         id=None,
-        args={},  # schema is derived by entity-server from the JWT
-        meta={"source": "entity-core:/entities"},
+        args={},
+        meta={"source": "entity-core:/api/entities"},
     )
 
-    data: Dict[str, Any] = await call_model_manage(envelope, token=token)
+    data = await call_model_manage(envelope, token=token)
+    result = _unwrap_result(data, "entity-server failed listing entities")
 
-    if not data.get("ok", False):
-        raise HTTPException(
-            status_code=502,
-            detail=data.get("message") or "entity-server reported failure for listTemplates",
-        )
+    rows = result.get("rows") if isinstance(result, dict) else result or []
 
-    result = data.get("result")
-    # Be defensive about shape: it might be list OR {"rows": [...]}
-    if isinstance(result, dict) and "rows" in result:
-        rows = result["rows"]
-    else:
-        rows = result or []
+    return {
+        "entities": [
+            r["entity_name"]
+            for r in rows
+            if isinstance(r, dict) and "entity_name" in r
+        ]
+    }
 
-    entities: List[str] = []
-    for row in rows:
-        if isinstance(row, dict) and "entity_name" in row:
-            entities.append(str(row["entity_name"]))
 
-    return {"entities": entities}
+# ---------------------------------------------------------------------------
+# Get entity template
+# ---------------------------------------------------------------------------
 
 @router.get("/{entity}", response_model=EntityResponse)
-async def get_entity(
-    request: Request,
-    entity: str) -> EntityResponse:
-    """
-    Get a template JSON for the given entity_name in the caller's schema.
-    """
+async def get_entity(request: Request, entity: str):
     token = _extract_bearer_token(request)
 
     envelope = RequestEnvelope(
@@ -91,38 +79,33 @@ async def get_entity(
         target="ec.get_entity",
         id=None,
         args={"entity_name": entity},
-        meta={"source": "entity-core:/api/entities/{entity}:GET"},
+        meta={"source": "entity-core:/api/entities/{entity}"},
     )
 
-    data: Dict[str, Any] = await call_model_manage(envelope, token=token)
+    data = await call_model_manage(envelope, token=token)
+    ent = _unwrap_result(data, "entity-server failed get_entity")
 
-    if not data.get("ok", False):
-        raise HTTPException(
-            status_code=502,
-            detail=data.get("message") or "entity-server reported failure for getTemplate",
-        )
-
-    ent = data.get("result")
     if ent is None:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    if isinstance(ent, dict) and "entity_json" in ent and "entity_name" in ent:
-        return EntityResponse(entity_name=ent["entity_name"], template=ent["entity_json"])
+    if isinstance(ent, dict) and "entity_name" in ent:
+        return EntityResponse(
+            entity_name=ent["entity_name"],
+            template=ent.get("entity_json"),
+        )
 
-    # Fallback: assume tpl is the raw template dict
-    return EntityResponse(entity_name=ent, template=ent)
+    return EntityResponse(entity_name=entity, template=ent)
+
+
+# ---------------------------------------------------------------------------
+# Create entity
+# ---------------------------------------------------------------------------
 
 @router.post("/{entity}")
-async def create_entity(
-    request: Request,
-    entity: str,
-    body: CreateEntityBody,
-):
+async def create_entity(request: Request, entity: str, body: CreateEntityBody):
+    if not body.entity_json:
+        raise HTTPException(status_code=400, detail="Missing entity_json")
 
-    if not body.entity_json or entity.strip() == "":
-        raise HTTPException(status_code=400, detail="Missing  entity_json")
-
-    _claims = await require_jwt([])(request)  # any authenticated user for now
     token = _extract_bearer_token(request)
 
     envelope = RequestEnvelope(
@@ -132,42 +115,24 @@ async def create_entity(
         args={
             "schema_name": body.schema_name,
             "entity_name": entity,
-            "entity_json": body.entity_jsom,
+            "entity_json": body.entity_json,
         },
-        meta={"source": "entity-core:/entities/{entity}"},
+        meta={"source": "entity-core:/api/entities/{entity}:POST"},
     )
 
-    data: Dict[str, Any] = await call_model_manage(envelope, token=token)
+    data = await call_model_manage(envelope, token=token)
+    _unwrap_result(data, "entity-server failed create_entity")
 
-    if not data.get("ok", False):
-        raise HTTPException(
-            status_code=502,
-            detail=data.get("message") or "entity-server reported failure for insertTemplate",
-        )
-
-    return JSONResponse(content={"status": "ok"}, status_code=200)
+    return {"status": "ok"}
 
 
 # ---------------------------------------------------------------------------
-# Get form metadata for entity (backed by ec.get_form_metadata)
+# Form metadata
 # ---------------------------------------------------------------------------
 
-@router.get("/{entityName}/form_metadata")
-async def get_form_metadata(
-    request: Request,
-    entity: str,
-):
-    """
-    Fetch form metadata for an entity.
-
-    Old behavior:
-      - SELECT * FROM ec.get_form_metadata(schema, entity).
-
-    New behavior:
-      - entity-core calls entity-server → target 'ec.get_form_metadata'
-      - entity-server resolves schema/org from JWT and calls the DB function.
-    """
-    _claims = await require_jwt([f"read:{entity}"])(request)
+@router.get("/{entity}/form_metadata")
+async def get_form_metadata(request: Request, entity: str):
+    await require_jwt([f"read:{entity}"])(request)
     token = _extract_bearer_token(request)
 
     envelope = RequestEnvelope(
@@ -175,52 +140,33 @@ async def get_form_metadata(
         target="ec.get_form_metadata",
         id=None,
         args={"entity_name": entity},
-        meta={"source": "entity-core:/api/entity/{entity}/form_metadata"},
+        meta={"source": "entity-core:/api/entities/{entity}/form_metadata"},
     )
 
-    data: Dict[str, Any] = await call_model_manage(envelope, token=token)
+    data = await call_model_manage(envelope, token=token)
+    result = _unwrap_result(data, "entity-server failed form_metadata")
 
-    if not data.get("ok", False):
-        raise HTTPException(
-            status_code=502,
-            detail=data.get("message") or "entity-server reported failure for get_form_metadata",
-        )
-
-    result = data.get("result")
-    # Again, be flexible about shape:
     if isinstance(result, dict) and "rows" in result:
         return result["rows"]
+
     if isinstance(result, list):
         return result
 
-    raise HTTPException(
-        status_code=500,
-        detail="Unexpected result format from entity-server for get_form_metadata",
-    )
+    raise HTTPException(status_code=500, detail="Unexpected result format")
 
 
 # ---------------------------------------------------------------------------
-# Column option provider for cascading dropdowns (ec.get_column_options)
+# Column options
 # ---------------------------------------------------------------------------
 
-@router.get("/options/{entityName}/{column}")
+@router.get("/options/{entity}/{column}")
 async def get_column_options(
     request: Request,
     entity: str,
     column: str,
     filter: Optional[str] = None,
 ):
-    """
-    Fetch options for a given entity/column (used for cascading dropdowns, etc.).
-
-    Old behavior:
-      - SELECT * FROM ec.get_column_options(schema, entity, column, filter).
-
-    New behavior:
-      - entity-core calls entity-server → target 'ec.get_column_options'
-      - entity-server resolves schema/org and calls the DB function.
-    """
-    _claims = await require_jwt([f"read:{entity}"])(request)
+    await require_jwt([f"read:{entity}"])(request)
     token = _extract_bearer_token(request)
 
     envelope = RequestEnvelope(
@@ -232,36 +178,23 @@ async def get_column_options(
             "column": column,
             "filter": filter,
         },
-        meta={"source": "entity-core:/api/options/{entity}/{column}"},
+        meta={"source": "entity-core:/api/entities/options"},
     )
 
-    data: Dict[str, Any] = await call_model_manage(envelope, token=token)
+    data = await call_model_manage(envelope, token=token)
+    result = _unwrap_result(data, "entity-server failed column_options")
 
-    if not data.get("ok", False):
-        raise HTTPException(
-            status_code=502,
-            detail=data.get("message") or "entity-server reported failure for get_column_options",
-        )
+    values: List[Any] = []
 
-    result = data.get("result")
-    # Expect either a list of scalars or list of dicts with 'value'
     if isinstance(result, list):
-        values: List[Any] = []
         for item in result:
-            if isinstance(item, dict) and "value" in item:
-                values.append(item["value"])
-            else:
-                values.append(item)
+            values.append(item.get("value") if isinstance(item, dict) else item)
         return values
 
     if isinstance(result, dict) and "rows" in result:
-        values = []
         for row in result["rows"]:
-            if isinstance(row, dict) and "value" in row:
-                values.append(row["value"])
+            if isinstance(row, dict):
+                values.append(row.get("value"))
         return values
 
-    raise HTTPException(
-        status_code=500,
-        detail="Unexpected result format from entity-server for get_column_options",
-    )
+    raise HTTPException(status_code=500, detail="Unexpected result format")
