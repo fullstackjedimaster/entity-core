@@ -8,9 +8,9 @@ from fastapi.responses import JSONResponse
 
 from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
-from app.schemas import CreateEntityBody, RequestEnvelope
+from app.schemas import CreateEntityBody, RequestEnvelope, EntityResponse
 
-router = APIRouter(prefix="/api/entity", tags=["entity"])
+router = APIRouter(prefix="/api/entities", tags=["entities"])
 
 
 def _extract_bearer_token(request: Request) -> str:
@@ -31,7 +31,7 @@ def _extract_bearer_token(request: Request) -> str:
     return parts[1]
 
 
-@router.get("/entity")
+@router.get("/")
 async def list_entities(request: Request):
     """
     List entity names that have templates.
@@ -52,7 +52,7 @@ async def list_entities(request: Request):
         target="ec.list_entities",
         id=None,
         args={},  # schema is derived by entity-server from the JWT
-        meta={"source": "entity-core:/entity"},
+        meta={"source": "entity-core:/entities"},
     )
 
     data: Dict[str, Any] = await call_model_manage(envelope, token=token)
@@ -75,11 +75,44 @@ async def list_entities(request: Request):
         if isinstance(row, dict) and "entity_name" in row:
             entities.append(str(row["entity_name"]))
 
-    return {"entity": entities}
+    return {"entities": entities}
 
+@router.get("/{entity}", response_model=EntityResponse)
+async def get_entity(
+    request: Request,
+    entity: str) -> EntityResponse:
+    """
+    Get a template JSON for the given entity_name in the caller's schema.
+    """
+    token = _extract_bearer_token(request)
 
+    envelope = RequestEnvelope(
+        operation="execute",
+        target="ec.get_entity",
+        id=None,
+        args={"entity_name": entity},
+        meta={"source": "entity-core:/api/entities/{entity}:GET"},
+    )
 
-@router.post("/entity/{entityName}")
+    data: Dict[str, Any] = await call_model_manage(envelope, token=token)
+
+    if not data.get("ok", False):
+        raise HTTPException(
+            status_code=502,
+            detail=data.get("message") or "entity-server reported failure for getTemplate",
+        )
+
+    ent = data.get("result")
+    if ent is None:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    if isinstance(ent, dict) and "entity_json" in ent and "entity_name" in ent:
+        return EntityResponse(entity_name=ent["entity_name"], template=ent["entity_json"])
+
+    # Fallback: assume tpl is the raw template dict
+    return EntityResponse(entity_name=ent, template=ent)
+
+@router.post("/{entity}")
 async def create_entity(
     request: Request,
     entity: str,
@@ -101,7 +134,7 @@ async def create_entity(
             "entity_name": entity,
             "entity_json": body.entity_jsom,
         },
-        meta={"source": "entity-core:/entity/{entity}"},
+        meta={"source": "entity-core:/entities/{entity}"},
     )
 
     data: Dict[str, Any] = await call_model_manage(envelope, token=token)
@@ -119,7 +152,7 @@ async def create_entity(
 # Get form metadata for entity (backed by ec.get_form_metadata)
 # ---------------------------------------------------------------------------
 
-@router.get("/entity/{entity}/form_metadata")
+@router.get("/{entityName}/form_metadata")
 async def get_form_metadata(
     request: Request,
     entity: str,
@@ -170,7 +203,7 @@ async def get_form_metadata(
 # Column option provider for cascading dropdowns (ec.get_column_options)
 # ---------------------------------------------------------------------------
 
-@router.get("/options/{entity}/{column}")
+@router.get("/options/{entityName}/{column}")
 async def get_column_options(
     request: Request,
     entity: str,
