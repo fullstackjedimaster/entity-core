@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { getAuth0 } from '@/lib/auth';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface EntityInfo {
@@ -14,45 +13,45 @@ export default function EntityIndexPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { disableAuth } = useAuth();
+  const { disableAuth, token, isAuthenticated, login } = useAuthInfo();
 
   useEffect(() => {
-  async function fetchEntities() {
-    try {
-      setLoading(true);
-      setError(null);
+      async function fetchEntities() {
+        try {
+          setLoading(true);
+          setError(null);
 
-      if (!disableAuth && !isAuthenticated) {
-        login();
-        return;
+          if (!disableAuth && !isAuthenticated) {
+            login();
+            return;
+          }
+
+          const resp = await fetch('/api/entities', {
+            headers: token
+              ? {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                }
+              : undefined,
+          });
+
+          if (!resp.ok) {
+            const text = await resp.text();
+            throw new Error(`Server ${resp.status}: ${text}`);
+          }
+
+          const data = await resp.json();
+          setEntities(data);
+        } catch (err: any) {
+          console.error(err);
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
       }
 
-      const resp = await fetch('/api/entities', {
-        headers: token
-          ? {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            }
-          : undefined,
-      });
-
-      if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(`Server ${resp.status}: ${text}`);
-      }
-
-      const data = await resp.json();
-      setEntities(data);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  fetchEntities();
-}, [disableAuth, isAuthenticated, token]);
+      fetchEntities();
+    }, [disableAuth, isAuthenticated, token]);
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
