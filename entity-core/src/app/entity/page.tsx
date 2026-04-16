@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import {useAuthInfo} from '@/hooks/useAuthInfo';
 
 interface EntityInfo {
-  entity_name: string;
+  entityName: string;
 }
 
 export default function EntityIndexPage() {
