@@ -52,7 +52,7 @@ async def list_entities(request: Request):
         meta={"source": "entity-core:/api/entities"},
     )
 
-    data = await call_model_manage(envelope, token=token)
+    data = await call_model_manage(envelope, token=None)
     result = _unwrap_result(data, "entity-server failed listing entities")
 
     rows = result.get("rows") if isinstance(result, dict) else result or []
