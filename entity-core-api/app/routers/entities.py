@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Request
-
+from fastapi import APIRouter, Request, Depends, HTTPException
 from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
 from app.schemas import CreateEntityBody, RequestEnvelope, EntityResponse
@@ -40,9 +39,11 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 # ---------------------------------------------------------------------------
 
 @router.get("")
-async def list_entities(request: Request):
-    await require_jwt([])(request)
-    token = _extract_bearer_token(request)
+async def list_entities(request: Request, _=Depends(require_jwt()),):
+    schema = request.state.schema
+
+    if not schema:
+        raise HTTPException(status_code=400, detail="Missing schema")
 
     envelope = RequestEnvelope(
         operation="execute",
@@ -51,8 +52,8 @@ async def list_entities(request: Request):
         args={},
         meta={"source": "entity-core:/api/entities"},
     )
-
-    data = await call_model_manage(envelope, token=None)
+    token = request.headers.get("Authorization")
+    data = await call_model_manage(envelope, token=token)
     result = _unwrap_result(data, "entity-server failed listing entities")
 
     rows = result.get("rows") if isinstance(result, dict) else result or []
