@@ -7,26 +7,26 @@ export function useAuthedFetch() {
   const { token, isAuthenticated, login, disableAuth } = useAuthInfo();
 
   return useCallback(
-    async (url: string, options: RequestInit = {}) => {
-      if (!disableAuth && !isAuthenticated) {
-        await login();
-        return;
-      }
+      async (url: string, options: RequestInit = {}): Promise<Response> => {
+        if (!disableAuth && !isAuthenticated) {
+          await login();
+          throw new Error('Not authenticated');
+        }
 
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      };
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+          ...(options.headers || {}),
+        };
 
-      if (token) {
-        (headers as any).Authorization = `Bearer ${token}`;
-      }
+        if (token) {
+          (headers as any).Authorization = `Bearer ${token}`;
+        }
 
-      return fetch(url, {
-        ...options,
-        headers,
-      });
-    },
-    [token, isAuthenticated, login, disableAuth]
-  );
+        return fetch(url, {
+          ...options,
+          headers,
+        });
+      },
+      [token, isAuthenticated, login, disableAuth]
+    );
 }
