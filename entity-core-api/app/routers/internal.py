@@ -44,12 +44,11 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 
 
 
-@router.post("/provision_status}")
-async def provision_status( request: Request, sub: str):
+@router.get("/provision_status", dependencies=[Depends(no_auth)])
+async def provision_status(sub: str):
     if not sub:
-        raise HTTPException(status_code=400, detail="Missing entity_json")
+        raise HTTPException(status_code=400, detail="Missing sub")
 
-    token = _extract_bearer_token(request)
 
     envelope = RequestEnvelope(
         operation="execute",
@@ -64,7 +63,7 @@ async def provision_status( request: Request, sub: str):
     data = await call_model_manage(envelope, token=token)
     result = _unwrap_result(data, "entity-server failed create_entity")
 
-    return {result}
+    return result
 
 
 # -----------------------------
