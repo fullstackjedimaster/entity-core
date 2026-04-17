@@ -39,7 +39,7 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 # ---------------------------------------------------------------------------
 
 @router.get("")
-async def list_entities(request: Request, _=Depends(require_jwt()),):
+async def list_entities(request: Request, _=Depends(require_jwt())):
     schema = request.state.schema
 
     if not schema:

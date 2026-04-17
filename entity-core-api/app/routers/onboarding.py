@@ -71,8 +71,7 @@ async def patch_auth0_user(sub: str, app_metadata: dict):
 
 @router.post("/provision_tenant")
 async def provision_tenant(
-    payload: Dict[str, Any],
-    request: Request
+    request: Request, _=Depends(require_jwt())
 ):
     """
     Provision a new tenant schema/org and seed the requesting user as creator.
@@ -83,6 +82,9 @@ async def provision_tenant(
       - entity-core then patches Auth0 app_metadata based on DB result
     """
     # ---- input ----------------------------------------------------------------
+
+    payload = verify_onboarding_token(request)
+
     schema = payload.get("schema")
     sub = payload.get("sub")
     email = payload.get("email")
@@ -106,7 +108,7 @@ async def provision_tenant(
     initial_roles = payload.get("roles") or ["creator"]
     initial_perms = payload.get("permissions") or ["crud:read", "crud:write", "crud:delete"]
 
-    claims = verify_onboarding_token(request)
+
 
     # ---- DB call via entity-server --------------------------------------------
     envelope = RequestEnvelope(
