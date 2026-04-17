@@ -42,34 +42,28 @@ def _extract_bearer_token(request: Request) -> str:
 # ----------------------------------------------------
 
 @router.get("/wait_for_metadata", dependencies=[Depends(no_auth)])
-async def wait_for_metadata(
-    sub: str = Query(...),
-    org_id: str = Query(...),
-):
-    """
-    Poll Auth0 Management API until app_metadata shows the desired org_id/schema.
-    This remains an entity-core concern; no DB involved.
-    """
-
+async def wait_for_metadata(sub: str = Query(...), org_id: str = Query(...)):
     token = await get_management_token()
     url = f"https://{domain}/api/v2/users/{sub}"
 
     async with httpx.AsyncClient(timeout=10.0) as client:
-        for attempt in range(50):
-            await asyncio.sleep(0.5)
-            resp = await client.get(url, headers={"Authorization": f"Bearer {token}"})
-            if not resp.is_success:
-                continue
+        for attempt in range(30):
+            resp = await client.get(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+            )
 
-            meta = resp.json().get("app_metadata", {})
-            print(f"[wait_for_metadata] Attempt {attempt}: {meta}{url}{token}")
+            if resp.is_success:
+                meta = resp.json().get("app_metadata", {})
 
-            if meta.get("org_id") == org_id and meta.get("schema") == org_id:
-                print(f"[wait_for_metadata] ✅ Metadata propagated for {sub}")
-                return {"ok": True, "meta": meta}
+                print(f"[wait_for_metadata] attempt={attempt} meta={meta}")
 
-    return JSONResponse({"ok": False, "pending": True}, status_code=202)
+                if meta.get("org_id") == org_id:
+                    return {"ok": True, "meta": meta}
 
+            await asyncio.sleep(1)  # consistent pacing
+
+    return JSONResponse({"ok": False}, status_code=202)
 
 # ----------------------------------------------------
 # /internal/schemas/list — admin-level call via entity-server

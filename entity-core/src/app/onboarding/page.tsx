@@ -63,79 +63,53 @@ function OnboardingInner() {
         }
     }, [sessionToken]);
 
-    // Wait for Auth0 app_metadata propagation
-    const waitForAuth0Metadata = async (sub: string, org: string) => {
-        const url = `${API_BASE_URL}/internal/wait_for_metadata?sub=${encodeURIComponent(
-            sub
-        )}&org_id=${encodeURIComponent(org)}`;
 
-        for (let attempt = 0; attempt < 24; attempt++) {
-            const res = await fetch(url);
-            if (res.ok) return true;
-            await new Promise((r) => setTimeout(r, 500));
-        }
-
-        return false;
-    };
 
   const submit = async () => {
-  try {
-    setError(null);
+      try {
+        setLoading(true);
+        setError(null);
 
-    if (!sessionToken) {
-      setError("Missing session token.");
-      return;
-    }
+        const org = orgKey.trim().toLowerCase();
 
-    const org = orgKey.trim().toLowerCase();
-    if (!org) {
-      setError("Please enter an organization name.");
-      return;
-    }
+        const provRes = await fetch(`${API_BASE_URL}/onboarding/provision_tenant`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Onboarding-Token": sessionToken,
+          },
+          body: JSON.stringify({
+            schema: org,
+            sub: decoded?.sub,
+            email: decoded?.email,
+            name: decoded?.name || decoded?.email?.split("@")[0],
+            picture: decoded?.picture || null,
+          }),
+        });
 
-    setLoading(true);
+        if (!provRes.ok) {
+          setError(await provRes.text());
+          return;
+        }
 
-    const body = {
-      schema: org,
-      sub: decoded?.sub,
-      email: decoded?.email,
-      name: decoded?.name || decoded?.email?.split("@")[0],
-      picture: decoded?.picture || null,
-    };
+        const prov = await provRes.json();
 
-    const provRes = await fetch(
-      `${API_BASE_URL}/onboarding/provision_tenant`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Onboarding-Token": sessionToken, // ✅ THIS is the key change
-        },
-        body: JSON.stringify(body),
+        const waitRes = await fetch(
+          `${API_BASE_URL}/internal/wait_for_metadata?sub=${encodeURIComponent(decoded?.sub)}&org_id=${encodeURIComponent(prov?.app_metadata?.org_id || org)}`
+        );
+
+        if (!waitRes.ok) {
+          setError("Provisioning not fully propagated");
+          return;
+        }
+
+        window.location.href = `https://${AUTH0_DOMAIN}/continue?state=${stateParam}`;
+      } catch (e: any) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
       }
-    );
-
-    if (!provRes.ok) {
-      const t = await provRes.text().catch(() => "");
-      setError(`Provision failed (${provRes.status}): ${t}`);
-      return;
-    }
-
-    const prov = await provRes.json();
-
-    await waitForAuth0Metadata(
-      decoded?.sub,
-      prov?.app_metadata?.org_id || org
-    );
-
-    window.location.href = `https://${AUTH0_DOMAIN}/continue?state=${stateParam}`;
-  } catch (err: any) {
-    console.error("[Onboarding] Error:", err);
-    setError(err.message || "Unknown error");
-  } finally {
-    setLoading(false);
-  }
-};
+    };
     return (
         <main className="p-6 max-w-md mx-auto space-y-6">
             <h1 className="text-2xl font-bold">Create Your Organization</h1>
