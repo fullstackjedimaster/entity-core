@@ -95,9 +95,7 @@ function OnboardingInner() {
 
         const prov = await provRes.json();
 
-        const waitRes = await fetch(
-          `${API_BASE_URL}/internal/wait_for_metadata?sub=${encodeURIComponent(decoded?.sub)}&org_id=${encodeURIComponent(prov?.app_metadata?.org_id || org)}`
-        );
+
 
         if (!waitRes.ok) {
           setError("Provisioning not fully propagated");

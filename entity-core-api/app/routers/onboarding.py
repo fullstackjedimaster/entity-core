@@ -123,6 +123,8 @@ async def provision_tenant(
         )
 
     # ---- auth0 patch -----------------------------------------------------------
+    domain = env("AUTH0_DOMAIN")
+    mgmt_token = await get_management_token()
 
     app_metadata = {
         "schema": schema,
@@ -131,6 +133,20 @@ async def provision_tenant(
         "permissions": db_result.get("permissions") or [],
     }
 
+    patch_url = f"https://{domain}/api/v2/users/{sub}"
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.patch(
+                patch_url,
+                headers={
+                    "Authorization": f"Bearer {mgmt_token}",
+                    "Content-Type": "application/json",
+                },
+                json={"app_metadata": app_metadata},
+            )
+            resp.raise_for_status()
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Auth0 patch failed: {e}")
 
     # ---- success ---------------------------------------------------------------
     return {
