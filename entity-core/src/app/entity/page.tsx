@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useApi } from '@/lib/apiClient';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EntityInfo {
   entity_name: string;
@@ -10,6 +11,7 @@ interface EntityInfo {
 
 export default function EntityIndexPage() {
   const api = useApi();
+  const { isAuthenticated, login, loading: authLoading, disableAuth } = useAuth();
 
   const [entities, setEntities] = useState<EntityInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +20,15 @@ export default function EntityIndexPage() {
   useEffect(() => {
     async function load() {
       try {
+        // ⛔ wait for auth system to initialize
+        if (authLoading) return;
+
+        // 🔐 trigger login if needed
+        if (!disableAuth && !isAuthenticated) {
+          await login();
+          return;
+        }
+
         setLoading(true);
         setError(null);
 
@@ -32,7 +43,7 @@ export default function EntityIndexPage() {
     }
 
     load();
-  }, []);
+  }, [authLoading, isAuthenticated, disableAuth]);
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">

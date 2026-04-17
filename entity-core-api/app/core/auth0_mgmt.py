@@ -46,6 +46,6 @@ async def get_management_token() -> str:
         _cached_token = data["access_token"]
         _cached_expiry = now + data.get("expires_in", 3600)
 
-        print("[auth0] ✅ Management token updated and cached")
+        print(f"[auth0] ✅ Management token updated and cached{data}")
 
         return _cached_token
