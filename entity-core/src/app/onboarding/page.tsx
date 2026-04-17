@@ -103,7 +103,7 @@ function OnboardingInner() {
           return;
         }
 
-        window.location.href = `https://${AUTH0_DOMAIN}/continue?state=${stateParam}`;
+      window.location.href =`https://${AUTH0_DOMAIN}/authorize?prompt=none&redirect_uri=${AUTH0_REDIRECT_URI}`;
       } catch (e: any) {
         setError(e.message);
       } finally {
