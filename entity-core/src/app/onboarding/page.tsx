@@ -128,7 +128,7 @@ function OnboardingInner() {
       prov?.app_metadata?.org_id || org
     );
 
-    window.location.href = `https://${AUTH0_DOMAIN}/continue?state=${stateParam}`;
+    window.location.href = `https://${domain}/continue?state=${stateParam}`;
   } catch (err: any) {
     console.error("[Onboarding] Error:", err);
     setError(err.message || "Unknown error");
