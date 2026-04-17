@@ -72,7 +72,7 @@ class FormMetadataResponse(BaseModel):
     entity_json: Dict[str, Any]
 
 
-class CreateTenantBody(BaseModel):
+class TenantBody(BaseModel):
     sub: str
     app_metadata: Dict[str, Any]
 

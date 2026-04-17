@@ -737,7 +737,7 @@ BEGIN
 
   PERFORM ec._upsert_tenant(p_sub, v_app_metadata);
 
-  return v_app_metadata;
+  return app_metadata;
 END;
 $$;
 

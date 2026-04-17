@@ -147,11 +147,13 @@ async def provision_tenant(
             detail="Provision failed: invalid DB response from entity-server",
         )
 
-        # ✅ async persistence (no waiting, no blocking)
-    asyncio.create_task(patch_auth0_user(sub, db_result.app_metadata))
+    app_metadata = db_result.get("app_metadata", {})
+
+    # ✅ async persistence
+    asyncio.create_task(patch_auth0_user(sub, app_metadata))
 
     return {
         "status": "ok",
-        "app_metadata": db_result.app_metadata
+        "app_metadata": app_metadata
     }
 
