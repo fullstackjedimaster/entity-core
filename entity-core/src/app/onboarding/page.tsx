@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { settings } from "@/lib/settings";
 import { useAuth } from "@/contexts/AuthContext";
 
-API_BASE_URL = settings.API_BASE_URL
+const API_BASE_URL = settings.API_BASE_URL
+const AUTH0_DOMAIN = settings.AUTH0_DOMAIN
 /**
  * Wrapper component to satisfy Next's requirement that
  * useSearchParams() be used inside a Suspense boundary.
@@ -103,7 +104,7 @@ function OnboardingInner() {
     };
 
     const provRes = await fetch(
-      `${settings.ENTITY_CORE_API_BASE_URL}/onboarding/provision_tenant`,
+      `${API_BASE_URL}/onboarding/provision_tenant`,
       {
         method: "POST",
         headers: {
@@ -127,7 +128,7 @@ function OnboardingInner() {
       prov?.app_metadata?.org_id || org
     );
 
-    window.location.href = `https://${settings.AUTH0_DOMAIN}/continue?state=${stateParam}`;
+    window.location.href = `https://${AUTH0_DOMAIN}/continue?state=${stateParam}`;
   } catch (err: any) {
     console.error("[Onboarding] Error:", err);
     setError(err.message || "Unknown error");
