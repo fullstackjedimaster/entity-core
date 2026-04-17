@@ -11,7 +11,7 @@ export async function apiFetchRaw(
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    return fetch(`${settings.ENTITY_CORE_API_BASE_URL}${path}`, {
+    return fetch(`${settings.API_BASE_URL}${path}`, {
         ...options,
         headers,
         credentials: "include",

@@ -19,7 +19,7 @@ export function useEntityEditor(entityName: string) {
             if (!token) throw new Error("Missing token");
 
             const res = await fetch(
-                `${settings.ENTITY_CORE_API_BASE_URL}/api/entities/${entityName}`,
+                `${settings.API_BASE_URL}/api/entities/${entityName}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -52,7 +52,7 @@ export function useEntityEditor(entityName: string) {
 
         try {
             const res = await fetch(
-                `${settings.ENTITY_CORE_API_BASE_URL}/api/entities`,
+                `${settings.API_BASE_URL}/api/entities`,
                 {
                     method: "POST",
                     headers: {
