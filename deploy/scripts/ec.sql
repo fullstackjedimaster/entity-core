@@ -37,7 +37,7 @@ BEGIN
   INSERT INTO ec.tenant(sub, app_metadata )
   VALUES (p_sub, p_app_metadata)
   ON CONFLICT (sub)
-  DO UPDATE SET sub = EXCLUDED.p_sub,
+  DO UPDATE SET sub = EXCLUDED.sub,
       app_metadata = EXCLUDED.app_metadata;
 END;
 $$;
