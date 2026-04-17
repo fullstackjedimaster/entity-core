@@ -491,7 +491,7 @@ DECLARE
   v_org_id uuid;
   v_parent_id uuid;
   v_sql text;
-  v_user text;
+  v_user jsonb;
   v_root_org_key text;
 BEGIN
   EXECUTE format(
@@ -731,8 +731,8 @@ BEGIN
     'org_id', v_org_id,
     'user_id', v_user_id,
     'user', v_user->user,
-    'roles', v_user->roles,
-    'permissions', v_user->permissions
+    'roles',  to_jsonb(p_roles),
+    'permissions', p_permissions
   );
 
   PERFORM ec._upsert_tenant(p_sub, v_app_metadata);
