@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const API_BASE_URL = settings.API_BASE_URL
 const AUTH0_DOMAIN = settings.AUTH0_DOMAIN
+const AUTH0_REDIRECT_URI = settings.AUTH0_REDIRECT_URI
 /**
  * Wrapper component to satisfy Next's requirement that
  * useSearchParams() be used inside a Suspense boundary.
