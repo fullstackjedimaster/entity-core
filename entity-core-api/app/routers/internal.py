@@ -50,9 +50,9 @@ async def wait_for_metadata(
     Poll Auth0 Management API until app_metadata shows the desired org_id/schema.
     This remains an entity-core concern; no DB involved.
     """
-    
+
     token = await get_management_token()
-    url = f"https://{env("AUTH0_DOMAIN")}/api/v2/users/{sub}"
+    url = f"https://{domain}/api/v2/users/{sub}"
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         for attempt in range(50):
