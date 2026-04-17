@@ -726,7 +726,7 @@ BEGIN
   );
 
   -- 9️eturn unified summary
-  v_app_metadata :=  jsonb_build_object(
+  v_app_metadata jsonb_build_object(
     'schema', p_schema,
     'org_id', v_org_id,
     'user_id', v_user_id,
@@ -737,7 +737,7 @@ BEGIN
 
   PERFORM ec._upsert_tenant(p_sub, v_app_metadata);
 
-  return app_metadata;
+  return v_app_metadata;
 END;
 $$;
 
