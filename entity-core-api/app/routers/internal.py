@@ -50,7 +50,7 @@ async def wait_for_metadata(
     Poll Auth0 Management API until app_metadata shows the desired org_id/schema.
     This remains an entity-core concern; no DB involved.
     """
-
+    domain = env("AUTH0_DOMAIN")
     token = await get_management_token()
     url = f"https://{domain}/api/v2/users/{sub}"
 
