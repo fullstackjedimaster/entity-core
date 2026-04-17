@@ -97,10 +97,6 @@ function OnboardingInner() {
 
 
 
-        if (!waitRes.ok) {
-          setError("Provisioning not fully propagated");
-          return;
-        }
 
       window.location.href =`https://${AUTH0_DOMAIN}/authorize?prompt=none&redirect_uri=${AUTH0_REDIRECT_URI}`;
       } catch (e: any) {
