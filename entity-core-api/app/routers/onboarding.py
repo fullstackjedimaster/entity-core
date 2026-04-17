@@ -92,8 +92,16 @@ async def provision_tenant(
     family = payload.get("family_name") or None
     locale = payload.get("locale") or "en"
 
-    if not (schema and sub and email):
-        raise HTTPException(status_code=400, detail="schema, sub, email are required")
+    if not (schema):
+        raise HTTPException(status_code=400, detail="schema required")
+
+    if not (sub):
+        raise HTTPException(status_code=400, detail=" sub required")
+
+
+    if not (email):
+        raise HTTPException(status_code=400, detail="email  required")
+
 
     initial_roles = payload.get("roles") or ["creator"]
     initial_perms = payload.get("permissions") or ["crud:read", "crud:write", "crud:delete"]
