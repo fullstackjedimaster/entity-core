@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { settings } from "@/lib/settings";
 import { useAuth } from "@/contexts/AuthContext";
 
+API_BASE_URL = settings.API_BASE_URL
 /**
  * Wrapper component to satisfy Next's requirement that
  * useSearchParams() be used inside a Suspense boundary.
@@ -63,7 +64,7 @@ function OnboardingInner() {
 
     // Wait for Auth0 app_metadata propagation
     const waitForAuth0Metadata = async (sub: string, org: string) => {
-        const url = `${settings.ENTITY_CORE_API_BASE_URL}/internal/wait_for_metadata?sub=${encodeURIComponent(
+        const url = `${API_BASE_URL}/internal/wait_for_metadata?sub=${encodeURIComponent(
             sub
         )}&org_id=${encodeURIComponent(org)}`;
 
