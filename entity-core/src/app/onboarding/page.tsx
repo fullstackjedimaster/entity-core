@@ -80,7 +80,7 @@ function OnboardingInner() {
             "X-Onboarding-Token": sessionToken,
           },
           body: JSON.stringify({
-            schema: {org},
+            schema: org,
             sub: decoded?.sub,
             email: decoded?.email,
             name: decoded?.name || decoded?.email?.split("@")[0],
