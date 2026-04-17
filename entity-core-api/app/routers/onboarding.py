@@ -20,10 +20,6 @@ domain = env("AUTH0_DOMAIN")
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
 
-def _stripped(v: Optional[str]) -> str:
-    return (v or "").strip()
-
-
 
 def verify_onboarding_token(request: Request) -> dict:
     token = request.headers.get("X-Onboarding-Token")
@@ -87,9 +83,9 @@ async def provision_tenant(
       - entity-core then patches Auth0 app_metadata based on DB result
     """
     # ---- input ----------------------------------------------------------------
-    schema = _stripped(payload.get("schema"))
-    sub = _stripped(payload.get("sub"))
-    email = _stripped(payload.get("email"))
+    schema = payload.get("schema")
+    sub = payload.get("sub")
+    email = payload.get("email")
     name = payload.get("name") or None
     picture = payload.get("picture") or None
     given = payload.get("given_name") or None
