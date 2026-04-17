@@ -475,7 +475,7 @@ ALTER FUNCTION ec._seed_roles_and_permissions(text) OWNER TO ec;
 CREATE OR REPLACE FUNCTION ec._apply_roles_and_permissions(
     p_schema text,
     p_user_id uuid,
-    p_root_org_id uuid,
+    p_org_id uuid,
     p_roles jsonb DEFAULT '[]'::jsonb,
     p_permissions text[] DEFAULT '{}'::text[]
 )
@@ -491,7 +491,7 @@ DECLARE
   v_org_id uuid;
   v_parent_id uuid;
   v_sql text;
-  v_user jsonb;
+  v_user text;
   v_root_org_key text;
 BEGIN
   EXECUTE format(
@@ -499,7 +499,7 @@ BEGIN
     p_schema
   )
   INTO v_root_org_key
-  USING p_root_org_id;
+  USING p_org_id;
 
   IF array_length(p_permissions, 1) IS NOT NULL THEN
     EXECUTE format($fmt$
@@ -536,7 +536,7 @@ BEGIN
       )
       INTO v_parent_id;
     ELSE
-      v_parent_id := p_root_org_id;
+      v_parent_id := p_org_id;
     END IF;
 
     EXECUTE format($fmt$
@@ -674,9 +674,9 @@ LANGUAGE plpgsql
 VOLATILE SECURITY DEFINER PARALLEL UNSAFE
 AS $$
 DECLARE
-  v_root_org_id uuid;
+  v_org_id uuid;
   v_user_id uuid;
-  v_user jsonb;
+  v_user text;
   v_app_metadata jsonb;
 BEGIN
   -- 1️⃣ Normalize schema key
@@ -700,7 +700,7 @@ BEGIN
   $org$, p_schema, p_schema);
 
   EXECUTE format('SELECT id FROM %I.organization WHERE org_key=%L', p_schema, p_schema)
-    INTO v_root_org_id;
+    INTO v_org_id;
 
   -- 6️⃣ Upsert initial user
   EXECUTE format($usr$
@@ -714,13 +714,13 @@ BEGIN
   INTO v_user_id;
 
   -- 7️⃣ Assign creator role to root org
-  PERFORM ec._assign_role(p_schema, v_user_id, v_root_org_id, 'creator');
+  PERFORM ec._assign_role(p_schema, v_user_id, v_org_id, 'creator');
 
   -- 8️⃣ Apply extended roles and permissions (from Auth0)
   v_user := ec._apply_roles_and_permissions(
       p_schema,
       v_user_id,
-      v_root_org_id,
+      v_org_id,
       to_jsonb(p_roles),
       p_permissions
   );
@@ -728,7 +728,7 @@ BEGIN
   -- 9️eturn unified summary
   v_app_metadata :=  jsonb_build_object(
     'schema', p_schema,
-    'root_org_id', v_root_org_id,
+    'org_id', v_org_id,
     'user_id', v_user_id,
     'user', v_user.user,
     'roles', v_user.roles,
