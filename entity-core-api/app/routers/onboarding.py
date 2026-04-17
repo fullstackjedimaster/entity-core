@@ -85,7 +85,9 @@ async def provision_tenant(
 
     payload = verify_onboarding_token(request)
 
-    schema = payload.get("schema")
+    body = await request.json()
+    schema = body["schema"]
+
     sub = payload.get("sub")
     email = payload.get("email")
     name = payload.get("name") or None

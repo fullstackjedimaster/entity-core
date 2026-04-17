@@ -74,19 +74,15 @@ function OnboardingInner() {
         const org = orgKey.trim().toLowerCase();
 
         const provRes = await fetch(`${API_BASE_URL}/onboarding/provision_tenant`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Onboarding-Token": sessionToken,
-          },
-          body: JSON.stringify({
-            schema: org,
-            sub: decoded?.sub,
-            email: decoded?.email,
-            name: decoded?.name || decoded?.email?.split("@")[0],
-            picture: decoded?.picture || null,
-          }),
-        });
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Onboarding-Token": sessionToken,
+              },
+              body: JSON.stringify({
+                schema: org,
+              }),
+            });
 
         if (!provRes.ok) {
           setError(await provRes.text());
