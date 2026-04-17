@@ -7,31 +7,72 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE IF NOT EXISTS ec.entity(
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  schema_name TEXT NOT NULL,
-  entity_name TEXT NOT NULL,
+  schema TEXT NOT NULL,
+  entity TEXT NOT NULL,
   entity_json JSONB NOT NULL
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_idx
-  ON ec.entity(lower(schema_name), lower(entity_name));
+  ON ec.entity(lower(schema), lower(entity));
 
+CREATE TABLE IF NOT EXISTS ec.tenant(
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sub TEXT NOT NULL UNIQUE,
+  app_metadata JSONB NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS tenant_sub_idx
+  ON ec.tenant(lower(sub));
 
 -- 2. Insert/update function with full JSON payload (meta-wrapped)
-CREATE OR REPLACE FUNCTION ec._upsert_entity(
-  schema_name TEXT,
-  entity_name TEXT,
-  entity_json    JSONB
+CREATE OR REPLACE FUNCTION ec._upsert_tenant(
+  p_sub TEXT,
+  p_app_metadata JSONB
 )
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  IF schema_name IS NULL OR trim(schema_name) = '' THEN
+  INSERT INTO ec.tenant(sub, app_metadata )
+  VALUES (p_sub, p_app_metadata)
+  ON CONFLICT (sub)
+  DO UPDATE SET sub = EXCLUDED.p_sub,
+      app_metadata = EXCLUDED.app_metadata;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION ec.provision_status(
+  p_sub TEXT
+)
+RETURNS JSONB AS $$
+DECLARE
+       result JSONB;
+
+BEGIN
+  SELECT app_metadata INTO result
+  FROM ec.tenant
+  WHERE sub = p_sub;
+
+  RETURN COALESCE(result, '{}'::jsonb);
+END;
+$$ LANGUAGE plpgsql;
+
+-- 2. Insert/update function with full JSON payload (meta-wrapped)
+CREATE OR REPLACE FUNCTION ec._upsert_entity(
+  p_schema TEXT,
+  p_entity TEXT,
+  p_entity_json    JSONB
+)
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF schema IS NULL OR trim(schema) = '' THEN
     RAISE EXCEPTION 'upsert_entity: schema_name is required';
   END IF;
 
-  IF entity_name IS NULL OR trim(entity_name) = '' THEN
+  IF entity IS NULL OR trim(entity) = '' THEN
     RAISE EXCEPTION 'upsert_entity: entity_name is required';
   END IF;
 
@@ -39,8 +80,8 @@ BEGIN
     RAISE EXCEPTION 'upsert_entity: entity_json must be a non-empty JSON object';
   END IF;
 
-  INSERT INTO ec.entity(schema_name, entity_name, entity_json)
-  VALUES (schema_name, entity_name, entity_json)
+  INSERT INTO ec.entity(schema, entity, entity_json)
+  VALUES (p_schema, p_entity, p_entity_json)
   ON CONFLICT (entity_name)
   DO UPDATE SET entity_json = EXCLUDED.entity_json;
 END;
@@ -50,8 +91,8 @@ ALTER FUNCTION ec._upsert_entity(TEXT, TEXT, JSONB) OWNER TO ec;
 
 
 CREATE OR REPLACE FUNCTION ec.get_entity(
-  p_schema_name TEXT,
-  p_entity_name TEXT,
+  p_schema TEXT,
+  p_entity TEXT,
   p_entity_json TEXT
 ) RETURNS JSONB AS $$
 DECLARE
@@ -59,8 +100,8 @@ DECLARE
 BEGIN
   SELECT entity_json INTO result
   FROM ec.entity
-  WHERE entity_name = p_entity_name
-    AND schema_name = p_schema_name;
+  WHERE entity = p_entity
+    AND schema = p_schema;
 
   RETURN COALESCE(result, '{}'::jsonb);
 END;
@@ -70,23 +111,29 @@ $$ LANGUAGE plpgsql;
 ALTER FUNCTION ec.get_entity(TEXT, TEXT, TEXT) OWNER TO ec;
 
 CREATE OR REPLACE FUNCTION ec.list_entities(
-  _schema_name TEXT
+  schema TEXT
 )
-RETURNS TABLE (entity_name TEXT)
-LANGUAGE sql AS $$
-  SELECT entity_name
+RETURNS JSONB
+LANGUAGE plpgsql AS $$
+DECLARE
+       result JSONB;
+BEGIN
+  SELECT entity INTO result
   FROM ec.entity
-  WHERE schema_name = _schema_name;
+  WHERE schema = p_schema;
+
+RETURN COALESCE(result, '{}'::jsonb);
+END;
 $$;
 
 ALTER FUNCTION ec.list_entities(TEXT) OWNER TO ec;
 
 
 CREATE OR REPLACE FUNCTION ec.get_column_options(
-  _schema_name TEXT,
-  _entity_name TEXT,
-  _column_name TEXT,
-  _filter TEXT DEFAULT NULL
+  p_schema TEXT,
+  p_entity TEXT,
+  p_column TEXT,
+  p_filter TEXT DEFAULT NULL
 )
 RETURNS TABLE (value TEXT)
 LANGUAGE plpgsql AS $$
@@ -96,10 +143,10 @@ BEGIN
   -- Fetch entity for schema + entity
   SELECT entity_json INTO tmpl
   FROM ec.entity
-  WHERE schema_name = _schema_name AND entity_name = _entity_name;
+  WHERE schema = p_schema AND entity = p_entity;
 
   IF tmpl IS NULL THEN
-    RAISE EXCEPTION 'No entity_json found for %.%', _schema_name, _entity_name;
+    RAISE EXCEPTION 'No entity_json found for %.%', p_schema, p_entity;
   END IF;
 
   RETURN QUERY EXECUTE format(
@@ -107,9 +154,9 @@ BEGIN
      FROM jsonb_array_elements($1->''entity_json''->%L->%L) AS j
      WHERE j->>%L IS NOT NULL %s
      ORDER BY value',
-     _column_name, _entity_name, _column_name, _column_name,
-     CASE WHEN _filter IS NOT NULL THEN
-       format('AND j->>%L ILIKE ''%%%s%%''', _column_name, _filter)
+     p_column, p_entity, p_column, p_column,
+     CASE WHEN p_filter IS NOT NULL THEN
+       format('AND j->>%L ILIKE ''%%%s%%''', p_column, p_filter)
      ELSE
        ''
      END
@@ -118,14 +165,16 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION ec.get_form_metadata(
-  _schema_name TEXT,
-  _entity_name TEXT
+  p_schema TEXT,
+  p_entity TEXT
 )
 RETURNS TABLE (entity_json JSONB)
-LANGUAGE sql AS $$
+LANGUAGE plpgsql AS $$
+BEGIN
   SELECT entity_json
   FROM ec.entity
-  WHERE schema_name = _schema_name AND entity_name = _entity_name;
+  WHERE schema = p_schema AND entity = p_entity;
+END;
 $$;
 
 
@@ -304,7 +353,7 @@ ALTER FUNCTION ec.manage_entity(text, text, uuid, json) OWNER TO ec;
 
 CREATE OR REPLACE FUNCTION ec._ensure_tenant_tables(p_schema text)
 RETURNS void
-LANGUAGE 'plpgsql'
+LANGUAGE plpgsql
 VOLATILE SECURITY DEFINER PARALLEL UNSAFE
 AS $$
 BEGIN
@@ -585,7 +634,7 @@ CREATE OR REPLACE FUNCTION ec._assign_role(
 	p_role_key text
 	)
 RETURNS void
-LANGUAGE 'plpgsql'
+LANGUAGE plpgsql
 VOLATILE PARALLEL UNSAFE
 AS $$
 DECLARE v_role_id uuid;
@@ -628,6 +677,7 @@ DECLARE
   v_root_org_id uuid;
   v_user_id uuid;
   v_user jsonb;
+  v_app_metadata jsonb;
 BEGIN
   -- 1️⃣ Normalize schema key
   p_schema := lower(trim(coalesce(p_schema, 'public')));
@@ -675,14 +725,19 @@ BEGIN
       p_permissions
   );
 
-  -- 9️⃣ Return unified summary
-  RETURN jsonb_build_object(
+  -- 9️eturn unified summary
+  v_app_metadata :=  jsonb_build_object(
     'schema', p_schema,
     'root_org_id', v_root_org_id,
     'user_id', v_user_id,
-    'user', v_user,
-    'status', 'initialized'
+    'user', v_user.user,
+    'roles', v_user.roles,
+    'permissions', v_user.permissions
   );
+
+  PERFORM ec._upsert_tenant(p_sub, v_app_metadata);
+
+  return v_app_metadata;
 END;
 $$;
 

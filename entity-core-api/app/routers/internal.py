@@ -15,7 +15,7 @@ from app.core.settings import env
 from app.core.auth0_mgmt import get_management_token
 from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
-from app.schemas import RequestEnvelope
+from app.schemas import RequestEnvelope, EntityResponse
 
 router = APIRouter(prefix="/api/internal", tags=["internal"])
 
@@ -36,10 +36,66 @@ def _extract_bearer_token(request: Request) -> str:
         )
     return parts[1]
 
+def _unwrap_result(data: Dict[str, Any], error_msg: str):
+    if not data.get("ok", False):
+        raise HTTPException(status_code=502, detail=data.get("message") or error_msg)
+    return data.get("result")
 
-# ----------------------------------------------------
-# /internal/wait_for_metadata — polling with NO AUTH
-# ----------------------------------------------------
+
+
+
+@router.post("/provision_status}")
+async def provision_status( request: Request, sub: str):
+    if not sub:
+        raise HTTPException(status_code=400, detail="Missing entity_json")
+
+    token = _extract_bearer_token(request)
+
+    envelope = RequestEnvelope(
+        operation="execute",
+        target="ec.provision_status",
+        id=None,
+        args={
+            "sub": sub,
+        },
+        meta={"source": "entity-core:/api/internal/provision_status:POST"},
+    )
+
+    data = await call_model_manage(envelope, token=token)
+    result = _unwrap_result(data, "entity-server failed create_entity")
+
+    return {result}
+
+
+# -----------------------------
+
+
+@router.get("/{entity}", response_model=EntityResponse)
+async def get_entity(request: Request, entity: str):
+    token = _extract_bearer_token(request)
+
+    envelope = RequestEnvelope(
+        operation="execute",
+        target="ec.get_entity",
+        id=None,
+        args={"entity_name": entity},
+        meta={"source": "entity-core:/api/entities/{entity}"},
+    )
+
+    data = await call_model_manage(envelope, token=token)
+    ent = _unwrap_result(data, "entity-server failed get_entity")
+
+    if ent is None:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    if isinstance(ent, dict) and "entity_name" in ent:
+        return EntityResponse(
+            entity_name=ent["entity_name"],
+            template=ent.get("entity_json"),
+        )
+
+    return EntityResponse(entity_name=entity, template=ent)
+
 
 @router.get("/wait_for_metadata", dependencies=[Depends(no_auth)])
 async def wait_for_metadata(sub: str = Query(...), org_id: str = Query(...)):

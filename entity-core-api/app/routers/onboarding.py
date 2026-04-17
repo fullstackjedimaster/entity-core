@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 import httpx
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.core.settings import env
@@ -15,6 +16,7 @@ from app.schemas import RequestEnvelope
 from jose import jwt, JWTError
 
 AUTH0_REDIRECT_SECRET = env("AUTH0_REDIRECT_SECRET", required=True)
+domain = env("AUTH0_DOMAIN")
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
 
@@ -55,6 +57,21 @@ def _extract_bearer_token(request: Request) -> str:
         )
     return parts[1]
 
+
+async def patch_auth0_user(sub: str, app_metadata: dict):
+    token = await get_management_token()
+
+    url = f"https://{domain}/api/v2/users/{sub}"
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        await client.patch(
+            url,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            json={"app_metadata": app_metadata},
+        )
 
 @router.post("/provision_tenant")
 async def provision_tenant(
@@ -122,36 +139,11 @@ async def provision_tenant(
             detail="Provision failed: invalid DB response from entity-server",
         )
 
-    # ---- auth0 patch -----------------------------------------------------------
-    domain = env("AUTH0_DOMAIN")
-    mgmt_token = await get_management_token()
+        # ✅ async persistence (no waiting, no blocking)
+    asyncio.create_task(patch_auth0_user(sub, db_result.app_metadata))
 
-    app_metadata = {
-        "schema": schema,
-        "org_id": db_result.get("root_org_id") or schema,
-        "roles": db_result.get("roles") or [],
-        "permissions": db_result.get("permissions") or [],
-    }
-
-    patch_url = f"https://{domain}/api/v2/users/{sub}"
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.patch(
-                patch_url,
-                headers={
-                    "Authorization": f"Bearer {mgmt_token}",
-                    "Content-Type": "application/json",
-                },
-                json={"app_metadata": app_metadata},
-            )
-            resp.raise_for_status()
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Auth0 patch failed: {e}")
-
-    # ---- success ---------------------------------------------------------------
     return {
         "status": "ok",
-        "provision": db_result,
-        "app_metadata": app_metadata,
-        "patched": True,
+        "app_metadata": db_result.app_metadata
     }
+

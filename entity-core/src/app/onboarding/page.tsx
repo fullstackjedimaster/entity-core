@@ -96,9 +96,7 @@ function OnboardingInner() {
         const prov = await provRes.json();
 
 
-
-
-      window.location.href =`https://${AUTH0_DOMAIN}/authorize?prompt=none&redirect_uri=${AUTH0_REDIRECT_URI}`;
+        window.location.href = `https://${AUTH0_DOMAIN}/continue?state=${state}`;
       } catch (e: any) {
         setError(e.message);
       } finally {

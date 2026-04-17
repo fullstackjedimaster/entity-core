@@ -72,6 +72,6 @@ class FormMetadataResponse(BaseModel):
     entity_json: Dict[str, Any]
 
 
-class CreateEntityBody(BaseModel):
-    schema_name: str
-    entity_json: Dict[str, Any]
+class CreateTenantBody(BaseModel):
+    sub: str
+    app_metadata: Dict[str, Any]
