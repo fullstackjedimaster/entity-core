@@ -676,7 +676,7 @@ AS $$
 DECLARE
   v_org_id uuid;
   v_user_id uuid;
-  v_user text;
+  v_user jsonb;
   v_app_metadata jsonb;
 BEGIN
   -- 1️⃣ Normalize schema key
@@ -730,9 +730,9 @@ BEGIN
     'schema', p_schema,
     'org_id', v_org_id,
     'user_id', v_user_id,
-    'user', v_user.user,
-    'roles', v_user.roles,
-    'permissions', v_user.permissions
+    'user', v_user->user,
+    'roles', v_user->roles,
+    'permissions', v_user->permissions
   );
 
   PERFORM ec._upsert_tenant(p_sub, v_app_metadata);
