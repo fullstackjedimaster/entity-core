@@ -71,7 +71,7 @@ async def patch_auth0_user(sub: str, app_metadata: dict):
 
 @router.post("/provision_tenant")
 async def provision_tenant(
-    request: Request, _=Depends(require_jwt())
+    request: Request
 ):
     """
     Provision a new tenant schema/org and seed the requesting user as creator.
