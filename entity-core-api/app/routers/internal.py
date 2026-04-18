@@ -60,7 +60,7 @@ async def provision_status(sub: str):
         meta={"source": "entity-core:/api/internal/provision_status:POST"},
     )
 
-    data = await call_model_manage(envelope, token=token)
+    data = await call_model_manage(envelope, token=None)
     result = _unwrap_result(data, "entity-server failed create_entity")
 
     return result
