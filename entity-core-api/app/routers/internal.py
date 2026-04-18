@@ -36,12 +36,6 @@ def _extract_bearer_token(request: Request) -> str:
         )
     return parts[1]
 
-def _unwrap_result(data: Dict[str, Any], error_msg: str):
-    if not data.get("ok", False):
-        raise HTTPException(status_code=502, detail=data.get("message") or error_msg)
-    return data.get("result")
-
-
 
 
 @router.get("/provision_status", dependencies=[Depends(no_auth)])
