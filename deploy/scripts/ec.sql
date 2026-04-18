@@ -677,7 +677,6 @@ DECLARE
   v_org_id uuid;
   v_user_id uuid;
   v_user jsonb;
-  v_app_metadata jsonb;
 BEGIN
   -- 1️⃣ Normalize schema key
   p_schema := lower(trim(coalesce(p_schema, 'public')));
@@ -725,19 +724,18 @@ BEGIN
       p_permissions
   );
 
-  -- 9️eturn unified summary
-  v_app_metadata := jsonb_build_object(
+  PERFORM ec._upsert_tenant(p_sub, v_user);
+
+  -- 9️⃣ Return unified summary
+  RETURN jsonb_build_object(
     'schema', p_schema,
     'org_id', v_org_id,
-    'user_id', v_user_id,
-    'user', v_user->user,
-    'roles',  to_jsonb(p_roles),
+    'sub', p_sub,
+    'roles', to_jsonb(p_roles),
     'permissions', p_permissions
   );
 
-  PERFORM ec._upsert_tenant(p_sub, v_app_metadata);
 
-  return v_app_metadata;
 END;
 $$;
 
