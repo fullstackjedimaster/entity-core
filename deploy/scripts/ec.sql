@@ -60,18 +60,27 @@ $$;
 CREATE OR REPLACE FUNCTION ec.provision_status(
   p_sub TEXT
 )
-RETURNS JSONB AS $$
+RETURNS JSONB
+LANGUAGE plpgsql
+AS $$
 DECLARE
-       result JSONB;
-
+  result JSONB;
 BEGIN
-  SELECT schema,  orgId, roles , permissions, memberships INTO result
+
+  SELECT jsonb_build_object(
+    'schema', schema,
+    'org_id', orgId,
+    'roles', roles,
+    'permissions', permissions,
+    'memberships', memberships
+  )
+  INTO result
   FROM ec.tenant
   WHERE sub = p_sub;
 
   RETURN COALESCE(result, '{}'::jsonb);
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- 2. Insert/update function with full JSON payload (meta-wrapped)
 CREATE OR REPLACE FUNCTION ec._upsert_entity(
