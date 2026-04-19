@@ -14,7 +14,7 @@ from app.core.model_client import call_model_manage
 from app.schemas import RequestEnvelope
 
 from jose import jwt, JWTError
-from internal import wait_for_metadata
+from app.routers.internal import wait_for_metadata
 
 AUTH0_REDIRECT_SECRET = env("AUTH0_REDIRECT_SECRET", required=True)
 domain = env("AUTH0_DOMAIN")
