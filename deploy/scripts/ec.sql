@@ -34,7 +34,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS tenant_sub_idx
 CREATE OR REPLACE FUNCTION ec._upsert_tenant(
   p_sub TEXT,
   p_schema TEXT,
-   p_orgId TEXT,
+   p_orgId UUID,
  p_roles JSONB,
    p_permissions TEXT[]
 )
