@@ -662,7 +662,7 @@ BEGIN
 	INTO v_role_id;
 	IF v_role_id IS NULL THEN
 		RAISE NOTICE 'Role % not found in %', p_role_key, p_schema;
-		RETURN; 
+		RETURN;
 	END IF;
 
 	EXECUTE format('INSERT INTO %I.user_org(user_id, org_id) VALUES($1,$2) ON CONFLICT DO NOTHING', p_schema)
