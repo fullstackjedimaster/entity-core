@@ -14,6 +14,7 @@ from app.core.model_client import call_model_manage
 from app.schemas import RequestEnvelope
 
 from jose import jwt, JWTError
+from internal import wait_for_metadata
 
 AUTH0_REDIRECT_SECRET = env("AUTH0_REDIRECT_SECRET", required=True)
 domain = env("AUTH0_DOMAIN")
@@ -54,13 +55,15 @@ def _extract_bearer_token(request: Request) -> str:
     return parts[1]
 
 
-async def patch_auth0_user(sub: str, app_metadata: dict):
-    token = await get_management_token()
+
+
+def patch_auth0_user(sub: str, app_metadata: dict):
+    token = get_management_token()
 
     url = f"https://{domain}/api/v2/users/{sub}"
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        await client.patch(
+    with httpx.Client(timeout=10.0) as client:
+        client.patch(
             url,
             headers={
                 "Authorization": f"Bearer {token}",
@@ -68,6 +71,7 @@ async def patch_auth0_user(sub: str, app_metadata: dict):
             },
             json={"app_metadata": app_metadata},
         )
+
 
 @router.post("/provision_tenant")
 async def provision_tenant(
@@ -159,7 +163,9 @@ async def provision_tenant(
     app_metadata = result
 
     # ✅ async persistence
-    asyncio.create_task(patch_auth0_user(sub, app_metadata))
+    patch_auth0_user(sub, app_metadata)
+
+    await wait_for_metadata(sub)
 
     return {
         "app_metadata": app_metadata
