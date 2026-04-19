@@ -591,7 +591,7 @@ BEGIN
       $fmt$, p_schema)
       USING p_user_id, v_org_id, v_roles;
     END IF;
-  END LOOP;
+
 
   v_sql := format($fmt$
     WITH roles_by_org AS (
