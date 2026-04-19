@@ -662,7 +662,7 @@ BEGIN
 	INTO v_role_id;
 	IF v_role_id IS NULL THEN
 		RAISE NOTICE 'Role % not found in %', p_role_key, p_schema;
-		RETURN;
+		RETURN; 
 	END IF;
 
 	EXECUTE format('INSERT INTO %I.user_org(user_id, org_id) VALUES($1,$2) ON CONFLICT DO NOTHING', p_schema)
@@ -751,7 +751,7 @@ BEGIN
   v_memberships := v_user->>'memberships';
 
 
-  PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, v_roles, p_permissions, v_memberships);
+--  PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, v_roles, p_permissions, v_memberships);
 
   -- 9️⃣ Return unified summary
   v_app_metadata := jsonb_build_object(

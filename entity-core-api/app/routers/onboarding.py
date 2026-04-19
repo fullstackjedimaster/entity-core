@@ -163,9 +163,7 @@ async def provision_tenant(
     app_metadata = result
 
     # ✅ async persistence
-    asyncio.create_task(patch_auth0_user(sub, app_metadata))
-
-    await wait_for_metadata()
+    await patch_auth0_user(sub, app_metadata)
 
     return {
         "app_metadata": app_metadata
