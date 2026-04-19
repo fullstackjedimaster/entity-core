@@ -17,9 +17,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_idx
 
 CREATE TABLE IF NOT EXISTS ec.tenant(
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sub TEXT NOT NULL UNIQUE,
-  app_metadata JSONB NOT NULL
+  sub TEXT NOT NULL,
+  schema TEXT NOT NULL,
+  orgId TEXT NOT NULL,
+  roles jsonb DEFAULT '[]'::jsonb,
+  permissions text[] DEFAULT '{}'::text[]
+
 );
+
+
 
 CREATE UNIQUE INDEX IF NOT EXISTS tenant_sub_idx
   ON ec.tenant(lower(sub));
@@ -27,18 +33,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS tenant_sub_idx
 -- 2. Insert/update function with full JSON payload (meta-wrapped)
 CREATE OR REPLACE FUNCTION ec._upsert_tenant(
   p_sub TEXT,
-  p_app_metadata JSONB
+  p_schema TEXT,
+   p_orgId TEXT,
+ p_roles JSONB,
+   p_permissions TEXT[]
 )
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  INSERT INTO ec.tenant(sub, app_metadata )
-  VALUES (p_sub, p_app_metadata)
+  INSERT INTO ec.tenant(sub, schema,  orgId, p_roles , permissions )
+  VALUES (p_sub, p_schema,p_orgId , p_roles , p_permissions )
   ON CONFLICT (sub)
   DO UPDATE SET sub = EXCLUDED.sub,
-      app_metadata = EXCLUDED.app_metadata;
+      schema = EXCLUDED.schema,
+      orgId = EXCLUDED.orgId,
+      roles = EXCLUDED.roles,
+      permissions =  EXCLUDED.permissions
 END;
 $$;
 
@@ -50,7 +62,7 @@ DECLARE
        result JSONB;
 
 BEGIN
-  SELECT app_metadata INTO result
+  SELECT schema,  orgId, roles , permissions INTO result
   FROM ec.tenant
   WHERE sub = p_sub;
 
@@ -724,18 +736,17 @@ BEGIN
       p_permissions
   );
 
-  PERFORM ec._upsert_tenant(p_sub, v_user);
+  PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, to_jsonb(p_roles), p_permissions);
 
   -- 9️⃣ Return unified summary
-  RETURN jsonb_build_object(
+  app_metadata := jsonb_build_object(
+    'sub', p_sub,
     'schema', p_schema,
     'org_id', v_org_id,
-    'sub', p_sub,
     'roles', to_jsonb(p_roles),
     'permissions', p_permissions
   );
-
-
+  RETURN app_metadata;
 END;
 $$;
 

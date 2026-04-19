@@ -49,7 +49,7 @@ async def provision_status(sub: str):
     if not sub:
         raise HTTPException(status_code=400, detail="Missing sub")
 
-
+    print("SUB RECEIVED:", sub)
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.provision_status",
@@ -61,9 +61,9 @@ async def provision_status(sub: str):
     )
 
     data = await call_model_manage(envelope, token=None)
-    result = data.get("result")
+    app_metadata = data.get("app_metadata")
 
-    return result
+    return app_metadata
 
 
 # -----------------------------
