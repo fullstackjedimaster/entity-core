@@ -141,7 +141,7 @@ async def provision_tenant(
         )
 
     result = data.get("result")
-    if not isinstance(dbresult, dict):
+    if not isinstance(result, dict):
         raise HTTPException(
             status_code=500,
             detail="Provision failed: invalid DB response from entity-server",

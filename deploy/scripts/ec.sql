@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS ec.tenant(
   sub TEXT NOT NULL,
   schema TEXT NOT NULL,
   orgId TEXT NOT NULL,
-  roles jsonb DEFAULT '[]'::jsonb,
-  permissions text[] DEFAULT '{}'::text[]
+  roles jsonb DEFAULT '{}'::jsonb,
+  permissions text[] DEFAULT '[]'::text[]
 
 );
 
@@ -35,7 +35,7 @@ CREATE OR REPLACE FUNCTION ec._upsert_tenant(
   p_sub TEXT,
   p_schema TEXT,
    p_orgId UUID,
- p_roles JSONB,
+  p_roles JSONB,
    p_permissions TEXT[]
 )
 RETURNS VOID
@@ -488,8 +488,8 @@ CREATE OR REPLACE FUNCTION ec._apply_roles_and_permissions(
     p_schema text,
     p_user_id uuid,
     p_org_id uuid,
-    p_roles jsonb DEFAULT '[]'::jsonb,
-    p_permissions text[] DEFAULT '{}'::text[]
+    p_roles jsonb DEFAULT '{}'::jsonb,
+    p_permissions text[] DEFAULT '[]'::text[]
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -499,7 +499,7 @@ DECLARE
   v_item jsonb;
   v_org_key text;
   v_parent_key text;
-  v_roles text[];
+  v_roles jsonb;
   v_org_id uuid;
   v_parent_id uuid;
   v_sql text;
@@ -678,8 +678,8 @@ CREATE OR REPLACE FUNCTION ec.provision_tenant(
     p_given_name text DEFAULT NULL::text,
     p_family_name text DEFAULT NULL::text,
     p_locale text DEFAULT 'en'::text,
-    p_roles text[] DEFAULT '{}'::text[],
-    p_permissions text[] DEFAULT '{}'::text[]
+    p_roles jsonb DEFAULT '{}'::jsonb,
+    p_permissions text[] DEFAULT '[]'::text[]
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -690,6 +690,8 @@ DECLARE
   v_user_id uuid;
   v_user jsonb;
   v_app_metadata jsonb;
+  v_roles jsonb;
+  v_permissions text[];
 BEGIN
   -- 1️⃣ Normalize schema key
   p_schema := lower(trim(coalesce(p_schema, 'public')));
@@ -733,25 +735,28 @@ BEGIN
       p_schema,
       v_user_id,
       v_org_id,
-      to_jsonb(p_roles),
+      p_roles,
       p_permissions
   );
 
-  PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, to_jsonb(p_roles), p_permissions);
+   v_roles = v_user->>'roles';
+    v_permissions = v_user-->'permissions';
+
+  PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, v_roles, v_permissions);
 
   -- 9️⃣ Return unified summary
   v_app_metadata := jsonb_build_object(
     'sub', p_sub,
     'schema', p_schema,
     'org_id', v_org_id,
-    'roles', to_jsonb(p_roles),
-    'permissions', p_permissions
+    'roles', v_roles,
+    'permissions', v_permissions
   );
   RETURN v_app_metadata;
 END;
 $$;
 
-ALTER FUNCTION ec.provision_tenant(text, text, text, text, text, text, text, text, text[], text[])
+ALTER FUNCTION ec.provision_tenant(text, text, text, text, text, text, text, text, json, text[])
     OWNER TO ec;
 
 
