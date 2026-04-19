@@ -70,7 +70,7 @@ async def patch_auth0_user(sub: str, app_metadata: dict):
             json={"app_metadata": app_metadata},
         )
 
-        await wait_for_metadata()
+
 
 
 @router.post("/provision_tenant")
@@ -165,6 +165,7 @@ async def provision_tenant(
     # ✅ async persistence
     asyncio.create_task(patch_auth0_user(sub, app_metadata))
 
+    await wait_for_metadata()
 
     return {
         "app_metadata": app_metadata
