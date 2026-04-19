@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS ec.tenant(
   sub TEXT NOT NULL,
   schema TEXT NOT NULL,
   orgId TEXT NOT NULL,
-  roles jsonb DEFAULT '{}'::jsonb,
-  permissions text[] DEFAULT '[]'::text[]
+  roles jsonb DEFAULT '[]'::jsonb,
+  permissions text[] DEFAULT '{}'::text[]
 
 );
 
@@ -488,8 +488,8 @@ CREATE OR REPLACE FUNCTION ec._apply_roles_and_permissions(
     p_schema text,
     p_user_id uuid,
     p_org_id uuid,
-    p_roles jsonb DEFAULT '{}'::jsonb,
-    p_permissions text[] DEFAULT '[]'::text[]
+    p_roles jsonb DEFAULT '[]'::jsonb,
+    p_permissions text[] DEFAULT '{}'::text[]
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -678,8 +678,8 @@ CREATE OR REPLACE FUNCTION ec.provision_tenant(
     p_given_name text DEFAULT NULL::text,
     p_family_name text DEFAULT NULL::text,
     p_locale text DEFAULT 'en'::text,
-    p_roles jsonb DEFAULT '{}'::jsonb,
-    p_permissions text[] DEFAULT '[]'::text[]
+    p_roles jsonb DEFAULT '[]'::jsonb,
+    p_permissions text[] DEFAULT '{}'::text[]
 )
 RETURNS jsonb
 LANGUAGE plpgsql
