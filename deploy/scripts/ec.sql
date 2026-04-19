@@ -17,7 +17,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_idx
 
 CREATE TABLE IF NOT EXISTS ec.tenant(
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sub TEXT NOT NULL,
+  sub TEXT UNIQUE NOT NULL,
   schema TEXT NOT NULL,
   orgId TEXT NOT NULL,
   roles text[] DEFAULT '{}'::text[],
