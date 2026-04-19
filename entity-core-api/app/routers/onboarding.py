@@ -61,7 +61,7 @@ async def patch_auth0_user(sub: str, app_metadata: dict):
     url = f"https://{domain}/api/v2/users/{sub}"
 
     with httpx.Client() as client:
-        await client.patch(
+        client.patch(
             url,
             headers={
                 "Authorization": f"Bearer {token}",
