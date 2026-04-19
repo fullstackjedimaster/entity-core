@@ -97,7 +97,7 @@ BEGIN
 
   INSERT INTO ec.entity(schema, entity, entity_json)
   VALUES (p_schema, p_entity, p_entity_json)
-  ON CONFLICT (entity_name)
+  ON CONFLICT (entity)
   DO UPDATE SET entity_json = EXCLUDED.entity_json;
 END;
 $$;
