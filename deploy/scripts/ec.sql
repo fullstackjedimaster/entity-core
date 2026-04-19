@@ -747,7 +747,7 @@ BEGIN
   v_memberships := v_user->>'memberships';
 
 
-  PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, v_roles, p_permissions);
+  PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, v_roles, p_permissions, v_memberships);
 
   -- 9️⃣ Return unified summary
   v_app_metadata := jsonb_build_object(

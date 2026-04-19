@@ -136,7 +136,6 @@ async def provision_tenant(
             "family_name": family,
             "locale": locale,
             "roles":roles,
-            "memberships": memberships,
             "permissions": perms,
         },
         meta={"source": "entity-core:/onboarding/provision_tenant"},
