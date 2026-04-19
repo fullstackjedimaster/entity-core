@@ -744,7 +744,7 @@ BEGIN
   );
 
    v_roles := v_user->>'roles';
-  v_memberships := v_user->>'memberships'
+  v_memberships := v_user->>'memberships';
 
 
   PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, v_roles, p_permissions);
