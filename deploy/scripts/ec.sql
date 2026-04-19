@@ -50,7 +50,7 @@ BEGIN
       schema = EXCLUDED.schema,
       orgId = EXCLUDED.orgId,
       roles = EXCLUDED.roles,
-      permissions =  EXCLUDED.permissions
+      permissions =  EXCLUDED.permissions;
 END;
 $$;
 
@@ -739,7 +739,7 @@ BEGIN
       p_permissions
   );
 
-   v_roles = v_user->>'roles';
+   v_roles := v_user->>'roles';
 
 
   PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, v_roles, p_permissions);
