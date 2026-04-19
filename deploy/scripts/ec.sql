@@ -756,9 +756,6 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION ec.provision_tenant(text, text, text, text, text, text, text, text, json, text[])
-    OWNER TO ec;
-
 
 
 CREATE OR REPLACE FUNCTION ec.create_entity(_schema TEXT, _entity TEXT, _entity_json JSONB )
