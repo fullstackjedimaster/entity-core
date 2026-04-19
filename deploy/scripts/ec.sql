@@ -529,12 +529,12 @@ BEGIN
 
   FOR v_item IN
     SELECT *
-    FROM jsonb_array_elements(coalesce(p_roles, '[]'::jsonb))
+    FROM jsonb_array_elements(coalesce(p_roles, '{}'::text[]))
   LOOP
     v_org_key := coalesce(v_item->>'org_key', v_root_org_key);
     v_parent_key := NULLIF(trim(v_item->>'parent_key'), '');
     v_roles := ARRAY(
-      SELECT jsonb_array_elements_text(coalesce(v_item->'roles', '[]'::jsonb))
+      SELECT jsonb_array_elements_text(coalesce(v_item->'roles', '{}'::text[]))
     );
 
     IF v_parent_key IS NOT NULL THEN
