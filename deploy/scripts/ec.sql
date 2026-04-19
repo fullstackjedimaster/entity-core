@@ -20,8 +20,9 @@ CREATE TABLE IF NOT EXISTS ec.tenant(
   sub TEXT NOT NULL,
   schema TEXT NOT NULL,
   orgId TEXT NOT NULL,
-  roles jsonb DEFAULT '[]'::jsonb,
-  permissions text[] DEFAULT '{}'::text[]
+  roles text[] DEFAULT '{}'::text[],
+  permissions text[] DEFAULT '{}'::text[],
+   memberships jsonb DEFAULT '[]'::jsonb
 
 );
 
@@ -35,22 +36,24 @@ CREATE OR REPLACE FUNCTION ec._upsert_tenant(
   p_sub TEXT,
   p_schema TEXT,
    p_orgId UUID,
-  p_roles JSONB,
-   p_permissions TEXT[]
+  p_roles TEXT[],
+   p_permissions TEXT[],
+    p_memberships JSONB
 )
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  INSERT INTO ec.tenant(sub, schema,  orgId, p_roles , permissions )
-  VALUES (p_sub, p_schema,p_orgId , p_roles , p_permissions )
+  INSERT INTO ec.tenant(sub, schema,  orgId, roles , permissions, memberships )
+  VALUES (p_sub, p_schema,p_orgId , p_roles , p_permissions , p_memberships)
   ON CONFLICT (sub)
   DO UPDATE SET sub = EXCLUDED.sub,
       schema = EXCLUDED.schema,
       orgId = EXCLUDED.orgId,
       roles = EXCLUDED.roles,
-      permissions =  EXCLUDED.permissions;
+      permissions =  EXCLUDED.permissions,
+      memberships =  EXCLUDED.memberships;
 END;
 $$;
 
@@ -62,7 +65,7 @@ DECLARE
        result JSONB;
 
 BEGIN
-  SELECT schema,  orgId, roles , permissions INTO result
+  SELECT schema,  orgId, roles , permissions, memberships INTO result
   FROM ec.tenant
   WHERE sub = p_sub;
 
@@ -488,7 +491,7 @@ CREATE OR REPLACE FUNCTION ec._apply_roles_and_permissions(
     p_schema text,
     p_user_id uuid,
     p_org_id uuid,
-    p_roles jsonb DEFAULT '[]'::jsonb,
+    p_roles text[] DEFAULT '{}'::text[],
     p_permissions text[] DEFAULT '{}'::text[]
 )
 RETURNS jsonb
@@ -499,7 +502,7 @@ DECLARE
   v_item jsonb;
   v_org_key text;
   v_parent_key text;
-  v_roles jsonb;
+  v_roles text[];
   v_org_id uuid;
   v_parent_id uuid;
   v_sql text;
@@ -614,7 +617,7 @@ BEGIN
       'auth0_sub', u.auth0_sub,
       'email', u.email,
       'name', u.name,
-      'roles', COALESCE(
+      'memberships', COALESCE(
         (
           SELECT jsonb_agg(
             jsonb_build_object(
@@ -678,7 +681,7 @@ CREATE OR REPLACE FUNCTION ec.provision_tenant(
     p_given_name text DEFAULT NULL::text,
     p_family_name text DEFAULT NULL::text,
     p_locale text DEFAULT 'en'::text,
-    p_roles jsonb DEFAULT '[]'::jsonb,
+    p_roles text[] DEFAULT '{}'::text[],
     p_permissions text[] DEFAULT '{}'::text[]
 )
 RETURNS jsonb
@@ -690,8 +693,9 @@ DECLARE
   v_user_id uuid;
   v_user jsonb;
   v_app_metadata jsonb;
-  v_roles jsonb;
+  v_roles text[];
   v_permissions text[];
+  v_memberships jsonb;
 BEGIN
   -- 1️⃣ Normalize schema key
   p_schema := lower(trim(coalesce(p_schema, 'public')));
@@ -740,6 +744,7 @@ BEGIN
   );
 
    v_roles := v_user->>'roles';
+  v_memberships := v_user->>'memberships'
 
 
   PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, v_roles, p_permissions);
@@ -750,7 +755,8 @@ BEGIN
     'schema', p_schema,
     'org_id', v_org_id,
     'roles', v_roles,
-    'permissions', p_permissions
+    'permissions', p_permissions,
+    'memberships', v_memberships
   );
   RETURN v_app_metadata;
 END;

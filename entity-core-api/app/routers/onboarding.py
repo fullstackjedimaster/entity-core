@@ -106,9 +106,18 @@ async def provision_tenant(
     if not (email):
         raise HTTPException(status_code=400, detail="email  required")
 
+    memberships = payload.get("memberships")
 
-    initial_roles = payload.get("roles") or ["creator"]
-    initial_perms = payload.get("permissions") or ["crud:read", "crud:write", "crud:delete"]
+    roles = payload.get("roles") or ["creator"]
+
+    if not memberships:
+        memberships = [
+            {
+                "org_key": schema,
+                "roles": roles
+            }
+        ]
+    perms = payload.get("permissions") or ["crud:read", "crud:write", "crud:delete"]
 
 
 
@@ -126,8 +135,9 @@ async def provision_tenant(
             "given_name": given,
             "family_name": family,
             "locale": locale,
-            "roles": initial_roles,
-            "permissions": initial_perms,
+            "roles":roles,
+            "memberships": memberships,
+            "permissions": perms,
         },
         meta={"source": "entity-core:/onboarding/provision_tenant"},
     )
