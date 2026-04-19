@@ -639,7 +639,7 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION ec._apply_roles_and_permissions(text, uuid, uuid, jsonb, text[])
+ALTER FUNCTION ec._apply_roles_and_permissions(text, uuid, uuid, text[], text[])
     OWNER TO ec;
 
 CREATE OR REPLACE FUNCTION ec._assign_role(
