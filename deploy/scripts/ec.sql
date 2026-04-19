@@ -740,9 +740,9 @@ BEGIN
   );
 
    v_roles = v_user->>'roles';
-    v_permissions = v_user-->'permissions';
 
-  PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, v_roles, v_permissions);
+
+  PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, v_roles, p_permissions);
 
   -- 9️⃣ Return unified summary
   v_app_metadata := jsonb_build_object(
@@ -750,7 +750,7 @@ BEGIN
     'schema', p_schema,
     'org_id', v_org_id,
     'roles', v_roles,
-    'permissions', v_permissions
+    'permissions', p_permissions
   );
   RETURN v_app_metadata;
 END;
