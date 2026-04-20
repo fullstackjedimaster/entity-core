@@ -95,17 +95,9 @@ async def get_entity(request: Request, entity: str):
 
     return EntityResponse(entity_name=entity, template=ent)
 
-@router.get("/app_metadata_updated")
-async def app_metadata_updated(request: Request):
-    token = _extract_bearer_token(request)
-    body = await request.json()
-    eventData = body["eventData"]
-
-    if eventData.type = "user.updated":
-        return
 
 
-}
+
 @router.get("/wait_for_metadata", dependencies=[Depends(no_auth)])
 async def wait_for_metadata(sub: str = Query(...), org_id: str = Query(...)):
     token = await get_management_token()
