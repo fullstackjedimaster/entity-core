@@ -15,6 +15,7 @@ from app.schemas import RequestEnvelope
 
 from jose import jwt, JWTError
 from app.routers.internal import wait_for_metadata
+from datetime import datetime, timedelta
 
 AUTH0_REDIRECT_SECRET = env("AUTH0_REDIRECT_SECRET", required=True)
 domain = env("AUTH0_DOMAIN")
@@ -69,6 +70,8 @@ async def patch_auth0_user(sub: str, app_metadata: dict):
             },
             json={"app_metadata": app_metadata},
         )
+
+
 
 
 
@@ -165,7 +168,31 @@ async def provision_tenant(
     # ✅ async persistence
     await patch_auth0_user(sub, app_metadata)
 
+    session_token = create_session_token({
+        "sub": sub,
+        "email": email,
+        "schema": app_metadata.get("schema"),
+        "org_id": app_metadata.get("org_id"),
+        "roles": app_metadata.get("roles"),
+        "permissions": app_metadata.get("permissions"),
+        "memberships": app_metadata.get("memberships"),
+    })
+
     return {
-        "app_metadata": app_metadata
+
+        "session_token": session_token,
     }
+
+
+def create_session_token(payload: dict) -> str:
+    now = datetime.utcnow()
+    return jwt.encode(
+        {
+            **payload,
+            "iat": now,
+            "exp": now + timedelta(minutes=5),
+        },
+        AUTH0_REDIRECT_SECRET,
+        algorithm="HS256",
+    )
 
