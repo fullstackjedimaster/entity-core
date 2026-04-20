@@ -89,15 +89,16 @@ function OnboardingInner() {
           return;
         }
 
-        const prov = await provRes.json();
+         window.location.href = `https://${AUTH0_DOMAIN}/continue?state=${stateParam}`;
 
 
-        window.location.href = `https://${AUTH0_DOMAIN}/continue?state=${stateParam}`;
+
       } catch (e: any) {
         setError(e.message);
       } finally {
         setLoading(false);
       }
+
     };
     return (
         <main className="p-6 max-w-md mx-auto space-y-6">
