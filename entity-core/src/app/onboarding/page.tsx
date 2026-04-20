@@ -89,7 +89,7 @@ function OnboardingInner() {
           return;
         }
 
-        const prov = await provRes.json();
+        const prov = await provRes.text();
 
         window.location.href = `https://${AUTH0_DOMAIN}/continue?state=${stateParam}&session_token=${prov.session_token}`;
 
