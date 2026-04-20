@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 import httpx
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
-
+from fastapi.responses import JSONResponse
 from app.core.settings import env
 from app.core.auth0_mgmt import get_management_token
 from app.controllers.auth import require_jwt
@@ -178,21 +178,20 @@ async def provision_tenant(
         "memberships": app_metadata.get("memberships"),
     })
 
-    return {
 
-        "session_token": session_token,
-    }
+
+    return JSONResponse(content={"session_token": session_token})
 
 
 def create_session_token(payload: dict) -> str:
     now = datetime.utcnow()
+
     return jwt.encode(
         {
             **payload,
-            "iat": now,
-            "exp": now + timedelta(minutes=5),
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(minutes=5)).timestamp()),
         },
         AUTH0_REDIRECT_SECRET,
         algorithm="HS256",
     )
-
