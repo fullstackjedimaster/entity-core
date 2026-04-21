@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export const useAuthedFetch = () => {
-  const { getAccessTokenSilently } = useAuth();
+  const { getToken } = useAuth();
 
   return async (url: string, options: RequestInit = {}) => {
     const token = await getAccessTokenSilently();
