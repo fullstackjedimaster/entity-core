@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Request, Depends, HTTPException
 from app.controllers.auth import require_jwt
+from app.controllers.internal_auth import issue_internal_token
 from app.core.model_client import call_model_manage
 from app.schemas import CreateEntityBody, RequestEnvelope, EntityResponse
 
@@ -40,7 +41,7 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 
 @router.get("")
 async def list_entities(request: Request, _=Depends(require_jwt())):
-    token = _extract_bearer_token(request)
+    internal_token = issue_internal_token(request)
     schema = request.state.schema
 
     if not schema:
@@ -54,7 +55,7 @@ async def list_entities(request: Request, _=Depends(require_jwt())):
         meta={"source": "entity-core:/api/entities"},
     )
 
-    data = await call_model_manage(envelope, token=token)
+    data = await call_model_manage(envelope, token=internal_token)
     result = _unwrap_result(data, "entity-server failed listing entities")
 
     rows = result.get("rows") if isinstance(result, dict) else result or []
@@ -74,7 +75,7 @@ async def list_entities(request: Request, _=Depends(require_jwt())):
 
 @router.get("/{entity}", response_model=EntityResponse)
 async def get_entity(request: Request, entity: str):
-    token = _extract_bearer_token(request)
+    internal_token = issue_internal_token(request)
 
     envelope = RequestEnvelope(
         operation="execute",
@@ -84,7 +85,7 @@ async def get_entity(request: Request, entity: str):
         meta={"source": "entity-core:/api/entities/{entity}"},
     )
 
-    data = await call_model_manage(envelope, token=token)
+    data = await call_model_manage(envelope, token=internal_token )
     ent = _unwrap_result(data, "entity-server failed get_entity")
 
     if ent is None:
@@ -108,7 +109,7 @@ async def create_entity(request: Request, entity: str, body: CreateEntityBody):
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
 
-    token = _extract_bearer_token(request)
+    internal_token = issue_internal_token(request)
 
     envelope = RequestEnvelope(
         operation="execute",
@@ -122,7 +123,7 @@ async def create_entity(request: Request, entity: str, body: CreateEntityBody):
         meta={"source": "entity-core:/api/entities/{entity}:POST"},
     )
 
-    data = await call_model_manage(envelope, token=token)
+    data = await call_model_manage(envelope, token=  internal_token)
     _unwrap_result(data, "entity-server failed create_entity")
 
     return {"status": "ok"}
@@ -135,7 +136,7 @@ async def create_entity(request: Request, entity: str, body: CreateEntityBody):
 @router.get("/{entity}/form_metadata")
 async def get_form_metadata(request: Request, entity: str):
     await require_jwt([f"read:{entity}"])(request)
-    token = _extract_bearer_token(request)
+    internal_token = issue_internal_token(request)
 
     envelope = RequestEnvelope(
         operation="execute",
@@ -145,7 +146,7 @@ async def get_form_metadata(request: Request, entity: str):
         meta={"source": "entity-core:/api/entities/{entity}/form_metadata"},
     )
 
-    data = await call_model_manage(envelope, token=token)
+    data = await call_model_manage(envelope, token= internal_token )
     result = _unwrap_result(data, "entity-server failed form_metadata")
 
     if isinstance(result, dict) and "rows" in result:
@@ -169,7 +170,7 @@ async def get_column_options(
     filter: Optional[str] = None,
 ):
     await require_jwt([f"read:{entity}"])(request)
-    token = _extract_bearer_token(request)
+    internal_token = issue_internal_token(request)
 
     envelope = RequestEnvelope(
         operation="execute",
@@ -183,7 +184,7 @@ async def get_column_options(
         meta={"source": "entity-core:/api/entities/options"},
     )
 
-    data = await call_model_manage(envelope, token=token)
+    data = await call_model_manage(envelope, token= internal_token )
     result = _unwrap_result(data, "entity-server failed column_options")
 
     values: List[Any] = []
