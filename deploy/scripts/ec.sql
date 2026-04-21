@@ -135,7 +135,7 @@ $$ LANGUAGE plpgsql;
 ALTER FUNCTION ec.get_entity(TEXT, TEXT, TEXT) OWNER TO ec;
 
 CREATE OR REPLACE FUNCTION ec.list_entities(
-  schema TEXT
+  p_schema TEXT
 )
 RETURNS JSONB
 LANGUAGE plpgsql AS $$
