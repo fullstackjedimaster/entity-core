@@ -93,11 +93,11 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
   IF schema IS NULL OR trim(schema) = '' THEN
-    RAISE EXCEPTION 'upsert_entity: schema_name is required';
+    RAISE EXCEPTION 'upsert_entity: schema is required';
   END IF;
 
   IF entity IS NULL OR trim(entity) = '' THEN
-    RAISE EXCEPTION 'upsert_entity: entity_name is required';
+    RAISE EXCEPTION 'upsert_entity: entity is required';
   END IF;
 
   IF entity_json IS NULL OR entity_json::text = '{}' THEN
@@ -204,7 +204,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION ec.manage_entity(
   operation text,
-  entity_name text,
+  entity text,
   id uuid DEFAULT NULL,
   data json DEFAULT NULL
 )
@@ -223,26 +223,26 @@ DECLARE
   query text;
   zero_uuid constant uuid := '00000000-0000-0000-0000-000000000000'::uuid;
   target_schema text := lower(NULLIF(data->>'__schema',''));
-  table_name text := entity_name;
+  table_name text := entity;
 BEGIN
   operation := lower(coalesce(operation,''));
-  entity_name := lower(coalesce(entity_name,''));
+  entity := lower(coalesce(entity,''));
 
   -- Fetch matching entity config from ec.entity_config
   IF target_schema IS NOT NULL THEN
     SELECT * INTO cfg
     FROM ec.entity_config
-    WHERE lower(entity_name) = entity_name AND lower(schema_name) = target_schema;
+    WHERE lower(entity) = entity AND lower(schema) = target_schema;
   ELSE
     SELECT * INTO cfg
     FROM ec.entity_config
-    WHERE lower(entity_name) = entity_name
-    ORDER BY schema_name
+    WHERE lower(entity) = entity
+    ORDER BY schema
     LIMIT 1;
   END IF;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'No config found for entity_name=%, schema=%', entity_name, target_schema;
+    RAISE EXCEPTION 'No config found for entity=%, schema=%', entity, target_schema;
   END IF;
 
   -- CREATE
@@ -250,7 +250,7 @@ BEGIN
     FOR col IN
       SELECT column_name, data_type
       FROM information_schema.columns
-      WHERE table_schema = cfg.schema_name
+      WHERE table_schema = cfg.schema
         AND table_name = table_name
         AND column_name <> 'id'
         AND column_name NOT IN ('last_updated_at', 'last_updated_by')
@@ -278,14 +278,14 @@ BEGIN
     IF col_names = '' THEN
       query := format(
         'INSERT INTO %I.%I DEFAULT VALUES RETURNING to_jsonb(%I.*)',
-        cfg.schema_name, table_name, table_name
+        cfg.schema, table_name, table_name
       );
     ELSE
       col_names := left(col_names, length(col_names) - 2);
       col_values := left(col_values, length(col_values) - 2);
       query := format(
         'INSERT INTO %I.%I (%s) VALUES (%s) RETURNING to_jsonb(%I.*)',
-        cfg.schema_name, table_name, col_names, col_values, table_name
+        cfg.schema, table_name, col_names, col_values, table_name
       );
     END IF;
     EXECUTE query INTO result;
@@ -295,12 +295,12 @@ BEGIN
     IF id IS NULL OR id = zero_uuid THEN
       query := format(
         'SELECT COALESCE(json_agg(to_jsonb(t.*)), ''[]''::json) FROM %I.%I t',
-        cfg.schema_name, table_name
+        cfg.schema, table_name
       );
     ELSE
       query := format(
         'SELECT to_jsonb(t.*) FROM %I.%I t WHERE id = %L::uuid',
-        cfg.schema_name, table_name, id::text
+        cfg.schema, table_name, id::text
       );
     END IF;
     EXECUTE query INTO result;
@@ -309,7 +309,7 @@ BEGIN
   ELSIF operation IN ('list', 'select') THEN
     query := format(
       'SELECT COALESCE(json_agg(to_jsonb(t.*)), ''[]''::json) FROM %I.%I t',
-      cfg.schema_name, table_name
+      cfg.schema, table_name
     );
     EXECUTE query INTO result;
 
@@ -322,7 +322,7 @@ BEGIN
     FOR col IN
       SELECT column_name, data_type
       FROM information_schema.columns
-      WHERE table_schema = cfg.schema_name
+      WHERE table_schema = cfg.schema
         AND table_name = table_name
         AND column_name <> 'id'
         AND column_name NOT IN ('last_updated_at', 'last_updated_by')
@@ -349,7 +349,7 @@ BEGIN
     update_pairs := left(update_pairs, length(update_pairs) - 2);
     query := format(
       'UPDATE %I.%I SET %s WHERE id = %L::uuid RETURNING to_jsonb(%I.*)',
-      cfg.schema_name, table_name, update_pairs, id::text, table_name
+      cfg.schema, table_name, update_pairs, id::text, table_name
     );
     EXECUTE query INTO result;
 
@@ -360,7 +360,7 @@ BEGIN
     END IF;
     query := format(
       'DELETE FROM %I.%I WHERE id = %L::uuid RETURNING to_jsonb(%I.*)',
-      cfg.schema_name, table_name, id::text, table_name
+      cfg.schema, table_name, id::text, table_name
     );
     EXECUTE query INTO result;
 

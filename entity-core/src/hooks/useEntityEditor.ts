@@ -2,14 +2,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useState , useCallback} from "react";
 import { settings } from '@/lib/settings';
 
-export function useEntityEditor(entityName: string) {
+export function useEntityEditor(entity: string) {
     const { getToken, isAuthenticated, loading: authLoading } = useAuth();
     const [entity, setEntity] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const loadEntity = useCallback(async () => {
-        if (!entityName || authLoading || !isAuthenticated) return;
+        if (!entity || authLoading || !isAuthenticated) return;
 
         setIsLoading(true);
         setError(null);
@@ -19,7 +19,7 @@ export function useEntityEditor(entityName: string) {
             if (!token) throw new Error("Missing token");
 
             const res = await fetch(
-                `${settings.API_BASE_URL}/api/entities/${entityName}`,
+                `${settings.API_BASE_URL}/api/entities/${entity}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -36,7 +36,7 @@ export function useEntityEditor(entityName: string) {
         } finally {
             setIsLoading(false);
         }
-    }, [entityName, getToken, authLoading, isAuthenticated]);
+    }, [entity, getToken, authLoading, isAuthenticated]);
 
     const saveEntity = useCallback(
     async (entityJson: any) => {
@@ -45,7 +45,7 @@ export function useEntityEditor(entityName: string) {
 
         // 👇 optimistic update FIRST
         const optimistic = {
-            entity_name: entityName,
+            entity: entity,
             entity_json: entityJson,
         };
         setEntity(optimistic);
@@ -79,7 +79,7 @@ export function useEntityEditor(entityName: string) {
             throw err;
         }
     },
-    [entityName, getToken]
+    [entity, getToken]
 );
 
     return { entity, loadEntity, saveEntity, isLoading, error };

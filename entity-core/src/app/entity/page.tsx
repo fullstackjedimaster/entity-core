@@ -65,10 +65,10 @@ export default function EntityIndexPage() {
 
       <ul className="border divide-y rounded">
         {entities.map((ent) => (
-          <li key={ent.entity_name} className="p-4 flex justify-between">
-            <span>{ent.entity_name}</span>
+          <li key={ent.entity} className="p-4 flex justify-between">
+            <span>{ent.entity}</span>
             <Link
-              href={`/entity/${ent.entity_name}`}
+              href={`/entity/${ent.entity`}
               className="text-blue-600 hover:underline"
             >
               View / Edit →
