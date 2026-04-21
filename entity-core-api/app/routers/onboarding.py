@@ -56,13 +56,14 @@ def _extract_bearer_token(request: Request) -> str:
     return parts[1]
 
 
-async def patch_auth0_user(sub: str, app_metadata: dict):
-    token = await get_management_token()
+def patch_auth0_user(sub: str, app_metadata: dict):
+    token = get_management_token()
 
     url = f"https://{domain}/api/v2/users/{sub}"
+    print(url)
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        await client.patch(
+    with httpx.Client(timeout=10.0) as client:
+        client.patch(
             url,
             headers={
                 "Authorization": f"Bearer {token}",
@@ -165,7 +166,7 @@ async def provision_tenant(
     app_metadata = result
 
     # ✅ async persistence
-    await patch_auth0_user(sub, app_metadata)
+    patch_auth0_user(sub, app_metadata)
 
     session_token = create_session_token({
         "sub": sub,
