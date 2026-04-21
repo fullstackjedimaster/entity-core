@@ -36,5 +36,5 @@ APP_DATABASE_URL = env("APP_DATABASE_URL", required=True)
 
 CORS_ORIGINS = env("CORS_ORIGINS", "")
 DISABLE_AUTH = env_bool("DISABLE_AUTH", False)
-EC_SHARED_JWT_SECRET = env("DEV_JWT_SECRET", "")
+EC_SHARED_JWT_SECRET = env("EC_SHARED_JWT_SECRET", "")
 AUTH0_MANAGEMENT_AUDIENCE= env("https://dev-gttnobig6h3trkvm.us.auth0.com/api/v2/", "")

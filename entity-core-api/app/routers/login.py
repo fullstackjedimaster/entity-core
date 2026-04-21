@@ -17,14 +17,14 @@ router = APIRouter(prefix="/internal/users", tags=["auth"])
 # Dev login (unchanged)
 # ---------------------------------------------------------------------------
 
-SECRET_KEY = env("DEV_JWT_SECRET")
+SECRET_KEY = env("EC_SHARED_JWT_SECRET")
 ALGORITHM = "HS256"
 
 
 @router.post("/login")
 async def login_dev(username: str):
     """
-    Simple dev-only login that mints an HS256 token from DEV_JWT_SECRET.
+    Simple dev-only login that mints an HS256 token from EC_SHARED_JWT_SECRET.
     NOTE: This is separate from your Auth0 flow and should only be used
     in local/dev environments.
     """
@@ -34,7 +34,7 @@ async def login_dev(username: str):
     if not SECRET_KEY:
         raise HTTPException(
             status_code=500,
-            detail="DEV_JWT_SECRET is not set; dev login unavailable.",
+            detail="EC_SHARED_JWT_SECRET is not set; dev login unavailable.",
         )
 
     payload = {"sub": username, "exp": int(time.time()) + 7200}

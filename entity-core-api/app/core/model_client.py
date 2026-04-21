@@ -18,12 +18,12 @@ from app.schemas import RequestEnvelope
 EC_MODEL_BASE_URL = env("EC_MODEL_BASE_URL") or "http://localhost:8003"
 
 # Shared secret used for internal entity-core -> entity-server service JWTs.
-# Prefer EC_SHARED_JWT_SECRET if present; fall back to DEV_JWT_SECRET.
-EC_SHARED_JWT_SECRET = env("EC_SHARED_JWT_SECRET") or env("DEV_JWT_SECRET")
+# Prefer EC_SHARED_JWT_SECRET if present; fall back to EC_SHARED_JWT_SECRET.
+EC_SHARED_JWT_SECRET = env("EC_SHARED_JWT_SECRET") or env("EC_SHARED_JWT_SECRET")
 
 if not EC_SHARED_JWT_SECRET:
     raise RuntimeError(
-        "[entity-core] EC_SHARED_JWT_SECRET or DEV_JWT_SECRET must be set "
+        "[entity-core] EC_SHARED_JWT_SECRET or EC_SHARED_JWT_SECRET must be set "
         "for internal service JWT generation."
     )
 

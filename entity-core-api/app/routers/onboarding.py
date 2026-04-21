@@ -124,7 +124,7 @@ async def provision_tenant(
                 "roles": roles
             }
         ]
-    perms = payload.get("permissions") or ["crud:read", "crud:write", "crud:delete"]
+    perms = payload.get("permissions") or ["crud:read", "crud:create", "crud:update", "crud:delete"]
 
 
 
