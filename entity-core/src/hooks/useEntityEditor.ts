@@ -2,7 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useState , useCallback} from "react";
 import { settings } from '@/lib/settings';
 
-export function useEntityEditor(entity: string) {
+export function useEntityEditor(entityName: string) {
     const { getToken, isAuthenticated, loading: authLoading } = useAuth();
     const [entity, setEntity] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -19,7 +19,7 @@ export function useEntityEditor(entity: string) {
             if (!token) throw new Error("Missing token");
 
             const res = await fetch(
-                `${settings.API_BASE_URL}/api/entities/${entity}`,
+                `${settings.API_BASE_URL}/api/entities/${entityName}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -45,7 +45,7 @@ export function useEntityEditor(entity: string) {
 
         // 👇 optimistic update FIRST
         const optimistic = {
-            entity: entity,
+            entity: entityName,
             entity_json: entityJson,
         };
         setEntity(optimistic);
@@ -79,7 +79,7 @@ export function useEntityEditor(entity: string) {
             throw err;
         }
     },
-    [entity, getToken]
+    [entityName, getToken]
 );
 
     return { entity, loadEntity, saveEntity, isLoading, error };
