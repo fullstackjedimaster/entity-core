@@ -68,7 +68,7 @@ export default function EntityIndexPage() {
           <li key={ent.entity} className="p-4 flex justify-between">
             <span>{ent.entity}</span>
             <Link
-              href={`/entity/${ent.entity`}
+              href={`/entity/${ent.entity}`}
               className="text-blue-600 hover:underline"
             >
               View / Edit →
