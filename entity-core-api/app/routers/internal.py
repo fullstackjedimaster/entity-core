@@ -69,35 +69,6 @@ async def provision_status(sub: str):
 # -----------------------------
 
 
-@router.get("/{entity}", response_model=EntityResponse)
-async def get_entity(request: Request, entity: str):
-    token = _extract_bearer_token(request)
-
-    envelope = RequestEnvelope(
-        operation="execute",
-        target="ec.get_entity",
-        id=None,
-        args={"entity_name": entity},
-        meta={"source": "entity-core:/api/entities/{entity}"},
-    )
-
-    data = await call_model_manage(envelope, token=token)
-    ent = _unwrap_result(data, "entity-server failed get_entity")
-
-    if ent is None:
-        raise HTTPException(status_code=404, detail="Template not found")
-
-    if isinstance(ent, dict) and "entity_name" in ent:
-        return EntityResponse(
-            entity_name=ent["entity_name"],
-            template=ent.get("entity_json"),
-        )
-
-    return EntityResponse(entity_name=entity, template=ent)
-
-
-
-
 @router.get("/wait_for_metadata", dependencies=[Depends(no_auth)])
 async def wait_for_metadata(sub: str = Query(...), org_id: str = Query(...)):
     token = await get_management_token()

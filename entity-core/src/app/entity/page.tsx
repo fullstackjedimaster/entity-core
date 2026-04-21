@@ -6,7 +6,7 @@ import { useApi } from '@/lib/apiClient';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface EntityInfo {
-  entity_name: string;
+  entity: string;
 }
 
 export default function EntityIndexPage() {

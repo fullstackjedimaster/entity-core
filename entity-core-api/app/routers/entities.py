@@ -93,7 +93,7 @@ async def get_entity(request: Request, entity: str):
 
     if isinstance(ent, dict) and "entity" in ent:
         return EntityResponse(
-            entity_name=ent["entity"],
+            entity=ent["entity"],
             template=ent.get("entity_json"),
         )
 
@@ -117,7 +117,7 @@ async def create_entity(request: Request, entity: str, body: CreateEntityBody):
         id=None,
         args={
             "schema": body.schema,
-            "entity_name": entity,
+            "schemaentity": entity,
             "entity_json": body.entity_json,
         },
         meta={"source": "entity-core:/api/entities/{entity}:POST"},
@@ -142,7 +142,7 @@ async def get_form_metadata(request: Request, entity: str):
         operation="execute",
         target="ec.get_form_metadata",
         id=None,
-        args={"entity_name": entity},
+        args={"schemaentity": entity},
         meta={"source": "entity-core:/api/entities/{entity}/form_metadata"},
     )
 
@@ -177,7 +177,7 @@ async def get_column_options(
         target="ec.get_column_options",
         id=None,
         args={
-            "entity_name": entity,
+            "schemaentity": entity,
             "column": column,
             "filter": filter,
         },

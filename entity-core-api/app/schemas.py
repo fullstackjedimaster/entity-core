@@ -68,7 +68,7 @@ class ProvisionPayload(BaseModel):
 
 
 class FormMetadataResponse(BaseModel):
-    entity_name: str
+    entity: str
     entity_json: Dict[str, Any]
 
 

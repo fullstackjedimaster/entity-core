@@ -31,7 +31,7 @@ export default function EntityEditor({ entityName: initialName }: { entityName?:
             const saved = await saveEntity(parsed);
 
             // 👇 THIS is the magic
-            const finalName = saved.entity_name || entityName;
+            const finalName = saved.entity || entityName;
 
             router.push(`/entities/${finalName}`);
 
