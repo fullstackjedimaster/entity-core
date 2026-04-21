@@ -199,7 +199,7 @@ def claims_have_scopes(
     return False
 
 
-SCHEMA_CLAIM = "https://entity-core.fullstackjedi.dev/schema"
+SCHEMA_CLAIM = "https://fullstackjedi.dev/schema"
 
 def require_jwt(required_permissions: Optional[Iterable[str]] = None):
     required_permissions = set(required_permissions or [])
@@ -227,9 +227,10 @@ def require_jwt(required_permissions: Optional[Iterable[str]] = None):
 
         request.state.claims = claims
         request.state.schema = (
-            claims.get(SCHEMA_CLAIM)
-            or claims.get("schema")  # internal fallback
+                claims.get(SCHEMA_CLAIM)
+                or claims.get("schema")  # optional fallback
         )
+        
 
         return claims
 
