@@ -40,6 +40,7 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 
 @router.get("")
 async def list_entities(request: Request, _=Depends(require_jwt())):
+    token = _extract_bearer_token(request)
     schema = request.state.schema
 
     if not schema:
@@ -52,7 +53,7 @@ async def list_entities(request: Request, _=Depends(require_jwt())):
         args={},
         meta={"source": "entity-core:/api/entities"},
     )
-    token = request.headers.get("Authorization")
+
     data = await call_model_manage(envelope, token=token)
     result = _unwrap_result(data, "entity-server failed listing entities")
 
@@ -102,7 +103,7 @@ async def get_entity(request: Request, entity: str):
 # Create entity
 # ---------------------------------------------------------------------------
 
-@router.post("/{entity}")
+@router.post("/new")
 async def create_entity(request: Request, entity: str, body: CreateEntityBody):
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
