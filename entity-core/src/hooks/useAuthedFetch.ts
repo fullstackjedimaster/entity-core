@@ -1,32 +1,22 @@
 import { useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
-export function useAuthedFetch() {
-  const { getToken, isAuthenticated, login, disableAuth } = useAuth();
+export const useAuthedFetch = () => {
+  const { getAccessTokenSilently } = useAuth();
 
-  return useCallback(
-    async (url: string, options: RequestInit = {}) => {
-      if (!disableAuth && !isAuthenticated) {
-        await login();
-        throw new Error('Not authenticated');
-      }
+  return async (url: string, options: RequestInit = {}) => {
+    const token = await getAccessTokenSilently();
 
-      const token = await getToken(); // 🔥 ALWAYS fetch fresh token
+    const headers = new Headers(options.headers || {});
+    headers.set('Content-Type', 'application/json');
 
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      };
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
 
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-
-      return fetch(url, {
-        ...options,
-        headers,
-      });
-    },
-    [getToken, isAuthenticated, login, disableAuth]
-  );
-}
+    return fetch(url, {
+      ...options,
+      headers,
+    });
+  };
+};

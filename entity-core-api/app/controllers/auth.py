@@ -31,24 +31,32 @@ if not AUTH0_DOMAIN or not AUTH0_AUDIENCE or not AUTH0_ISSUER:
 # ---------------------------------------------------------------------------
 
 def _get_token_from_header(request: Request) -> str:
-    """
-    Extract Bearer token from Authorization header.
-    """
     auth_header = request.headers.get("Authorization")
+
     if not auth_header:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
-    parts = auth_header.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
+    try:
+        scheme, token = auth_header.split(" ", 1)
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header must be in the format: Bearer <token>",
+            detail="Invalid Authorization header format",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return parts[1]
+    if scheme.lower() != "bearer" or not token.strip():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header must be: Bearer <token>",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return token.strip()
 
 
 def _get_rsa_key(request: Request, token: str) -> Dict[str, Any]:
