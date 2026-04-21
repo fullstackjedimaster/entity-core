@@ -18,10 +18,10 @@ source "$DEPLOY_DIR/env/postgres.env"
 source "$DEPLOY_DIR/env/entity-core-api.env"
 set +a
 
-docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml build --no-cache
+#docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml build --no-cache
 
 echo "[up] Starting stack"
-docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml up -d
+docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml up -d --build
 
 docker compose logs -f
 
