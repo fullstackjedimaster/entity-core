@@ -191,5 +191,5 @@ def create_session_token(payload: dict) -> str:
             "exp": int((now + timedelta(minutes=5)).timestamp()),
         },
         AUTH0_REDIRECT_SECRET,
-        algorithm="RS256",
+        algorithm="HS256",
     )
