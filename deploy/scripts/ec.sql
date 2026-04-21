@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS ec.tenant(
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sub TEXT UNIQUE NOT NULL,
   schema TEXT NOT NULL,
-  orgId TEXT NOT NULL,
+  org_id TEXT NOT NULL,
   roles text[] DEFAULT '{}'::text[],
   permissions text[] DEFAULT '{}'::text[],
    memberships jsonb DEFAULT '[]'::jsonb
@@ -35,7 +35,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS tenant_sub_idx
 CREATE OR REPLACE FUNCTION ec._upsert_tenant(
   p_sub TEXT,
   p_schema TEXT,
-   p_orgId UUID,
+   p_org_id UUID,
   p_roles TEXT[],
    p_permissions TEXT[],
     p_memberships JSONB
@@ -45,12 +45,12 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  INSERT INTO ec.tenant(sub, schema,  orgId, roles , permissions, memberships )
-  VALUES (p_sub, p_schema,p_orgId , p_roles , p_permissions , p_memberships)
+  INSERT INTO ec.tenant(sub, schema,  org_Id, roles , permissions, memberships )
+  VALUES (p_sub, p_schema,p_org_id , p_roles , p_permissions , p_memberships)
   ON CONFLICT (sub)
   DO UPDATE SET sub = EXCLUDED.sub,
       schema = EXCLUDED.schema,
-      orgId = EXCLUDED.orgId,
+      org_id = EXCLUDED.org_id ,
       roles = EXCLUDED.roles,
       permissions =  EXCLUDED.permissions,
       memberships =  EXCLUDED.memberships;
@@ -69,7 +69,7 @@ BEGIN
 
   SELECT jsonb_build_object(
     'schema', schema,
-    'org_id', orgId,
+    'org_id', org_id,
     'roles', roles,
     'permissions', permissions,
     'memberships', memberships
