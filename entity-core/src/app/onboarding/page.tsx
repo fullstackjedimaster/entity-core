@@ -73,9 +73,8 @@ function OnboardingInner() {
 
         const org = orgKey.trim().toLowerCase();
 
-        const provRes: jsonb = [];
 
-        provRes = await fetch(`${API_BASE_URL}/onboarding/provision_tenant`, {
+        const provRes = await fetch(`${API_BASE_URL}/onboarding/provision_tenant`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
