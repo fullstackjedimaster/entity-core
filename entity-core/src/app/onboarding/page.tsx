@@ -90,9 +90,10 @@ function OnboardingInner() {
           return;
         }
 
-        const prov = await provRes.json();
+         const sessionToken = await provRes.json();
 
-        window.location.href = `https://${AUTH0_DOMAIN}/continue?state=${stateParam}&session_token=${prov.session_token}`;
+         window.location.href = `https://${AUTH0_DOMAIN}/continue?state=${stateParam}&session_token=${sessionToken}`;
+//             const url = `https://${TENANT_DOMAIN}/continue?state=${stateParam}&session_token=${sessionToken}`
 
       } catch (e: any) {
         setError(e.message);
