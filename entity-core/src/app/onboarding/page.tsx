@@ -81,6 +81,7 @@ function OnboardingInner() {
               },
               body: JSON.stringify({
                 schema: org,
+                state: stateParam
               }),
             });
 

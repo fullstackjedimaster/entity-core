@@ -75,7 +75,6 @@ async def patch_auth0_user(sub: str, app_metadata: dict):
 
 
 
-
 @router.post("/provision_tenant")
 async def provision_tenant(
     request: Request
@@ -94,7 +93,7 @@ async def provision_tenant(
 
     body = await request.json()
     schema = body["schema"]
-
+    state = body["state"]
     sub = payload.get("sub")
     email = payload.get("email")
     name = payload.get("name") or None
@@ -170,17 +169,15 @@ async def provision_tenant(
 
     session_token = create_session_token({
         "sub": sub,
-        "email": email,
+        "state": state,
         "schema": app_metadata.get("schema"),
         "org_id": app_metadata.get("org_id"),
         "roles": app_metadata.get("roles"),
         "permissions": app_metadata.get("permissions"),
-        "memberships": app_metadata.get("memberships"),
+        "memberships": app_metadata.get("memberships")
     })
 
-
-
-    return JSONResponse(content={"session_token": session_token})
+    return session_token
 
 
 def create_session_token(payload: dict) -> str:
