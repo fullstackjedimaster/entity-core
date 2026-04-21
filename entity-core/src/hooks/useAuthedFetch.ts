@@ -1,32 +1,32 @@
-'use client';
-
 import { useCallback } from 'react';
-import { useAuthInfo } from '@/hooks/useAuthInfo';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function useAuthedFetch() {
-  const { token, isAuthenticated, login, disableAuth } = useAuthInfo();
+  const { getToken, isAuthenticated, login, disableAuth } = useAuth();
 
   return useCallback(
-      async (url: string, options: RequestInit = {}): Promise<Response> => {
-        if (!disableAuth && !isAuthenticated) {
-          await login();
-          throw new Error('Not authenticated');
-        }
+    async (url: string, options: RequestInit = {}) => {
+      if (!disableAuth && !isAuthenticated) {
+        await login();
+        throw new Error('Not authenticated');
+      }
 
-        const headers: HeadersInit = {
-          'Content-Type': 'application/json',
-          ...(options.headers || {}),
-        };
+      const token = await getToken(); // 🔥 ALWAYS fetch fresh token
 
-        if (token) {
-          (headers as any).Authorization = `Bearer ${token}`;
-        }
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      };
 
-        return fetch(url, {
-          ...options,
-          headers,
-        });
-      },
-      [token, isAuthenticated, login, disableAuth]
-    );
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      return fetch(url, {
+        ...options,
+        headers,
+      });
+    },
+    [getToken, isAuthenticated, login, disableAuth]
+  );
 }

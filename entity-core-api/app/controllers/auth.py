@@ -191,44 +191,32 @@ def claims_have_scopes(
     return False
 
 
-# ---------------------------------------------------------------------------
-#  FastAPI dependency
-# ---------------------------------------------------------------------------
-
-def require_jwt(required_scopes: Optional[Iterable[str]] = None):
-    """
-    Usage patterns you already have:
-
-        # As a Depends:
-        @router.get("/something")
-        async def route(claims: dict = Depends(require_jwt(["crud:read"]))):
-            ...
-
-        # Or manually:
-        claims = await require_jwt([])(request)
-
-    This validates an Auth0 JWT from the Authorization header, enforces
-    scopes/permissions if provided, and returns the decoded claims.
-    """
-
-    required_scopes = list(required_scopes or [])
+def require_jwt(required_permissions: Optional[Iterable[str]] = None):
+    required_permissions = set(required_permissions or [])
 
     async def dependency(request: Request) -> Dict[str, Any]:
         token = _get_token_from_header(request)
         claims = decode_token(request, token)
 
-        if required_scopes and not claims_have_scopes(
-            claims, required_scopes, scope_claim="scope"
-        ):
-            # Also consider Auth0 `permissions` claim
-            if not claims_have_scopes(claims, required_scopes, scope_claim="permissions"):
+        if required_permissions:
+            scope_str = claims.get("scope", "")
+            scope_list = scope_str.split() if isinstance(scope_str, str) else []
+
+            permissions = claims.get("permissions", [])
+            if isinstance(permissions, str):
+                permissions = [permissions]
+
+            has_scope = required_permissions.issubset(set(scope_list))
+            has_perm = required_permissions.issubset(set(permissions))
+
+            if not (has_scope or has_perm):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Insufficient scopes for this operation",
+                    detail="Insufficient permissions for this operation",
                 )
 
-        # Make claims available to middleware (e.g., SchemaContextMiddleware)
-        request.scope.setdefault("claims", claims)
+        request.state.claims = claims
+        request.state.schema = claims.get("schema")
         return claims
 
     return dependency
