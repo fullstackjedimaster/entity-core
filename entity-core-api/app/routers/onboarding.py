@@ -177,7 +177,8 @@ async def provision_tenant(
         "memberships": app_metadata.get("memberships")
     })
 
-    return session_token
+
+    return JSONResponse(content={"sessionToken": session_token})
 
 
 def create_session_token(payload: dict) -> str:
@@ -190,5 +191,5 @@ def create_session_token(payload: dict) -> str:
             "exp": int((now + timedelta(minutes=5)).timestamp()),
         },
         AUTH0_REDIRECT_SECRET,
-        algorithm="HS256",
+        algorithm="RS256",
     )
