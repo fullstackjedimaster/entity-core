@@ -92,8 +92,9 @@ function OnboardingInner() {
         }
 
         const prov = await provRes.json();
-
-         window.location.href = `https://${AUTH0_DOMAIN}/continue?state=${stateParam}&session_token=${prov.session_token}`;
+        const url = `https://${AUTH0_DOMAIN}/continue?state=${stateParam}&session_token=${prov.session_token}`;
+         console.log(url);  
+         window.location.href = url;
 
       } catch (e: any) {
         setError(e.message);

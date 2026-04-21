@@ -747,7 +747,6 @@ BEGIN
       p_permissions
   );
 
-   v_roles := v_user->>'roles';
   v_memberships := v_user->>'memberships';
 
 
@@ -758,7 +757,7 @@ BEGIN
     'sub', p_sub,
     'schema', p_schema,
     'org_id', v_org_id,
-    'roles', v_roles,
+    'roles', p_roles,
     'permissions', p_permissions,
     'memberships', v_memberships
   );
