@@ -5,7 +5,7 @@ export const useAuthedFetch = () => {
   const { getToken } = useAuth();
 
   return async (url: string, options: RequestInit = {}) => {
-    const token = await getAccessTokenSilently();
+    const token = await getToken();
 
     const headers = new Headers(options.headers || {});
     headers.set('Content-Type', 'application/json');
