@@ -42,7 +42,7 @@ function OnboardingInner() {
     const router = useRouter();
     const params = useSearchParams();
 
-    const sessionToken = params.get("session_token") || "";
+    const session_token = params.get("session_token") || "";
     const stateParam = params.get("state") || "";
 
     const [decoded, setDecoded] = useState<any>(null);
@@ -53,16 +53,16 @@ function OnboardingInner() {
 
     // Decode onboarding session token
     useEffect(() => {
-        if (!sessionToken) return;
+        if (!session_token) return;
         try {
-            const body = sessionToken.split(".")[1];
+            const body = session_token.split(".")[1];
             const json = atob(body.replace(/-/g, "+").replace(/_/g, "/"));
             setDecoded(JSON.parse(json));
         } catch (err) {
             console.error("Failed to decode session token:", err);
             setError("Invalid session token.");
         }
-    }, [sessionToken]);
+    }, [session_token]);
 
 
 
@@ -78,7 +78,7 @@ function OnboardingInner() {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "X-Onboarding-Token": sessionToken,
+                "X-Onboarding-Token": session_token,
               },
               body: JSON.stringify({
                 schema: org,
@@ -92,6 +92,7 @@ function OnboardingInner() {
         }
 
         const prov = await provRes.json();
+        console.log("prov response:", prov);
         const url = `https://${AUTH0_DOMAIN}/continue?state=${stateParam}&session_token=${prov.session_token}`;
          console.log(url);
          window.location.href = url;
