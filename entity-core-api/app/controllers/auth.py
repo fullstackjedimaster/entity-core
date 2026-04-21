@@ -230,7 +230,7 @@ def require_jwt(required_permissions: Optional[Iterable[str]] = None):
                 claims.get(SCHEMA_CLAIM)
                 or claims.get("schema")  # optional fallback
         )
-        
+
 
         return claims
 
