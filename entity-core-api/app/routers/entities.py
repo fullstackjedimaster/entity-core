@@ -62,9 +62,9 @@ async def list_entities(request: Request, _=Depends(require_jwt())):
 
     return {
         "entities": [
-            r["entity_name"]
+            r["entity"]
             for r in rows
-            if isinstance(r, dict) and "entity_name" in r
+            if isinstance(r, dict) and "entity" in r
         ]
     }
 
@@ -81,7 +81,7 @@ async def get_entity(request: Request, entity: str):
         operation="execute",
         target="ec.get_entity",
         id=None,
-        args={"entity_name": entity},
+        args={"entity": entity},
         meta={"source": "entity-core:/api/entities/{entity}"},
     )
 
@@ -91,13 +91,13 @@ async def get_entity(request: Request, entity: str):
     if ent is None:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    if isinstance(ent, dict) and "entity_name" in ent:
+    if isinstance(ent, dict) and "entity" in ent:
         return EntityResponse(
-            entity_name=ent["entity_name"],
+            entity_name=ent["entity"],
             template=ent.get("entity_json"),
         )
 
-    return EntityResponse(entity_name=entity, template=ent)
+    return EntityResponse(entity=entity, template=ent)
 
 
 # ---------------------------------------------------------------------------
