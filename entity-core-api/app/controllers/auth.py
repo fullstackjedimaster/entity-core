@@ -199,6 +199,8 @@ def claims_have_scopes(
     return False
 
 
+SCHEMA_CLAIM = "https://entity-core.fullstackjedi.dev/schema"
+
 def require_jwt(required_permissions: Optional[Iterable[str]] = None):
     required_permissions = set(required_permissions or [])
 
@@ -214,17 +216,21 @@ def require_jwt(required_permissions: Optional[Iterable[str]] = None):
             if isinstance(permissions, str):
                 permissions = [permissions]
 
-            has_scope = required_permissions.issubset(set(scope_list))
-            has_perm = required_permissions.issubset(set(permissions))
-
-            if not (has_scope or has_perm):
+            if not (
+                required_permissions.issubset(set(scope_list)) or
+                required_permissions.issubset(set(permissions))
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Insufficient permissions for this operation",
+                    detail="Insufficient permissions",
                 )
 
         request.state.claims = claims
-        request.state.schema = claims.get("schema")
+        request.state.schema = (
+            claims.get(SCHEMA_CLAIM)
+            or claims.get("schema")  # internal fallback
+        )
+
         return claims
 
     return dependency
