@@ -2,18 +2,17 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function CallbackPage() {
     const router = useRouter();
+    const { isAuthenticated, loading } = useAuth();
 
     useEffect(() => {
-        // After redirect callback is handled in AuthProvider, just go home
-        const timer = setTimeout(() => {
-            router.replace('/');
-        }, 400);
-
-        return () => clearTimeout(timer);
-    }, [router]);
+        if (!loading && isAuthenticated) {
+            router.replace('/entity');
+        }
+    }, [loading, isAuthenticated]);
 
     return (
         <main className="flex items-center justify-center min-h-screen text-center">

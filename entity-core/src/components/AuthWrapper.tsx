@@ -17,17 +17,20 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
             ? window.location.origin + '/callback'
             : settings.AUTH0_REDIRECT_URI ;
 
-    const onRedirectCallback = (appState?: AppState) => {
-
+      const onRedirectCallback = () => {
         if (typeof window === 'undefined') return;
 
-        const target =
-            (appState?.returnTo as string | undefined) ??
-            '/entity';
+        const url = new URL(window.location.href);
 
-        window.location.replace(target);
+        // 🔥 THIS is the key
+        const state = url.searchParams.get('state');
+
+        // You can route based on state if needed
+        // For now just land cleanly
+        window.history.replaceState({}, document.title, '/');
+
+        window.location.replace('/entity');
     };
-
     return (
         <Auth0Provider
             domain={settings.AUTH0_DOMAIN!}
