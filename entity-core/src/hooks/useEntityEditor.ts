@@ -86,5 +86,6 @@ export function useEntityEditor(entityName: string) {
 //     [entityName, getToken]
 // );
 
-    return { entity, loadEntity, saveEntity, isLoading, error };
+    return { entity, loadEntity, isLoading, error };
+//       return { entity, loadEntity, saveEntity, isLoading, error };
 }
