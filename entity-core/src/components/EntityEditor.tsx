@@ -41,38 +41,38 @@ export default function EntityEditor({ entityName: initialName }: { entityName?:
 //         }
 //     };
 //
-//     return (
-//         <div className="space-y-4">
-//             <h2 className="text-xl font-semibold">
-//                 Entity Editor — <span className="text-blue-600">{entityName || "New Entity"}</span>
-//             </h2>
-//
-//             <div>
-//                 <label className="block font-medium mb-2">Entity Name</label>
-//                 <input
-//                     type="text"
-//                     value={entityName}
-//                     onChange={(e) => setEntityName(e.target.value)}
-//                     className="border px-3 py-2 rounded w-full"
-//                 />
-//             </div>
-//
-//             {error && <div className="text-red-500 text-sm">{error}</div>}
-//
-//             <textarea
-//                 value={jsonStr}
-//                 onChange={(e) => setJsonStr(e.target.value)}
-//                 rows={20}
-//                 className="w-full font-mono text-sm border rounded-lg p-3"
-//             />
-//
-//             <button
-//                 onClick={onSave}
-//                 disabled={isLoading}
-//                 className="px-3 py-2 bg-blue-600 text-white rounded-md"
-//             >
-//                 Save Entity
-//             </button>
-//         </div>
-//     );
+    return (
+        <div className="space-y-4">
+            <h2 className="text-xl font-semibold">
+                Entity Editor — <span className="text-blue-600">{entityName || "New Entity"}</span>
+            </h2>
+
+            <div>
+                <label className="block font-medium mb-2">Entity Name</label>
+                <input
+                    type="text"
+                    value={entityName}
+                    onChange={(e) => setEntityName(e.target.value)}
+                    className="border px-3 py-2 rounded w-full"
+                />
+            </div>
+
+            {error && <div className="text-red-500 text-sm">{error}</div>}
+
+            <textarea
+                value={jsonStr}
+                onChange={(e) => setJsonStr(e.target.value)}
+                rows={20}
+                className="w-full font-mono text-sm border rounded-lg p-3"
+            />
+
+            <button
+
+                disabled={isLoading}
+                className="px-3 py-2 bg-blue-600 text-white rounded-md"
+            >
+                Save Entity
+            </button>
+        </div>
+    );
 }
