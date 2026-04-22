@@ -1,9 +1,8 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEntity } from "@/hooks/useEntity";
 import { Suspense, useState, useEffect} from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function EntityDetailPage() {
@@ -27,7 +26,7 @@ function EntityInner() {
     const entityNameParam = params?.entityName as string;
     const [entityName, setEntityName] = useState(entityNameParam || "");
     const [jsonStr, setJsonStr] = useState("");
-    const { isAuthenticated, loading: authLoading, useAuth} = useAuth();
+    const { isAuthenticated, loading: authLoading, } = useAuth();
     const { entity, loadEntity, saveEntity, isLoading, error } = useEntity(entityName);
 
     // ✅ Sync URL param → state
