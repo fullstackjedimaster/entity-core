@@ -7,7 +7,7 @@ const router = useRouter();
 
 export default function EntityEditor({ entityName: initialName }: { entityName?: string }) {
     const [entityName, setEntityName] = useState(initialName ?? "");
-    const { entity, loadEntity, saveEntity, isLoading, error } = useEntityEditor(entityName);
+    const { entity, loadEntity, isLoading, error } = useEntityEditor(entityName);
     const [jsonStr, setJsonStr] = useState("");
 
     // Load when entityName changes
