@@ -7,40 +7,40 @@ const router = useRouter();
 
 export default function EntityEditor({ entityName: initialName }: { entityName?: string }) {
     const [entityName, setEntityName] = useState(initialName ?? "");
-    const { entity, loadEntity, isLoading, error } = useEntityEditor(entityName);
+    const { entity, loadEntity, saveEntity, isLoading, error } = useEntityEditor(entityName);
     const [jsonStr, setJsonStr] = useState("");
 
-//     // Load when entityName changes
-//     useEffect(() => {
-//         debugger;
-//         if (entityName != "new") {
-//             loadEntity();
-//         }
-//     }, [entityName]);
-//
-//     // Reflect loaded entity into editor
-//     useEffect(() => {
-//         if (entity) {
-//             setJsonStr(JSON.stringify(entity.entity_json, null, 2));
-//         }
-//     }, [entity]);
-//
-//     const onSave = async () => {
-//         try {
-//             const parsed = JSON.parse(jsonStr);
-//
-//             const saved = await saveEntity(parsed);
-//
-//
-//             const finalName = saved.entity || entityName;
-//
-//             router.push(`/entities/${finalName}`);
-//
-//         } catch {
-//             alert("⚠️ Invalid JSON or save failed.");
-//         }
-//     };
-//
+    // Load when entityName changes
+    useEffect(() => {
+
+        if (entityName != "new") {
+            loadEntity();
+        }
+    }, [entityName]);
+
+    // Reflect loaded entity into editor
+    useEffect(() => {
+        if (entity) {
+            setJsonStr(JSON.stringify(entity.entity_json, null, 2));
+        }
+    }, [entity]);
+
+    const onSave = async () => {
+        try {
+            const parsed = JSON.parse(jsonStr);
+
+            const saved = await saveEntity(parsed);
+
+            // 👇 THIS is the magic
+            const finalName = saved.entity || entityName;
+
+            router.push(`/entities/${finalName}`);
+
+        } catch {
+            alert("⚠️ Invalid JSON or save failed.");
+        }
+    };
+
     return (
         <div className="space-y-4">
             <h2 className="text-xl font-semibold">
@@ -67,7 +67,7 @@ export default function EntityEditor({ entityName: initialName }: { entityName?:
             />
 
             <button
-
+                onClick={onSave}
                 disabled={isLoading}
                 className="px-3 py-2 bg-blue-600 text-white rounded-md"
             >
