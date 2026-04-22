@@ -228,14 +228,14 @@ BEGIN
   operation := lower(coalesce(operation,''));
   entity := lower(coalesce(entity,''));
 
-  -- Fetch matching entity config from ec.entity_config
+  -- Fetch matching entity config from ec.entity
   IF target_schema IS NOT NULL THEN
     SELECT * INTO cfg
-    FROM ec.entity_config
+    FROM ec.entity
     WHERE lower(entity) = entity AND lower(schema) = target_schema;
   ELSE
     SELECT * INTO cfg
-    FROM ec.entity_config
+    FROM ec.entity
     WHERE lower(entity) = entity
     ORDER BY schema
     LIMIT 1;

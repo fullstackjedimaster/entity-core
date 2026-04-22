@@ -79,4 +79,5 @@ class TenantBody(BaseModel):
 
 class CreateEntityBody(BaseModel):
     schema: str
+    entity: str
     entity_json: Dict[str, Any]

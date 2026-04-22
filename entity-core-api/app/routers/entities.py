@@ -62,9 +62,9 @@ async def list_entities(request: Request, _=Depends(require_jwt())):
 
     return {
         "entities": [
-            r["entity"]
+            r["entities"]
             for r in rows
-            if isinstance(r, dict) and "entity" in r
+                if isinstance(r, dict) and "entity" in r
         ]
     }
 
@@ -117,7 +117,7 @@ async def create_entity(request: Request, entity: str, body: CreateEntityBody):
         id=None,
         args={
             "schema": body.schema,
-            "schemaentity": entity,
+            "entity": entity,
             "entity_json": body.entity_json,
         },
         meta={"source": "entity-core:/api/entities/{entity}:POST"},
@@ -142,7 +142,7 @@ async def get_form_metadata(request: Request, entity: str):
         operation="execute",
         target="ec.get_form_metadata",
         id=None,
-        args={"schemaentity": entity},
+        args={"entity": entity},
         meta={"source": "entity-core:/api/entities/{entity}/form_metadata"},
     )
 
@@ -177,7 +177,7 @@ async def get_column_options(
         target="ec.get_column_options",
         id=None,
         args={
-            "schemaentity": entity,
+            "entity": entity,
             "column": column,
             "filter": filter,
         },
