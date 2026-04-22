@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import EntityEditor from "@/components/EntityEditor";
-import { Suspense} from "react";
+import { Suspense, useState, useEffect} from "react";
 
 export default function EntityDetailPage() {
     return (
