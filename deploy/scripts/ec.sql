@@ -116,8 +116,7 @@ ALTER FUNCTION ec._upsert_entity(TEXT, TEXT, JSONB) OWNER TO ec;
 
 CREATE OR REPLACE FUNCTION ec.get_entity(
   p_schema TEXT,
-  p_entity TEXT,
-  p_entity_json TEXT
+  p_entity TEXT
 ) RETURNS JSONB AS $$
 DECLARE
   result JSONB;
