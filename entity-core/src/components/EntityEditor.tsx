@@ -12,8 +12,8 @@ export default function EntityEditor({ entityName: initialName }: { entityName?:
 
     // Load when entityName changes
     useEffect(() => {
-        debugger;
-        if (entityName) {
+        debugger;-
+        if (entityName != "new") {
             loadEntity();
         }
     }, [entityName]);
@@ -25,21 +25,21 @@ export default function EntityEditor({ entityName: initialName }: { entityName?:
         }
     }, [entity]);
 
-    const onSave = async () => {
-        try {
-            const parsed = JSON.parse(jsonStr);
-
-            const saved = await saveEntity(parsed);
-
-            // 👇 THIS is the magic
-            const finalName = saved.entity || entityName;
-
-            router.push(`/entities/${finalName}`);
-
-        } catch {
-            alert("⚠️ Invalid JSON or save failed.");
-        }
-    };
+//     const onSave = async () => {
+//         try {
+//             const parsed = JSON.parse(jsonStr);
+//
+//             const saved = await saveEntity(parsed);
+//
+//             // 👇 THIS is the magic
+//             const finalName = saved.entity || entityName;
+//
+//             router.push(`/entities/${finalName}`);
+//
+//         } catch {
+//             alert("⚠️ Invalid JSON or save failed.");
+//         }
+//     };
 
     return (
         <div className="space-y-4">
@@ -67,7 +67,7 @@ export default function EntityEditor({ entityName: initialName }: { entityName?:
             />
 
             <button
-                onClick={onSave}
+//                 onClick={onSave}
                 disabled={isLoading}
                 className="px-3 py-2 bg-blue-600 text-white rounded-md"
             >
