@@ -58,13 +58,13 @@ async def list_entities(request: Request, _=Depends(require_jwt())):
     data = await call_model_manage(envelope, token=internal_token)
     result = _unwrap_result(data, "entity-server failed listing entities")
 
-    rows = result.get("rows") if isinstance(result, dict) else result or []
+    rows = result.get("rows", [])
 
     return {
         "entities": [
-            r["entities"]
+            r["entity"]
             for r in rows
-                if isinstance(r, dict) and "entity" in r
+            if isinstance(r, dict) and "entity" in r
         ]
     }
 
