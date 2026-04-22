@@ -18,19 +18,23 @@ export function useEntityEditor(entityName: string) {
             const token = await getToken();
             if (!token) throw new Error("Missing token");
 
-            const res = await fetch(
-                `${settings.API_BASE_URL}/api/entities/${entityName}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
+            if (entityName != 'new'){
 
-            if (!res.ok) throw new Error(await res.text());
+                const res = await fetch(
+                    `${settings.API_BASE_URL}/api/entities/${entityName}`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                );
 
-            const data = await res.json();
-            setEntity(data);
+                if (!res.ok) throw new Error(await res.text());
+
+                const data = await res.json();
+                setEntity(data);
+            }
+                
         } catch (err: any) {
             setError(err.message);
         } finally {

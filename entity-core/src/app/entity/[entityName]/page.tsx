@@ -11,7 +11,7 @@ export default function EntityEditPage() {
 
     return (
         <div className="p-6">
-
+             <EntityEditor entityName={entityName} />
         </div>
     );
 }
