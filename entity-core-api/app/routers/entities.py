@@ -8,7 +8,10 @@ from app.controllers.internal_auth import issue_internal_token
 from app.core.model_client import call_model_manage
 from app.schemas import CreateEntityBody, RequestEnvelope, EntityResponse
 
-router = APIRouter(prefix="/api/entities", tags=["entities"])
+router = APIRouter(
+    prefix="/api/entities",
+    dependencies=[Depends(require_jwt())]
+)
 
 
 # ---------------------------------------------------------------------------
