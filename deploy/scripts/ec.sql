@@ -142,11 +142,11 @@ LANGUAGE plpgsql AS $$
 DECLARE
        result JSONB;
 BEGIN
-  SELECT entity INTO result
+  SELECT entity INTO result as entity
   FROM ec.entity
   WHERE schema = p_schema;
 
-RETURN COALESCE(result, '{}'::jsonb);
+RETURN COALESCE(entity, '{}'::jsonb);
 END;
 $$;
 
