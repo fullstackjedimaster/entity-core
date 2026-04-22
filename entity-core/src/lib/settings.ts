@@ -39,6 +39,8 @@ export const settings = {
     "https://entity-core.fullstackjedi.dev/callback",
 
   DISABLE_AUTH: process.env.NEXT_PUBLIC_DISABLE_AUTH === "true",
+
+
 } as const;
 
 export default settings;

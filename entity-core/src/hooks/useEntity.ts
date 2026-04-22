@@ -19,7 +19,7 @@ export function useEntity(entityName: string) {
             if (!token) throw new Error("Missing token");
 
             const res = await fetch(
-                `${settings.API_BASE_URL}/api/entities/${entityName}`,
+                `${settings.API_BASE_URL}/entities/${entityName}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,

@@ -47,7 +47,6 @@ function OnboardingInner() {
 
     const [decoded, setDecoded] = useState<any>(null);
     const [orgKey, setOrgKey] = useState("");
-    const { isAuthenticated, getToken, user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
