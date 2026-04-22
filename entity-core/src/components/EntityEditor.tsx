@@ -12,6 +12,7 @@ export default function EntityEditor({ entityName: initialName }: { entityName?:
 
     // Load when entityName changes
     useEffect(() => {
+        debugger;
         if (entityName) {
             loadEntity();
         }
