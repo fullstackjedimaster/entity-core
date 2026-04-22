@@ -1,3 +1,6 @@
+import { useAuth } from "@/contexts/AuthContext";
+import {useCallback, useState} from "react";
+import {settings} from "@/lib/settings";
 export function useEntity(entityName: string) {
     const { getToken, isAuthenticated, loading: authLoading } = useAuth();
 
