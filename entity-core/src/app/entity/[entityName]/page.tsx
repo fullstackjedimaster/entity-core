@@ -23,13 +23,11 @@ export default function EntityDetailPage() {
 function EntityInner() {
     const router = useRouter();
     const params = useParams();
-    const entityNameParam = params?.entityName as string;
 
+    const entityNameParam = params?.entityName as string;
     const [entityName, setEntityName] = useState(entityNameParam || "");
     const [jsonStr, setJsonStr] = useState("");
-
-    const { isAuthenticated, loading: authLoading } = useAuth();
-
+    const { isAuthenticated, loading: authLoading useAuth} = useAuth();
     const { entity, loadEntity, saveEntity, isLoading, error } = useEntity(entityName);
 
     // ✅ Sync URL param → state
