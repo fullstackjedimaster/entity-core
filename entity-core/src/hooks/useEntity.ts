@@ -15,6 +15,7 @@ export function useEntity(entityName: string) {
         setError(null);
 
         try {
+
             const token = await getToken();
             if (!token) throw new Error("Missing token");
 
@@ -54,7 +55,7 @@ export function useEntity(entityName: string) {
 
         try {
             const res = await fetch(
-                `${settings.API_BASE_URL}/api/entities`,
+                `${settings.API_BASE_URL}/entities/${entityName}`,
                 {
                     method: "POST",
                     headers: {
