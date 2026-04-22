@@ -1,8 +1,10 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEntityEditor } from "@/hooks/useEntityEditor";
+import { useEntity } from "@/hooks/useEntity";
 import { Suspense, useState, useEffect} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function EntityDetailPage() {
     return (
@@ -18,20 +20,33 @@ export default function EntityDetailPage() {
     );
 }
 
-function EntityInner({ entityName: initialName }: { entityName?: string }) {
-    const [entityName, setEntityName] = useState(initialName ?? "");
-    const { entity, loadEntity, saveEntity, isLoading, error } = useEntityEditor(entityName);
+function EntityInner() {
+    const router = useRouter();
+    const params = useParams();
+    const entityNameParam = params?.entityName as string;
+
+    const [entityName, setEntityName] = useState(entityNameParam || "");
     const [jsonStr, setJsonStr] = useState("");
 
-     // Load when entityName changes
+    const { isAuthenticated, loading: authLoading } = useAuth();
+
+    const { entity, loadEntity, saveEntity, isLoading, error } = useEntity(entityName);
+
+    // ✅ Sync URL param → state
     useEffect(() => {
-
-        if (entityName != "new") {
-          loadEntity();
+        if (entityNameParam) {
+            setEntityName(entityNameParam);
         }
-    }, [entityName]);
+    }, [entityNameParam]);
 
-    // Reflect loaded entity into editor
+    // ✅ Load entity when ready
+    useEffect(() => {
+        if (!authLoading && isAuthenticated && entityName !== "new") {
+            loadEntity();
+        }
+    }, [authLoading, isAuthenticated, entityName]);
+
+    // ✅ Populate editor
     useEffect(() => {
         if (entity) {
             setJsonStr(JSON.stringify(entity.entity_json, null, 2));
@@ -42,6 +57,7 @@ function EntityInner({ entityName: initialName }: { entityName?: string }) {
         try {
             const parsed = JSON.parse(jsonStr);
             const saved = await saveEntity(parsed);
+
             const finalName = saved.entity || entityName;
             router.push(`/entities/${finalName}`);
 
@@ -50,10 +66,19 @@ function EntityInner({ entityName: initialName }: { entityName?: string }) {
         }
     };
 
+    // ✅ AUTH GUARD
+    if (authLoading) {
+        return <p className="p-6">Checking authentication...</p>;
+    }
+
+    if (!isAuthenticated) {
+        return <p className="p-6 text-red-500">You must be logged in.</p>;
+    }
+
     return (
         <div className="space-y-4">
             <h2 className="text-xl font-semibold">
-                Entity Editor — <span className="text-blue-600">{entityName || "New Entity"}</span>
+                Entity — <span className="text-blue-600">{entityName || "New Entity"}</span>
             </h2>
 
             <div>
@@ -80,7 +105,7 @@ function EntityInner({ entityName: initialName }: { entityName?: string }) {
                 disabled={isLoading}
                 className="px-3 py-2 bg-blue-600 text-white rounded-md"
             >
-                Save Entity
+                {isLoading ? "Saving..." : "Save Entity"}
             </button>
         </div>
     );
