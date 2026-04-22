@@ -134,22 +134,13 @@ $$ LANGUAGE plpgsql;
 
 ALTER FUNCTION ec.get_entity(TEXT, TEXT, TEXT) OWNER TO ec;
 
-CREATE OR REPLACE FUNCTION ec.list_entities(
-  p_schema TEXT
-)
-RETURNS JSONB
-LANGUAGE plpgsql AS $$
-DECLARE
-       result JSONB;
-BEGIN
-  SELECT entity INTO result as entity
+CREATE OR REPLACE FUNCTION ec.list_entities(p_schema TEXT)
+RETURNS TABLE (entity TEXT)
+LANGUAGE sql AS $$
+  SELECT entity
   FROM ec.entity
   WHERE schema = p_schema;
-
-RETURN COALESCE(entity, '{}'::jsonb);
-END;
 $$;
-
 ALTER FUNCTION ec.list_entities(TEXT) OWNER TO ec;
 
 
