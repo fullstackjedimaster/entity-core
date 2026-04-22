@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import EntityEditor from "@/components/EntityEditor";
+import { useEntityEditor } from "@/hooks/useEntityEditor";
 import { Suspense, useState, useEffect} from "react";
 
 export default function EntityDetailPage() {
