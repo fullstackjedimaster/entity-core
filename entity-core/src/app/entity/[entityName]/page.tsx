@@ -27,7 +27,7 @@ function EntityInner() {
     const entityNameParam = params?.entityName as string;
     const [entityName, setEntityName] = useState(entityNameParam || "");
     const [jsonStr, setJsonStr] = useState("");
-    const { isAuthenticated, loading: authLoading useAuth} = useAuth();
+    const { isAuthenticated, loading: authLoading, useAuth} = useAuth();
     const { entity, loadEntity, saveEntity, isLoading, error } = useEntity(entityName);
 
     // ✅ Sync URL param → state
