@@ -8,7 +8,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS ec.entity(
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   schema TEXT NOT NULL,
-  entity TEXT NOT NULL,
+  entity TEXT UNIQUE NOT NULL,
   entity_json JSONB NOT NULL
 );
 
