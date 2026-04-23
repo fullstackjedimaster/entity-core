@@ -56,8 +56,8 @@ function EntityInner() {
             const parsed = JSON.parse(jsonStr);
             const saved = await saveEntity(parsed);
 
-            const finalName = saved.entity || entityName;
-            router.push(`/entities/${finalName}`);
+            const finalName = saved.entity || entityNameParam;
+            router.push(`/entities/${entityNameParam}`);
 
         } catch {
             alert("⚠️ Invalid JSON or save failed.");
