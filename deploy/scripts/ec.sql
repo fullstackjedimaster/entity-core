@@ -92,17 +92,7 @@ RETURNS VOID
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  IF schema IS NULL OR trim(schema) = '' THEN
-    RAISE EXCEPTION 'upsert_entity: schema is required';
-  END IF;
 
-  IF entity IS NULL OR trim(entity) = '' THEN
-    RAISE EXCEPTION 'upsert_entity: entity is required';
-  END IF;
-
-  IF entity_json IS NULL OR entity_json::text = '{}' THEN
-    RAISE EXCEPTION 'upsert_entity: entity_json must be a non-empty JSON object';
-  END IF;
 
   INSERT INTO ec.entity(schema, entity, entity_json)
   VALUES (p_schema, p_entity, p_entity_json)
