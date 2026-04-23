@@ -24,6 +24,7 @@ function EntityInner() {
     const params = useParams();
 
     const entityNameParam = params?.entityName as string;
+    //const [inputName, setInputName] = useState(entityNameParam || "");
     const [entityName, setEntityName] = useState(entityNameParam || "");
     const [jsonStr, setJsonStr] = useState("");
     const { isAuthenticated, loading: authLoading, } = useAuth();
@@ -38,10 +39,10 @@ function EntityInner() {
 
     // ✅ Load entity when ready
     useEffect(() => {
-        if (!authLoading && isAuthenticated && entityName !== "new") {
+        if (!authLoading && isAuthenticated && entityNameParam !== "new") {
             loadEntity();
         }
-    }, [authLoading, isAuthenticated, entityName]);
+    }, [authLoading, isAuthenticated, entityNameParam]);
 
     // ✅ Populate editor
     useEffect(() => {
@@ -83,7 +84,7 @@ function EntityInner() {
                 <input
                     type="text"
                     value={entityName}
-                  //   onChange={(e) => setEntityName(e.target.value)}
+                     onChange={(e) => setEntityName(e.target.value)}
                     className="border px-3 py-2 rounded w-full"
                 />
             </div>
@@ -92,7 +93,7 @@ function EntityInner() {
 
             <textarea
                 value={jsonStr}
-       //         onChange={(e) => setJsonStr(e.target.value)}
+                onChange={(e) => setJsonStr(e.target.value)}
                 rows={20}
                 className="w-full font-mono text-sm border rounded-lg p-3"
             />
