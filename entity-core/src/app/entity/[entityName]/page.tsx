@@ -83,7 +83,7 @@ function EntityInner() {
                 <input
                     type="text"
                     value={entityName}
-                     onChange={(e) => setEntityName(e.target.value)}
+                  //   onChange={(e) => setEntityName(e.target.value)}
                     className="border px-3 py-2 rounded w-full"
                 />
             </div>
@@ -92,7 +92,7 @@ function EntityInner() {
 
             <textarea
                 value={jsonStr}
-                onChange={(e) => setJsonStr(e.target.value)}
+       //         onChange={(e) => setJsonStr(e.target.value)}
                 rows={20}
                 className="w-full font-mono text-sm border rounded-lg p-3"
             />
