@@ -121,7 +121,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 
-ALTER FUNCTION ec.get_entity(TEXT, TEXT, TEXT) OWNER TO ec;
+ALTER FUNCTION ec.get_entity(TEXT, TEXT) OWNER TO ec;
 
 CREATE OR REPLACE FUNCTION ec.list_entities(p_schema TEXT)
 RETURNS TABLE (entity TEXT)
