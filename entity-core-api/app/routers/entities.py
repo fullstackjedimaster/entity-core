@@ -15,8 +15,7 @@ router = APIRouter(
     dependencies=[Depends(require_jwt())]
 )
 
-token_payload: dict = Depends(require_jwt())
-schema = token_payload.get("https://fullstackjedi.dev/claims/schema")
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -109,12 +108,12 @@ async def get_entity(request: Request, entity: str, _=Depends(require_jwt())):
 # ---------------------------------------------------------------------------
 
 @router.post("/{entity}")
-async def create_entity(request: Request, entity: str, body: CreateEntityBody ):
+async def create_entity(request: Request, entity: str, body: CreateEntityBody,   claims: Dict[str, Any] = Depends(require_jwt()), ):
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
 
     internal_token = issue_internal_token(request)
-
+    schema = claims.get("schema")
 
     envelope = RequestEnvelope(
         operation="execute",
