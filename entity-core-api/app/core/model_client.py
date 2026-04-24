@@ -35,15 +35,6 @@ def _build_url(path: str) -> str:
     return base + path
 
 
-def _build_internal_service_token() -> str:
-    now = datetime.now(timezone.utc)
-    payload = {
-        "iss": "entity-core",
-        "sub": "entity-core",
-        "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=5)).timestamp()),
-    }
-    return jwt.encode(payload, EC_SHARED_JWT_SECRET, algorithm="HS256")
 
 
 async def _post(
@@ -59,7 +50,7 @@ async def _post(
     if token:
         headers["Authorization"] = f"Bearer {token}"
     else:
-        internal_token = _build_internal_service_token()
+        internal_token = token
         headers["Authorization"] = f"Bearer {internal_token}"
 
     async with httpx.AsyncClient(timeout=30.0) as client:

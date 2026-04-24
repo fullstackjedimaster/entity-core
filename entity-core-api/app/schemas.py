@@ -19,8 +19,7 @@ class RequestEnvelope(BaseModel):
 
 
 class EntityResponse(BaseModel):
-    ok: bool
-    result: Any = None
+    entity: Any = None
 
 
 class RequestResult(BaseModel):

@@ -96,11 +96,10 @@ async def get_entity(request: Request, entity: str):
 
     if isinstance(ent, dict) and "entity" in ent:
         return EntityResponse(
-            entity=ent["entity"],
-            template=ent.get("entity_json"),
+            entity=ent["entity"]
         )
 
-    return EntityResponse(entity=entity, template=ent)
+    return EntityResponse(entity=entity)
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +112,7 @@ async def create_entity(request: Request, entity: str, body: CreateEntityBody):
         raise HTTPException(status_code=400, detail="Missing entity_json")
 
     internal_token = issue_internal_token(request)
-    schema = internal_token.claims["schema"]
+    schema = internal_token.schema
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.create_entity",
