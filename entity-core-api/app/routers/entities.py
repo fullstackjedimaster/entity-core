@@ -6,9 +6,7 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from app.controllers.auth import require_jwt
 from app.controllers.internal_auth import issue_internal_token
 from app.core.model_client import call_model_manage
-from app.schemas import CreateEntityBody, RequestEnvelope, EntityResponse, TenantContext
-from app.middleware.tenant_context import get_tenant_context
-
+from app.schemas import CreateEntityBody, RequestEnvelope, EntityResponse
 
 router = APIRouter(
     prefix="/api/entities",
@@ -45,9 +43,9 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 # ---------------------------------------------------------------------------
 
 @router.get("")
-async def list_entities(request: Request,  ctx: TenantContext = Depends(get_tenant_context)):
+async def list_entities(request: Request,  schema:str):
     internal_token = issue_internal_token(request)
-    schema = ctx.schema
+
 
     envelope = RequestEnvelope(
         operation="execute",
@@ -76,9 +74,8 @@ async def list_entities(request: Request,  ctx: TenantContext = Depends(get_tena
 # ---------------------------------------------------------------------------
 
 @router.get("/{entity}", response_model=EntityResponse)
-async def get_entity(request: Request, entity: str, ctx: TenantContext = Depends(get_tenant_context)):
+async def get_entity(request: Request, schema:str, entity: str):
     internal_token = issue_internal_token(request)
-    schema  = ctx.schema
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.get_entity",
@@ -107,20 +104,18 @@ async def get_entity(request: Request, entity: str, ctx: TenantContext = Depends
 # ---------------------------------------------------------------------------
 
 @router.post("/{entity}")
-async def create_entity(request: Request,  body: CreateEntityBody, ctx: TenantContext = Depends(get_tenant_context)
-):
+async def create_entity(request: Request,  body: CreateEntityBody):
 
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
 
     internal_token = issue_internal_token(request)
-    schema = ctx.schema
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.create_entity",
         id=None,
         args={
-            "schema": schema,
+            "schema": body.schema,
             "entity": body.entity,
             "entity_json": body.entity_json,
         },
