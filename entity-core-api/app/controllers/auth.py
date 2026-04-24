@@ -209,7 +209,7 @@ def require_jwt(required_permissions: Optional[Iterable[str]] = None):
         claims = decode_token(token)
 
         schema = claims.get(SCHEMA_CLAIM) or claims.get("schema")
-
+        print(f"{schema}")
         if not schema:
             raise HTTPException(400, "Missing tenant schema")
 

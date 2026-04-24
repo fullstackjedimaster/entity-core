@@ -139,7 +139,7 @@ export const useAuth = (): AuthContextType => {
     const getSchema = (): string | null => {
         if (!user) return null;
         const claims = user as UserWithClaims;
-
+        console.warn('claims', claims['schema']);
         return (
             (claims['https://fullstackjedi.dev/schema'] as string) ||
             (claims['schema'] as string) ||

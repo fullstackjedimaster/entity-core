@@ -27,7 +27,7 @@ function EntityInner() {
     //const [inputName, setInputName] = useState(entityNameParam || "");
     const [entityName, setEntityName] = useState(entityNameParam || "");
     const [jsonStr, setJsonStr] = useState("");
-    const { isAuthenticated, loading: authLoading, } = useAuth();
+    const { isAuthenticated, loading: authLoading} = useAuth();
     const { entity, loadEntity, saveEntity, isLoading, error } = useEntity();
 
 

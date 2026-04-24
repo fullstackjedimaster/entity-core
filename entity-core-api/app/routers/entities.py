@@ -8,11 +8,15 @@ from app.controllers.internal_auth import issue_internal_token
 from app.core.model_client import call_model_manage
 from app.schemas import CreateEntityBody, RequestEnvelope, EntityResponse
 
+
+
 router = APIRouter(
     prefix="/api/entities",
     dependencies=[Depends(require_jwt())]
 )
 
+token_payload: dict = Depends(require_jwt())
+schema = token_payload.get("https://fullstackjedi.dev/claims/schema")
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -45,16 +49,13 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 @router.get("")
 async def list_entities(request: Request, _=Depends(require_jwt())):
     internal_token = issue_internal_token(request)
-    schema = request.state.schema
 
-    if not schema:
-        raise HTTPException(status_code=400, detail="Missing schema")
 
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.list_entities",
         id=None,
-        args={},
+        args={"schema":schema},
         meta={"source": "entity-core:/api/entities"},
     )
 
@@ -77,14 +78,15 @@ async def list_entities(request: Request, _=Depends(require_jwt())):
 # ---------------------------------------------------------------------------
 
 @router.get("/{entity}", response_model=EntityResponse)
-async def get_entity(request: Request, entity: str):
+async def get_entity(request: Request, entity: str, _=Depends(require_jwt())):
     internal_token = issue_internal_token(request)
 
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.get_entity",
         id=None,
-        args={"entity": entity},
+        args={"schema":schema,
+            "entity": entity},
         meta={"source": "entity-core:/api/entities/{entity}"},
     )
 
@@ -107,15 +109,13 @@ async def get_entity(request: Request, entity: str):
 # ---------------------------------------------------------------------------
 
 @router.post("/{entity}")
-async def create_entity(request: Request, entity: str, body: CreateEntityBody,token_payload: dict = Depends(require_jwt()) ):
+async def create_entity(request: Request, entity: str, body: CreateEntityBody ):
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
 
     internal_token = issue_internal_token(request)
-    schema = token_payload.get("https://fullstackjedi.dev/claims/schema")
-    print(f"{schema}")
-    if not schema:
-        raise HTTPException(400, "Missing schema in token")
+
+
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.create_entity",
