@@ -35,7 +35,22 @@ def _build_url(path: str) -> str:
     return base + path
 
 
+def _mint_internal_token() -> str:
+    now = datetime.now(timezone.utc)
 
+    payload = {
+        "iss": "entity-core",
+        "sub": "entity-core",
+        "iat": now,
+        "exp": now + timedelta(minutes=5),
+        "scope": "internal",
+    }
+
+    return jwt.encode(
+        payload,
+        EC_SHARED_JWT_SECRET,
+        algorithm="HS256",
+    )
 
 async def _post(
     path: str,
@@ -45,13 +60,10 @@ async def _post(
     url = _build_url(path)
     headers: Dict[str, str] = {"Content-Type": "application/json"}
 
-    # If a real user access token is provided, forward it.
-    # Otherwise mint a short-lived internal service JWT.
     if token:
         headers["Authorization"] = f"Bearer {token}"
     else:
-        internal_token = token
-        headers["Authorization"] = f"Bearer {internal_token}"
+        headers["Authorization"] = f"Bearer {_mint_internal_token()}"
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
@@ -63,25 +75,15 @@ async def _post(
             ) from exc
 
     if resp.status_code >= 400:
-        detail: Any = None
         try:
             data = resp.json()
-            detail = data.get("detail") if isinstance(data, dict) else data
+            detail = data.get("detail")
         except Exception:
             detail = resp.text
 
-        raise HTTPException(
-            status_code=resp.status_code,
-            detail=detail,
-        )
+        raise HTTPException(status_code=resp.status_code, detail=detail)
 
-    try:
-        return resp.json()
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Invalid JSON response from entity-server at {url}",
-        ) from exc
+    return resp.json()
 
 
 # ---------------------------------------------------------------------------

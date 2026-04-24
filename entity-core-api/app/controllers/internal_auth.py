@@ -18,3 +18,4 @@ def issue_internal_token(request):
         EC_SHARED_JWT_SECRET,
         algorithm="HS256",
     )
+
