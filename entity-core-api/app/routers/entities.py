@@ -112,7 +112,7 @@ async def create_entity(request: Request, entity: str, body: CreateEntityBody):
         raise HTTPException(status_code=400, detail="Missing entity_json")
 
     internal_token = issue_internal_token(request)
-    schema = internal_token.schema
+    schema = request.state.schema
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.create_entity",
