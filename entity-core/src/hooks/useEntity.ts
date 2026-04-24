@@ -1,15 +1,18 @@
 import { useAuth } from "@/contexts/AuthContext";
 import {useCallback, useState} from "react";
 import {settings} from "@/lib/settings";
-export function useEntity(entityName: string) {
-    const { getToken, isAuthenticated, loading: authLoading } = useAuth();
+
+export function useEntity() {
+    const { getToken, isAuthenticated, getSchema,  loading: authLoading } = useAuth();
 
     const [entity, setEntity] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const loadEntity = useCallback(async () => {
-        if (authLoading || !isAuthenticated || entityName === "new") return;
+    const schema = getSchema();
+
+    const loadEntity = useCallback(async (entityName:string) => {
+        if (authLoading || !isAuthenticated) return;
 
         setIsLoading(true);
         setError(null);
@@ -38,9 +41,9 @@ export function useEntity(entityName: string) {
         } finally {
             setIsLoading(false);
         }
-    }, [entityName, getToken, authLoading, isAuthenticated]);
+    }, [ getToken, authLoading, isAuthenticated]);
 
-    const saveEntity = useCallback(async (entityJson: any) => {
+    const saveEntity = useCallback(async (entityName:string, entityJson: any) => {
         if (!isAuthenticated) throw new Error("Not authenticated");
 
         const token = await getToken();
@@ -77,7 +80,7 @@ export function useEntity(entityName: string) {
             setError(err.message);
             throw err;
         }
-    }, [entityName, getToken, isAuthenticated]);
+    }, [ getToken, isAuthenticated]);
 
     return { entity, loadEntity, saveEntity, isLoading, error };
 }

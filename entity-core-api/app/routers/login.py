@@ -146,8 +146,15 @@ async def get_current_user(
     org_id = _get_claim(
         claims,
         "org_id",
-        "https://fullstackjedi.dev/org_id",
-        "https://fullstackjedi.dev/schema",
+        "https://fullstackjedi.dev/org_id"
+
+    )
+
+    schema = _get_claim(
+        claims,
+        "schema",
+        "https://fullstackjedi.dev/schema"
+
     )
 
     # Map into DBUserWithAuth. Fields that normally come from DB stay None.
@@ -166,4 +173,5 @@ async def get_current_user(
         roles=roles,
         permissions=permissions,
         org_id=org_id,
+        schema=schema
     )

@@ -107,19 +107,19 @@ async def get_entity(request: Request, entity: str):
 # Create entity
 # ---------------------------------------------------------------------------
 
-@router.post("/new")
-async def create_entity(request: Request, entity: str, body: CreateEntityBody):
+@router.post("/{entity}")
+async def create_entity(request: Request, entity: str = Query(...), body:  CreateEntityBody = ... ):
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
 
     internal_token = issue_internal_token(request)
-
+    schema = internal_token.claims["schema"]
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.create_entity",
         id=None,
         args={
-            "schema": body.schema,
+            "schema": schema,
             "entity": entity,
             "entity_json": body.entity_json,
         },

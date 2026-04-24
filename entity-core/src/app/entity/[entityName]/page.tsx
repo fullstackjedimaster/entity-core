@@ -28,21 +28,16 @@ function EntityInner() {
     const [entityName, setEntityName] = useState(entityNameParam || "");
     const [jsonStr, setJsonStr] = useState("");
     const { isAuthenticated, loading: authLoading, } = useAuth();
-    const { entity, loadEntity, saveEntity, isLoading, error } = useEntity(entityName);
+    const { entity, loadEntity, saveEntity, isLoading, error } = useEntity();
 
-    // ✅ Sync URL param → state
-    useEffect(() => {
-        if (entityNameParam) {
-            setEntityName(entityNameParam);
-        }
-    }, [entityNameParam]);
+
 
     // ✅ Load entity when ready
     useEffect(() => {
         if (!authLoading && isAuthenticated && entityNameParam !== "new") {
-            loadEntity();
+            loadEntity(entityName);
         }
-    }, [authLoading, isAuthenticated, entityNameParam]);
+    }, [authLoading, isAuthenticated, entityName]);
 
     // ✅ Populate editor
     useEffect(() => {
@@ -54,10 +49,8 @@ function EntityInner() {
     const onSave = async () => {
         try {
             const parsed = JSON.parse(jsonStr);
-            const saved = await saveEntity(parsed);
-
-            const finalName = saved.entity || entityNameParam;
-            router.push(`/entities/${entityNameParam}`);
+            await saveEntity(entityName, parsed);
+            router.push(`/entity/${entityName}`);
 
         } catch {
             alert("⚠️ Invalid JSON or save failed.");
