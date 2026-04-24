@@ -199,31 +199,33 @@ def claims_have_scopes(
     return False
 
 
-SCHEMA_CLAIM = "https://fullstackjedi.dev/schema"
 
 def require_jwt(required_permissions: Optional[Iterable[str]] = None):
     required_permissions = set(required_permissions or [])
 
     async def dependency(request: Request) -> Dict[str, Any]:
         token = _get_token_from_header(request)
-        claims = decode_token(token)
+        claims = decode_token(request, token)
 
-        schema = claims.get(SCHEMA_CLAIM) or claims.get("schema")
-        print(f"{schema}")
-        if not schema:
-            raise HTTPException(400, f"Missing tenant schema")
+        if required_permissions:
+            scope_str = claims.get("scope", "")
+            scope_list = scope_str.split() if isinstance(scope_str, str) else []
 
-        # 👇 CREATE CONTEXT OBJECT
-        ctx = TenantContext(
-            schema=schema,
-            sub=claims.get("sub"),
-            org_id=claims.get("org_id"),
-            permissions=claims.get("permissions", []),
-        )
+            permissions = claims.get("permissions", [])
+            if isinstance(permissions, str):
+                permissions = [permissions]
+
+            has_scope = required_permissions.issubset(set(scope_list))
+            has_perm = required_permissions.issubset(set(permissions))
+
+            if not (has_scope or has_perm):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Insufficient permissions for this operation",
+                )
 
         request.state.claims = claims
-        request.state.ctx = ctx
-
+        request.state.schema = claims.get("schema")
         return claims
 
     return dependency
