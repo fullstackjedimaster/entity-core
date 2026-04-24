@@ -108,7 +108,9 @@ async def create_entity(request: Request,  body: CreateEntityBody):
 
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
-
+    # 👇 ADD DEBUG HERE (right after validation, before DB work)
+    print("ENTITY_JSON TYPE:", type(body.entity_json))
+    print("ENTITY_JSON VALUE:", body.entity_json)
     internal_token = issue_internal_token(request)
     envelope = RequestEnvelope(
         operation="execute",
