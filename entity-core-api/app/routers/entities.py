@@ -113,7 +113,7 @@ async def create_entity(request: Request, entity: str, body: CreateEntityBody,to
 
     internal_token = issue_internal_token(request)
     schema = token_payload.get("https://fullstackjedi.dev/claims/schema")
-
+    print(f"{schema}")
     if not schema:
         raise HTTPException(400, "Missing schema in token")
     envelope = RequestEnvelope(
