@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional, Dict, Any, Literal, List
 from pydantic import BaseModel, Field
 
+from dataclasses import dataclass
 
 
 Operation = Literal["create", "read", "update", "delete", "execute"]
@@ -80,3 +81,11 @@ class CreateEntityBody(BaseModel):
     schema: str
     entity: str
     entity_json: Dict[str, Any]
+
+
+@dataclass
+class TenantContext:
+    schema: str
+    sub: Optional[str] = None
+    org_id: Optional[str] = None
+    permissions: list[str] = None

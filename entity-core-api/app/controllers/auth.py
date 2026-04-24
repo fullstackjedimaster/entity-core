@@ -7,7 +7,7 @@ import json
 
 from fastapi import Depends, HTTPException, Request, status
 from jose import jwt
-
+from app.schemas import TenantContext
 from app.core.settings import env
 
 # ---------------------------------------------------------------------------
@@ -206,31 +206,23 @@ def require_jwt(required_permissions: Optional[Iterable[str]] = None):
 
     async def dependency(request: Request) -> Dict[str, Any]:
         token = _get_token_from_header(request)
-        claims = decode_token(request, token)
+        claims = decode_token(token)
 
-        if required_permissions:
-            scope_str = claims.get("scope", "")
-            scope_list = scope_str.split() if isinstance(scope_str, str) else []
+        schema = claims.get(SCHEMA_CLAIM) or claims.get("schema")
 
-            permissions = claims.get("permissions", [])
-            if isinstance(permissions, str):
-                permissions = [permissions]
+        if not schema:
+            raise HTTPException(400, "Missing tenant schema")
 
-            if not (
-                required_permissions.issubset(set(scope_list)) or
-                required_permissions.issubset(set(permissions))
-            ):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Insufficient permissions",
-                )
-
-        request.state.claims = claims
-        request.state.schema = (
-                claims.get(SCHEMA_CLAIM)
-                or claims.get("schema")  # optional fallback
+        # 👇 CREATE CONTEXT OBJECT
+        ctx = TenantContext(
+            schema=schema,
+            sub=claims.get("sub"),
+            org_id=claims.get("org_id"),
+            permissions=claims.get("permissions", []),
         )
 
+        request.state.claims = claims
+        request.state.ctx = ctx
 
         return claims
 
