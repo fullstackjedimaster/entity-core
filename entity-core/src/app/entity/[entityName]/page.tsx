@@ -47,15 +47,20 @@ function EntityInner() {
     }, [entity]);
 
     const onSave = async () => {
-        try {
-            const parsed = JSON.parse(jsonStr);
-            await saveEntity(entityName, parsed);
-            router.push(`/entity/${entityName}`);
+    console.log("🔥 SAVE CLICKED");
+    console.log("RAW jsonStr:", jsonStr);
 
-        } catch {
-            alert("⚠️ Invalid JSON or save failed.");
-        }
-    };
+    try {
+        const parsed = JSON.parse(jsonStr);
+        console.log("✅ PARSED OK:", parsed);
+
+        await saveEntity(entityName, parsed);
+
+    } catch (e) {
+        console.error("❌ FULL ERROR:", e);
+        alert("JSON PARSE FAILED — check console");
+    }
+};
 
     // ✅ AUTH GUARD
     if (authLoading) {
