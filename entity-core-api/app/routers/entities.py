@@ -43,7 +43,7 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 # ---------------------------------------------------------------------------
 
 @router.get("")
-async def list_entities(request: Request,  schema:str):
+async def list_entities(request: Request):
     internal_token = issue_internal_token(request)
 
 
@@ -51,7 +51,7 @@ async def list_entities(request: Request,  schema:str):
         operation="execute",
         target="ec.list_entities",
         id=None,
-        args={"schema":schema},
+        args=None,
         meta={"source": "entity-core:/api/entities"},
     )
 

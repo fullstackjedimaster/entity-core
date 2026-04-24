@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { useApi } from '@/lib/apiClient';
+import { useApi } from '@/lib/apiEntity';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface EntityInfo {
