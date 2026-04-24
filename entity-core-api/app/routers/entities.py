@@ -108,7 +108,7 @@ async def get_entity(request: Request, entity: str):
 # ---------------------------------------------------------------------------
 
 @router.post("/{entity}")
-async def create_entity(request: Request, entity: str = Query(...), body:  CreateEntityBody = ... ):
+async def create_entity(request: Request, entity: str, body: CreateEntityBody):
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
 
