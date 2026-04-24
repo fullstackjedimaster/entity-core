@@ -224,8 +224,8 @@ def require_jwt(required_permissions: Optional[Iterable[str]] = None):
                     detail="Insufficient permissions for this operation",
                 )
 
-        # request.state.claims = claims
-        # request.state.schema = claims.get("schema")
+        request.state.claims = claims
+        request.state.schema = claims.get("schema")
         return claims
 
     return dependency
