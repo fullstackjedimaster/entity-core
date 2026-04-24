@@ -7,15 +7,19 @@ EC_SHARED_JWT_SECRET = env("EC_SHARED_JWT_SECRET")
 
 def issue_internal_token(request):
     claims = request.state.claims
-
+    now = datetime.now(timezone.utc)
     return jwt.encode(
         {
             "iss": "entity-core",
             "sub": "entity-core",
-            "schema": request.state.schema,
+            "iat": now,
+            "exp": now + timedelta(minutes=5),
+            "scope": "internal",
+            "schema": claims.get("schema"),
             "permissions": claims.get("permissions", []),
         },
         EC_SHARED_JWT_SECRET,
         algorithm="HS256",
     )
 
+from datetime import datetime, timedelta, timezone
