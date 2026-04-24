@@ -3,13 +3,12 @@ import {useCallback, useState} from "react";
 import {settings} from "@/lib/settings";
 
 export function useEntity() {
-    const { getToken, isAuthenticated, getSchema,  loading: authLoading } = useAuth();
+    const { getToken, isAuthenticated,  loading: authLoading } = useAuth();
 
     const [entity, setEntity] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const schema = getSchema();
 
     const loadEntity = useCallback(async (entityName:string) => {
         if (authLoading || !isAuthenticated) return;
@@ -49,7 +48,6 @@ export function useEntity() {
         const token = await getToken();
         if (!token) throw new Error("Missing token");
 
-        const schema = getSchema();
         const optimistic = {
             entity: entityName,
             entity_json: entityJson,
@@ -83,5 +81,5 @@ export function useEntity() {
         }
     }, [ getToken, isAuthenticated]);
 
-    return { entity, loadEntity, getSchema, saveEntity, isLoading, error };
+    return { entity, loadEntity, saveEntity, isLoading, error };
 }

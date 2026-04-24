@@ -32,11 +32,6 @@ export function useAuthInfo() {
         })();
     }, [isAuthenticated, getToken, disableAuth]);
 
-    const schema =
-        claims?.["https://fullstackjedi.dev/schema"] ||
-        claims?.["schema"] ||
-        null;
-
     const org_id =
         claims?.["https://fullstackjedi.dev/org_id"] ||
         claims?.["org_id"] ||
@@ -56,8 +51,6 @@ export function useAuthInfo() {
         user,
         token,
         claims,
-        schema,
-        org_id,
         roles,
         permissions,
         isAuthenticated,

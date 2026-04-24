@@ -16,7 +16,6 @@ interface AuthContextType {
     logout: () => void;
     getToken: () => Promise<string | null>;
     getIdClaims: () => Promise<Record<string, unknown> | null>;
-    getSchema: () => string | null;
     getOrgId: () => string | null;
     getRoles: () => string[];
     auth0: Auth0ContextInterface<User> | null;
@@ -56,7 +55,6 @@ export const useAuth = (): AuthContextType => {
             },
             getToken: async () => null,
             getIdClaims: async () => null,
-            getSchema: () => null,
             getOrgId: () => null,
             getRoles: () => [],
             auth0: null,
@@ -133,20 +131,6 @@ export const useAuth = (): AuthContextType => {
         }
     };
 
-    // --------------------------------------------------
-    // CLAIM HELPERS (CRITICAL FOR MULTI-TENANT)
-    // --------------------------------------------------
-    const getSchema = (): string | null => {
-        if (!user) return null;
-        const claims = user as UserWithClaims;
-        console.warn('claims', claims['schema']);
-        return (
-            (claims['https://fullstackjedi.dev/schema'] as string) ||
-            (claims['schema'] as string) ||
-            (claims['org_id'] as string) ||
-            null
-        );
-    };
 
     const getOrgId = (): string | null => {
         if (!user) return null;
@@ -178,7 +162,6 @@ export const useAuth = (): AuthContextType => {
         logout,
         getToken,
         getIdClaims,
-        getSchema,
         getOrgId,
         getRoles,
         auth0,
