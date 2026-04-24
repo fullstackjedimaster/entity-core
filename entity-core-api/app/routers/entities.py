@@ -15,8 +15,7 @@ router = APIRouter(
     dependencies=[Depends(require_jwt())]
 )
 
-ctx: TenantContext = Depends(get_tenant_context)
-schema = ctx.schema
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -46,9 +45,9 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 # ---------------------------------------------------------------------------
 
 @router.get("")
-async def list_entities(request: Request,  _=Depends(require_jwt())):
+async def list_entities(request: Request,  ctx: TenantContext = Depends(get_tenant_context)):
     internal_token = issue_internal_token(request)
-
+    schema = ctx.schema
 
     envelope = RequestEnvelope(
         operation="execute",
@@ -77,9 +76,9 @@ async def list_entities(request: Request,  _=Depends(require_jwt())):
 # ---------------------------------------------------------------------------
 
 @router.get("/{entity}", response_model=EntityResponse)
-async def get_entity(request: Request, entity: str, _=Depends(require_jwt())):
+async def get_entity(request: Request, entity: str, ctx: TenantContext = Depends(get_tenant_context)):
     internal_token = issue_internal_token(request)
-
+    schema  = ctx.schema
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.get_entity",
@@ -108,14 +107,14 @@ async def get_entity(request: Request, entity: str, _=Depends(require_jwt())):
 # ---------------------------------------------------------------------------
 
 @router.post("/{entity}")
-async def create_entity(request: Request,  body: CreateEntityBody
+async def create_entity(request: Request,  body: CreateEntityBody, ctx: TenantContext = Depends(get_tenant_context)
 ):
 
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
 
     internal_token = issue_internal_token(request)
-
+    schema = ctx.schema
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.create_entity",
