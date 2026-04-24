@@ -49,6 +49,7 @@ export function useEntity() {
         const token = await getToken();
         if (!token) throw new Error("Missing token");
 
+        const schema = getSchema();
         const optimistic = {
             entity: entityName,
             entity_json: entityJson,
@@ -82,5 +83,5 @@ export function useEntity() {
         }
     }, [ getToken, isAuthenticated]);
 
-    return { entity, loadEntity, saveEntity, isLoading, error };
+    return { entity, loadEntity, getSchema, saveEntity, isLoading, error };
 }

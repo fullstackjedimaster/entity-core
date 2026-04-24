@@ -6,8 +6,8 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from app.controllers.auth import require_jwt
 from app.controllers.internal_auth import issue_internal_token
 from app.core.model_client import call_model_manage
-from app.schemas import CreateEntityBody, RequestEnvelope, EntityResponse
-
+from app.schemas import CreateEntityBody, RequestEnvelope, EntityResponse, TenantContext
+from app.middleware.tenant_context import get_tenant_context
 
 
 router = APIRouter(
@@ -15,8 +15,8 @@ router = APIRouter(
     dependencies=[Depends(require_jwt())]
 )
 
-
-
+ctx: TenantContext = Depends(get_tenant_context)
+schema = ctx.schema
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -46,7 +46,7 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 # ---------------------------------------------------------------------------
 
 @router.get("")
-async def list_entities(request: Request, _=Depends(require_jwt())):
+async def list_entities(request: Request,  _=Depends(require_jwt())):
     internal_token = issue_internal_token(request)
 
 
@@ -108,12 +108,13 @@ async def get_entity(request: Request, entity: str, _=Depends(require_jwt())):
 # ---------------------------------------------------------------------------
 
 @router.post("/{entity}")
-async def create_entity(request: Request, entity: str, body: CreateEntityBody,   claims: Dict[str, Any] = Depends(require_jwt()), ):
+async def create_entity(request: Request,  body: CreateEntityBody
+):
+
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
 
     internal_token = issue_internal_token(request)
-    schema = claims.get("schema")
 
     envelope = RequestEnvelope(
         operation="execute",
@@ -121,7 +122,7 @@ async def create_entity(request: Request, entity: str, body: CreateEntityBody,  
         id=None,
         args={
             "schema": schema,
-            "entity": entity,
+            "entity": body.entity,
             "entity_json": body.entity_json,
         },
         meta={"source": "entity-core:/api/entities/{entity}:POST"},
