@@ -40,11 +40,26 @@ function EntityInner() {
     }, [authLoading, isAuthenticated, entityName]);
 
     // ✅ Populate editor
-    useEffect(() => {
-        if (entity) {
-            setJsonStr(JSON.stringify(entity.entity_json, null, 2));
-        }
-    }, [entity]);
+   useEffect(() => {
+    if (!entity) return;
+
+    if (!entity.entity_json) {
+        setJsonStr("{}");
+        return;
+    }
+
+    try {
+        const safe =
+            typeof entity.entity_json === "string"
+                ? JSON.parse(entity.entity_json)
+                : entity.entity_json;
+
+        setJsonStr(JSON.stringify(safe, null, 2));
+    } catch (e) {
+        console.error("Failed to normalize entity_json:", e);
+        setJsonStr("{}");
+    }
+}, [entity]);
 
     const onSave = async () => {
     console.log("🔥 SAVE CLICKED");
