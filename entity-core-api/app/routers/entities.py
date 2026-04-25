@@ -44,7 +44,7 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 
 @router.get("")
 async def list_entities(request: Request, token_payload: dict = Depends(require_jwt)):
-    schema = token_payload.get("https://fullstackjedi.dev/schema"):
+    schema = token_payload.get("https://fullstackjedi.dev/schema")
     internal_token = issue_internal_token(request)
 
 
@@ -76,7 +76,7 @@ async def list_entities(request: Request, token_payload: dict = Depends(require_
 
 @router.get("/{entity}", response_model=EntityResponse)
 async def get_entity(request: Request,  entity: str, token_payload: dict = Depends(require_jwt)):
-    schema = token_payload.get("https://fullstackjedi.dev/schema"):
+    schema = token_payload.get("https://fullstackjedi.dev/schema")
     internal_token = issue_internal_token(request)
     envelope = RequestEnvelope(
         operation="execute",
