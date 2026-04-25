@@ -120,7 +120,7 @@ async def create_entity(request: Request,  body: CreateEntityBody, token_payload
         target="ec.create_entity",
         id=None,
         args={
-            "schema": schema
+            "schema": schema,
             "entity": body.entity,
             "entity_json": body.entity_json,
         },
