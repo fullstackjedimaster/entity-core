@@ -4,9 +4,10 @@ from jose import jwt
 from app.core.settings import env
 
 EC_SHARED_JWT_SECRET = env("EC_SHARED_JWT_SECRET")
-print(claims.get("schema"))
+
 def issue_internal_token(request):
     claims = request.state.claims
+    print(claims.get("schema"))
     now = datetime.now(timezone.utc)
     return jwt.encode(
         {
