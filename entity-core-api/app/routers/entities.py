@@ -43,7 +43,8 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 # ---------------------------------------------------------------------------
 
 @router.get("")
-async def list_entities(request: Request):
+async def list_entities(request: Request), token_payload: dict = Depends(require_jwt)):
+    schema = token_payload.get("https://fullstackjedi.dev/schema"):
     internal_token = issue_internal_token(request)
 
 
@@ -51,7 +52,7 @@ async def list_entities(request: Request):
         operation="execute",
         target="ec.list_entities",
         id=None,
-        args=None,
+        args= {"schema":schema},
         meta={"source": "entity-core:/api/entities"},
     )
 
@@ -74,7 +75,8 @@ async def list_entities(request: Request):
 # ---------------------------------------------------------------------------
 
 @router.get("/{entity}", response_model=EntityResponse)
-async def get_entity(request: Request, schema:str, entity: str):
+async def get_entity(request: Request,  entity: str, token_payload: dict = Depends(require_jwt)):
+    schema = token_payload.get("https://fullstackjedi.dev/schema"):
     internal_token = issue_internal_token(request)
     envelope = RequestEnvelope(
         operation="execute",
@@ -104,19 +106,21 @@ async def get_entity(request: Request, schema:str, entity: str):
 # ---------------------------------------------------------------------------
 
 @router.post("/{entity}")
-async def create_entity(request: Request,  body: CreateEntityBody):
-
+async def create_entity(request: Request,  body: CreateEntityBody, token_payload: dict = Depends(require_jwt)):
+    schema = token_payload.get("https://fullstackjedi.dev/schema")
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
     # 👇 ADD DEBUG HERE (right after validation, before DB work)
     print("ENTITY_JSON TYPE:", type(body.entity_json))
     print("ENTITY_JSON VALUE:", body.entity_json)
     internal_token = issue_internal_token(request)
+
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.create_entity",
         id=None,
         args={
+            "schema": schema
             "entity": body.entity,
             "entity_json": body.entity_json,
         },
