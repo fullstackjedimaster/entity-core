@@ -46,13 +46,14 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 async def list_entities(request: Request, token_payload: dict = Depends(require_jwt)):
     schema = token_payload.get("https://fullstackjedi.dev/schema")
     internal_token = issue_internal_token(request)
-
+    print("list_entiies")
+    print(claims.get("schema"))
 
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.list_entities",
         id=None,
-        args= {"schema":schema},
+        args= {"schema": schema},
         meta={"source": "entity-core:/api/entities"},
     )
 
