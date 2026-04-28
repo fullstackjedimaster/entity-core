@@ -139,7 +139,7 @@ DECLARE
   update_pairs text := '';
   query text;
   zero_uuid constant uuid := '00000000-0000-0000-0000-000000000000'::uuid;
-  target_schema text :=lower(coalesce(schema,''));;
+  target_schema text :=lower(coalesce(schema,''));
   table_name text :=  lower(coalesce(entity,''));
   arg_list text := '';
     arg text;
