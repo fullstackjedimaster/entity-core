@@ -124,7 +124,7 @@ CREATE OR REPLACE FUNCTION ec.manage_entity(
   entity text,
   operation text,
   id uuid DEFAULT NULL,
-  data json DEFAULT NULL
+  data jsonb DEFAULT NULL
 )
 RETURNS json
 LANGUAGE plpgsql
