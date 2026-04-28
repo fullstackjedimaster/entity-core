@@ -46,8 +46,7 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 async def list_entities(request: Request, token_payload: dict = Depends(require_jwt)):
     schema = token_payload.get("https://fullstackjedi.dev/schema")
     internal_token = issue_internal_token(request)
-    print("list_entiies")
-    print(claims.get("schema"))
+
 
     envelope = RequestEnvelope(
         operation="execute",
@@ -107,13 +106,20 @@ async def get_entity(request: Request,  entity: str, token_payload: dict = Depen
 # ---------------------------------------------------------------------------
 
 @router.post("/{entity}")
-async def create_entity(request: Request,  body: CreateEntityBody, token_payload: dict = Depends(require_jwt)):
-    schema = token_payload.get("https://fullstackjedi.dev/schema")
+async def create_entity(
+    request: Request,
+    body: CreateEntityBody,
+    token_payload: dict = Depends(require_jwt),
+):
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
-    # 👇 ADD DEBUG HERE (right after validation, before DB work)
+
+    schema = token_payload.get("https://fullstackjedi.dev/schema")
+
+    print("SCHEMA:", schema)
     print("ENTITY_JSON TYPE:", type(body.entity_json))
     print("ENTITY_JSON VALUE:", body.entity_json)
+
     internal_token = issue_internal_token(request)
 
     envelope = RequestEnvelope(
@@ -128,81 +134,9 @@ async def create_entity(request: Request,  body: CreateEntityBody, token_payload
         meta={"source": "entity-core:/api/entities/{entity}:POST"},
     )
 
-    data = await call_model_manage(envelope, token=  internal_token)
+    data = await call_model_manage(envelope, token=internal_token)
     _unwrap_result(data, "entity-server failed create_entity")
 
     return {"status": "ok"}
 
 
-# ---------------------------------------------------------------------------
-# Form metadata
-# ---------------------------------------------------------------------------
-
-@router.get("/{entity}/form_metadata")
-async def get_form_metadata(request: Request, entity: str):
-    await require_jwt([f"read:{entity}"])(request)
-    internal_token = issue_internal_token(request)
-
-    envelope = RequestEnvelope(
-        operation="execute",
-        target="ec.get_form_metadata",
-        id=None,
-        args={"entity": entity},
-        meta={"source": "entity-core:/api/entities/{entity}/form_metadata"},
-    )
-
-    data = await call_model_manage(envelope, token= internal_token )
-    result = _unwrap_result(data, "entity-server failed form_metadata")
-
-    if isinstance(result, dict) and "rows" in result:
-        return result["rows"]
-
-    if isinstance(result, list):
-        return result
-
-    raise HTTPException(status_code=500, detail="Unexpected result format")
-
-
-# ---------------------------------------------------------------------------
-# Column options
-# ---------------------------------------------------------------------------
-
-@router.get("/options/{entity}/{column}")
-async def get_column_options(
-    request: Request,
-    entity: str,
-    column: str,
-    filter: Optional[str] = None,
-):
-    await require_jwt([f"read:{entity}"])(request)
-    internal_token = issue_internal_token(request)
-
-    envelope = RequestEnvelope(
-        operation="execute",
-        target="ec.get_column_options",
-        id=None,
-        args={
-            "entity": entity,
-            "column": column,
-            "filter": filter,
-        },
-        meta={"source": "entity-core:/api/entities/options"},
-    )
-
-    data = await call_model_manage(envelope, token= internal_token )
-    result = _unwrap_result(data, "entity-server failed column_options")
-
-    values: List[Any] = []
-
-    if isinstance(result, list):
-        for item in result:
-            values.append(item.get("value") if isinstance(item, dict) else item)
-        return values
-
-    if isinstance(result, dict) and "rows" in result:
-        for row in result["rows"]:
-            if isinstance(row, dict):
-                values.append(row.get("value"))
-        return values
-
-    raise HTTPException(status_code=500, detail="Unexpected result format")
