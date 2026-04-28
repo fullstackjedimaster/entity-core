@@ -1,6 +1,6 @@
 CREATE SCHEMA IF NOT EXISTS ec AUTHORIZATION ec;
 
-ALTER ROLE ec SET search_path = ec, public
+ALTER ROLE ec SET search_path = ec, public;
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
@@ -139,7 +139,7 @@ DECLARE
   update_pairs text := '';
   query text;
   zero_uuid constant uuid := '00000000-0000-0000-0000-000000000000'::uuid;
-  target_schema text := lower(NULLIF(data->>'__schema',''));
+  target_schema text := lower(NULLIF(data->>'schema',''));
   table_name text := entity;
   arg_list text := '';
     arg text;
@@ -397,7 +397,7 @@ BEGIN
         RETURNS VOID
         LANGUAGE plpgsql
         AS
-        $$
+        $inner$
         DECLARE k TEXT;
         v JSONB;
         coltype TEXT;
@@ -433,7 +433,7 @@ BEGIN
                    END LOOP;
             PERFORM %I._upsert_entity(_schema, _entity, _entity_json);
         END;
-        $$;
+        $inner$;
 
         ALTER FUNCTION %I.create_entity(TEXT, TEXT, JSONB) OWNER TO %I;
 
@@ -444,7 +444,7 @@ BEGIN
         )
         RETURNS VOID
         LANGUAGE plpgsql
-        AS $$
+        AS $inner$
         BEGIN
 
           INSERT INTO %I.entity(schema, entity, entity_json)
@@ -452,7 +452,7 @@ BEGIN
           ON CONFLICT (entity)
           DO UPDATE SET entity_json = EXCLUDED.entity_json;
         END;
-        $$;
+        $inner$
 
         ALTER FUNCTION %I.upsert_entity(TEXT, TEXT, JSONB) OWNER TO %I;
 
@@ -460,7 +460,7 @@ BEGIN
         CREATE OR REPLACE FUNCTION %I.get_entity(
           p_schema TEXT,
           p_entity TEXT
-        ) RETURNS JSONB AS $$
+        ) RETURNS JSONB AS $inner$
         DECLARE
           result JSONB;
         BEGIN
@@ -471,18 +471,18 @@ BEGIN
 
           RETURN COALESCE(result, '{}'::jsonb);
         END;
-        $$ LANGUAGE plpgsql;
+        $inner$ LANGUAGE plpgsql;
 
 
         ALTER FUNCTION %I.get_entity(TEXT, TEXT) OWNER TO %I;
 
         CREATE OR REPLACE FUNCTION %I.list_entities(p_schema TEXT)
         RETURNS TABLE (entity TEXT)
-        LANGUAGE sql AS $$
+        LANGUAGE sql AS $inner$
           SELECT entity
           FROM %I.entity
           WHERE schema = p_schema;
-        $$;
+        $inner$
         ALTER FUNCTION %I.list_entities(TEXT) OWNER TO %I;
 
         CREATE OR REPLACE FUNCTION %I.manage_entity(
@@ -495,8 +495,8 @@ BEGIN
         RETURNS json
         LANGUAGE plpgsql
         SECURITY DEFINER
-        SET search_path = ec, public
-        AS $$
+        SET search_path = %I, public
+        AS $inner$
         DECLARE
           result json;
           col RECORD;
@@ -639,7 +639,7 @@ BEGIN
 
           RETURN result;
         END;
-        $$;
+        $inner$;
 
     $ddl$, p_schema);
  END;
@@ -903,7 +903,7 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION ec._upsert_tenant(TEXT, TEXT, JSONB) OWNER TO ec;
+ALTER FUNCTION ec._upsert_tenant(TEXT, TEXT, UUID, TEXT[], TEXT[], JSONB) OWNER TO ec;
 
 CREATE OR REPLACE FUNCTION ec.provision_tenant(
     p_schema text,
@@ -930,20 +930,20 @@ DECLARE
   v_permissions text[];
   v_memberships jsonb;
 BEGIN
-  -- 1️⃣ Normalize schema key
+  -- 1?? Normalize schema key
   p_schema := lower(trim(coalesce(p_schema, 'public')));
   p_email  := lower(p_email);
 
-  -- 2️⃣ Ensure schema exists
+  -- 2?? Ensure schema exists
   EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION CURRENT_USER', p_schema);
 
-  -- 3️⃣ Ensure baseline tables
-  PERFORM ec._ensure_tenant_tables(p_schema);
+  -- 3?? Ensure baseline tables
+  PERFORM ec._ensure_tenant_objects(p_schema);
 
-  -- 4️⃣ Seed baseline roles and permissions
+  -- 4?? Seed baseline roles and permissions
   PERFORM ec._seed_roles_and_permissions(p_schema);
 
-  -- 5️⃣ Root organization
+  -- 5?? Root organization
   EXECUTE format($org$
     INSERT INTO %1$I.organization (org_key, name)
     VALUES (%2$L, %2$L)
@@ -953,7 +953,7 @@ BEGIN
   EXECUTE format('SELECT id FROM %I.organization WHERE org_key=%L', p_schema, p_schema)
     INTO v_org_id;
 
-  -- 6️⃣ Upsert initial user
+  -- 6?? Upsert initial user
   EXECUTE format($usr$
     INSERT INTO %1$I."user" (auth0_sub, email, name, picture_url, given_name, family_name, locale, last_login_at, updated_at)
     VALUES ($1,$2,$3,$4,$5,$6,$7,now(),now())
@@ -964,10 +964,10 @@ BEGIN
   USING p_sub, p_email, p_name, p_picture, p_given_name, p_family_name, p_locale
   INTO v_user_id;
 
-  -- 7️⃣ Assign creator role to root org
+  -- 7?? Assign creator role to root org
   PERFORM ec._assign_role(p_schema, v_user_id, v_org_id, 'creator');
 
-  -- 8️⃣ Apply extended roles and permissions (from Auth0)
+  -- 8?? Apply extended roles and permissions (from Auth0)
   v_user := ec._apply_roles_and_permissions(
       p_schema,
       v_user_id,
@@ -981,7 +981,7 @@ BEGIN
 
 --  PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, v_roles, p_permissions, v_memberships);
 
-  -- 9️⃣ Return unified summary
+  -- 9?? Return unified summary
   v_app_metadata := jsonb_build_object(
     'sub', p_sub,
     'schema', p_schema,
