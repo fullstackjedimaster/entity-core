@@ -44,7 +44,7 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 
 @router.get("")
 async def list_entities(request: Request, token_payload: dict = Depends(require_jwt)):
-    schema = token_payload.get("https://fullstackjedi.dev/schema")
+    entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
     internal_token = issue_internal_token(request)
 
 
@@ -52,7 +52,7 @@ async def list_entities(request: Request, token_payload: dict = Depends(require_
         operation="execute",
         target="ec.list_entities",
         id=None,
-        args= {"schema": schema},
+        args= {"entity_schema": entity_schema},
         meta={"source": "entity-core:/api/entities"},
     )
 
@@ -75,16 +75,16 @@ async def list_entities(request: Request, token_payload: dict = Depends(require_
 # ---------------------------------------------------------------------------
 
 @router.get("/{entity}", response_model=EntityResponse)
-async def get_entity(request: Request,  entity: str, token_payload: dict = Depends(require_jwt)):
-    schema = token_payload.get("https://fullstackjedi.dev/schema")
+async def get_entity(request: Request,  entity_name: str, token_payload: dict = Depends(require_jwt)):
+    entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
     internal_token = issue_internal_token(request)
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.get_entity",
         id=None,
-        args={"schema":schema,
-            "entity": entity},
-        meta={"source": "entity-core:/api/entities/{entity}"},
+        args={"entity_schema":entity_schema,
+            "entity_name": entity_name},
+        meta={"source": "entity-core:/api/entities/{entity_name}"},
     )
 
     data = await call_model_manage(envelope, token=internal_token )
@@ -114,9 +114,9 @@ async def create_entity(
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
 
-    schema = token_payload.get("https://fullstackjedi.dev/schema")
+    entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
 
-    print("SCHEMA:", schema)
+    print("SCHEMA:", entity_schema)
     print("ENTITY_JSON TYPE:", type(body.entity_json))
     print("ENTITY_JSON VALUE:", body.entity_json)
 
@@ -127,7 +127,7 @@ async def create_entity(
         target="ec.create_entity",
         id=None,
         args={
-            "schema": schema,
+            "entity_schema": entity_schema,
             "entity": body.entity,
             "entity_json": body.entity_json,
         },

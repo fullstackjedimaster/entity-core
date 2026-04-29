@@ -80,7 +80,7 @@ function OnboardingInner() {
                 "X-Onboarding-Token": session_token,
               },
               body: JSON.stringify({
-                schema: org,
+                entity_schema: org,
                 state: stateParam
               }),
             });

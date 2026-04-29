@@ -81,7 +81,7 @@ async def provision_tenant(
     request: Request
 ):
     """
-    Provision a new tenant schema/org and seed the requesting user as creator.
+    Provision a new tenant entity_schema/org and seed the requesting user as creator.
 
     New flow:
       - entity-core builds RequestEnvelope(target='ec.provision_tenant')
@@ -93,7 +93,7 @@ async def provision_tenant(
     payload = verify_onboarding_token(request)
 
     body = await request.json()
-    schema = body["schema"]
+    entity_schema = body["entity_schema"]
     state = body["state"]
     sub = payload.get("sub")
     email = payload.get("email")
@@ -103,8 +103,8 @@ async def provision_tenant(
     family = payload.get("family_name") or None
     locale = payload.get("locale") or "en"
 
-    if not (schema):
-        raise HTTPException(status_code=400, detail="schema required")
+    if not (entity_schema):
+        raise HTTPException(status_code=400, detail="entity_schema required")
 
     if not (sub):
         raise HTTPException(status_code=400, detail=" sub required")
@@ -120,7 +120,7 @@ async def provision_tenant(
     if not memberships:
         memberships = [
             {
-                "org_key": schema,
+                "org_key": entity_schema,
                 "roles": roles
             }
         ]
@@ -134,7 +134,7 @@ async def provision_tenant(
         target="ec.provision_tenant",
         id=None,
         args={
-            "schema": schema,
+            "entity_schema": entity_schema,
             "sub": sub,
             "email": email,
             "name": name,
@@ -171,7 +171,7 @@ async def provision_tenant(
     session_token = create_session_token({
         "sub": sub,
         "state": state,
-        "schema": app_metadata.get("schema"),
+        "entity_schema": app_metadata.get("entity_schema"),
         "org_id": app_metadata.get("org_id"),
         "roles": app_metadata.get("roles"),
         "permissions": app_metadata.get("permissions"),

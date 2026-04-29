@@ -56,11 +56,11 @@ class DBUserWithAuth(DBUser):
 # ------------------------------------------------------------
 # Provisioning (during onboarding)
 # ------------------------------------------------------------
-# NOTE: You are creating a **single tenant schema**, not multi-org / multi-membership yet.
+# NOTE: You are creating a **single tenant entity_schema**, not multi-org / multi-membership yet.
 # This is the final, simplified shape matching `provision_tenant`.
 
 class ProvisionPayload(BaseModel):
-    schema: str = Field(..., description="Tenant schema name (org key)")
+    entity_schema: str = Field(..., description="Tenant entity_schema name (org key)")
     sub: str = Field(..., description="Auth0 user ID")
     email: str
     name: str
@@ -78,14 +78,14 @@ class TenantBody(BaseModel):
 
 
 class CreateEntityBody(BaseModel):
-    schema: str
+    entity_schema: str
     entity: str
     entity_json: Dict[str, Any]
 
 
 @dataclass
 class TenantContext:
-    schema: str
+    entity_schema: str
     sub: Optional[str] = None
     org_id: Optional[str] = None
     permissions: list[str] = None

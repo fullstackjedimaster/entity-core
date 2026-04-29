@@ -49,7 +49,7 @@ export function useEntity() {
         if (!token) throw new Error("Missing token");
 
         const optimistic = {
-            entity: entityName,
+            entity_name: entityName,
             entity_json: entityJson,
         };
 

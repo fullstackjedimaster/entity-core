@@ -225,7 +225,7 @@ def require_jwt(required_permissions: Optional[Iterable[str]] = None):
                 )
 
         request.state.claims = claims
-        request.state.schema = claims.get("schema")
+        request.state.entity_schema = claims.get("entity_schema")
         return claims
 
     return dependency

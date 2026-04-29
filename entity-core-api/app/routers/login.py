@@ -142,7 +142,7 @@ async def get_current_user(
         "scope",  # sometimes scopes come as a single space-delimited string
     )
 
-    # Org / schema — we’ll treat any of these as the org_id
+    # Org / entity_schema — we’ll treat any of these as the org_id
     org_id = _get_claim(
         claims,
         "org_id",
@@ -150,10 +150,10 @@ async def get_current_user(
 
     )
 
-    schema = _get_claim(
+    entity_schema = _get_claim(
         claims,
-        "schema",
-        "https://fullstackjedi.dev/schema"
+        "entity_schema",
+        "https://fullstackjedi.dev/entity_schema"
 
     )
 
@@ -173,5 +173,5 @@ async def get_current_user(
         roles=roles,
         permissions=permissions,
         org_id=org_id,
-        schema=schema
+        entity_schema=entity_schema
     )

@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS ec.tenant(
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sub TEXT UNIQUE NOT NULL,
-  schema TEXT NOT NULL,
+  entity_schema TEXT NOT NULL,
   org_id TEXT NOT NULL,
   roles text[] DEFAULT '{}'::text[],
   permissions text[] DEFAULT '{}'::text[],
@@ -19,16 +19,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS tenant_sub_idx
 
 CREATE TABLE IF NOT EXISTS ec.entity(
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  schema TEXT NOT NULL,
-  entity TEXT UNIQUE NOT NULL,
+  entity_schema TEXT NOT NULL,
+  entity_name TEXT UNIQUE NOT NULL,
   entity_json JSONB NOT NULL
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_idx
-  ON ec.entity(lower(schema), lower(entity));
+  ON ec.entity_name(lower(entity_schema), lower(entity_name));
 
 
-CREATE OR REPLACE FUNCTION ec.create_entity(_schema TEXT, _entity TEXT, _entity_json JSONB )
+CREATE OR REPLACE FUNCTION ec.create_entity(entity_schema TEXT, entity_name TEXT, entity_json JSONB )
 RETURNS VOID
 LANGUAGE plpgsql
 AS
@@ -40,15 +40,15 @@ has_table BOOLEAN;
 BEGIN
 	SELECT EXISTS ( SELECT 1
 		FROM information_schema.tables
-		WHERE table_schema = _schema
-		AND table_name = _entity )
+		WHERE table_schema = entity_schema
+		AND table_name = entity_name )
 		INTO has_table;
 
 	IF NOT has_table THEN
      		EXECUTE format( 'CREATE TABLE %I.%I ( id uuid PRIMARY KEY DEFAULT gen_random_uuid(), created_at timestamptz DEFAULT now(),
-			 updated_at timestamptz DEFAULT now() )', _schema, _entity);
+			 updated_at timestamptz DEFAULT now() )', entity_schema, entity_name);
      	END IF;
-     	FOR k, v IN SELECT key, value FROM jsonb_each(_entity_json)
+     	FOR k, v IN SELECT key, value FROM jsonb_each(entity_json)
      	    LOOP
      	    	coltype := CASE jsonb_typeof(v)
      	    			WHEN 'number' THEN 'numeric'
@@ -59,13 +59,13 @@ BEGIN
      	    		  END;
      		IF NOT EXISTS ( SELECT 1
      				FROM information_schema.columns
-     				WHERE table_schema = _schema
-     				AND table_name = _entity
+     				WHERE table_schema = entity_schema
+     				AND table_name = entity_name
      				AND column_name = k ) THEN
-     			EXECUTE format('ALTER TABLE %I.%I ADD COLUMN %I %s', _schema, _entity, k, coltype);
+     			EXECUTE format('ALTER TABLE %I.%I ADD COLUMN %I %s', entity_schema, entity_name, k, coltype);
      		END IF;
      	   END LOOP;
-	PERFORM ec._upsert_entity(_schema, _entity, _entity_json);
+	PERFORM ec._upsert_entity(entity_schema, entity_name, entity_json);
 END;
 $$;
 
@@ -75,15 +75,15 @@ ALTER FUNCTION ec.create_entity(TEXT, TEXT, JSONB) OWNER TO ec;
 CREATE OR REPLACE FUNCTION ec._upsert_entity(
   p_schema TEXT,
   p_entity TEXT,
-  p_entity_json    JSONB
+  pentity_json    JSONB
 )
 RETURNS VOID
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  INSERT INTO ec.entity(schema, entity, entity_json)
-  VALUES (p_schema, p_entity, p_entity_json)
-  ON CONFLICT (entity)
+  INSERT INTO ec.entity(entity_schema, entity_name, entity_json)
+  VALUES (p_schema, p_entity, pentity_json)
+  ON CONFLICT (entity_name)
   DO UPDATE SET entity_json = EXCLUDED.entity_json;
 END;
 $$;
@@ -100,7 +100,7 @@ BEGIN
   SELECT entity_json INTO result
   FROM ec.entity
   WHERE entity = p_entity
-    AND schema = p_schema;
+    AND entity_schema = p_schema;
 
   RETURN COALESCE(result, '{}'::jsonb);
 END;
@@ -114,13 +114,13 @@ RETURNS TABLE (entity TEXT)
 LANGUAGE sql AS $$
   SELECT entity
   FROM ec.entity
-  WHERE schema = p_schema;
+  WHERE entity_schema = p_schema;
 $$;
 ALTER FUNCTION ec.list_entities(TEXT) OWNER TO ec;
 
 
 CREATE OR REPLACE FUNCTION ec.manage_entity(
-  schema text,
+  entity_schema text,
   entity text,
   operation text,
   id uuid DEFAULT NULL,
@@ -139,7 +139,7 @@ DECLARE
   update_pairs text := '';
   query text;
   zero_uuid constant uuid := '00000000-0000-0000-0000-000000000000'::uuid;
-  target_schema text :=lower(coalesce(schema,''));
+  target_schema text :=lower(coalesce(entity_schema,''));
   table_name text :=  lower(coalesce(entity,''));
   arg_list text := '';
     arg text;
@@ -152,7 +152,7 @@ BEGIN
     FOR col IN
       SELECT column_name, data_type
       FROM information_schema.columns
-      WHERE table_schema = schema
+      WHERE table_schema = entity_schema
         AND table_name = table_name
         AND column_name <> 'id'
         AND column_name NOT IN ('last_updated_at', 'last_updated_by')
@@ -180,14 +180,14 @@ BEGIN
     IF col_names = '' THEN
       query := format(
         'INSERT INTO %I.%I DEFAULT VALUES RETURNING to_jsonb(%I.*)',
-        schema, table_name, table_name
+        entity_schema, table_name, table_name
       );
     ELSE
       col_names := left(col_names, length(col_names) - 2);
       col_values := left(col_values, length(col_values) - 2);
       query := format(
         'INSERT INTO %I.%I (%s) VALUES (%s) RETURNING to_jsonb(%I.*)',
-        schema, table_name, col_names, col_values, table_name
+        entity_schema, table_name, col_names, col_values, table_name
       );
     END IF;
     EXECUTE query INTO result;
@@ -197,12 +197,12 @@ BEGIN
     IF id IS NULL OR id = zero_uuid THEN
       query := format(
         'SELECT COALESCE(json_agg(to_jsonb(t.*)), ''[]''::json) FROM %I.%I t',
-        schema, table_name
+        entity_schema, table_name
       );
     ELSE
       query := format(
         'SELECT to_jsonb(t.*) FROM %I.%I t WHERE id = %L::uuid',
-        schema, table_name, id::text
+        entity_schema, table_name, id::text
       );
     END IF;
     EXECUTE query INTO result;
@@ -211,7 +211,7 @@ BEGIN
   ELSIF operation IN ('list', 'select') THEN
     query := format(
       'SELECT COALESCE(json_agg(to_jsonb(t.*)), ''[]''::json) FROM %I.%I t',
-      schema, table_name
+      entity_schema, table_name
     );
     EXECUTE query INTO result;
 
@@ -224,7 +224,7 @@ BEGIN
     FOR col IN
       SELECT column_name, data_type
       FROM information_schema.columns
-      WHERE table_schema = schema
+      WHERE table_schema = entity_schema
         AND table_name = table_name
         AND column_name <> 'id'
         AND column_name NOT IN ('last_updated_at', 'last_updated_by')
@@ -251,7 +251,7 @@ BEGIN
     update_pairs := left(update_pairs, length(update_pairs) - 2);
     query := format(
       'UPDATE %I.%I SET %s WHERE id = %L::uuid RETURNING to_jsonb(%I.*)',
-      schema, table_name, update_pairs, id::text, table_name
+      entity_schema, table_name, update_pairs, id::text, table_name
     );
     EXECUTE query INTO result;
 
@@ -262,7 +262,7 @@ BEGIN
     END IF;
     query := format(
       'DELETE FROM %I.%I WHERE id = %L::uuid RETURNING to_jsonb(%I.*)',
-      schema, table_name, id::text, table_name
+      entity_schema, table_name, id::text, table_name
     );
     EXECUTE query INTO result;
 
@@ -285,13 +285,13 @@ BEGIN
       IF arg_list = '' THEN
         query := format(
           'SELECT to_jsonb(%I.%I())',
-          schema,
+          entity_schema,
           entity
         );
       ELSE
         query := format(
           'SELECT to_jsonb(%I.%I(%s))',
-          schema,
+          entity_schema,
           entity,
           arg_list
         );
@@ -381,16 +381,16 @@ BEGIN
 
         CREATE TABLE IF NOT EXISTS %I.entity(
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          schema TEXT NOT NULL,
+          entity_schema TEXT NOT NULL,
           entity TEXT UNIQUE NOT NULL,
           entity_json JSONB NOT NULL
         );
 
 
         CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_idx
-          ON %I.entity(lower(schema), lower(entity));
+          ON %I.entity(lower(entity_schema), lower(entity));
 
-        CREATE OR REPLACE FUNCTION ec.create_entity(_schema TEXT, _entity TEXT, _entity_json JSONB )
+        CREATE OR REPLACE FUNCTION ec.create_entity(entity_schema TEXT, entity_name TEXT, entity_json JSONB )
         RETURNS VOID
         LANGUAGE plpgsql
         AS
@@ -403,15 +403,15 @@ BEGIN
 
             SELECT EXISTS ( SELECT 1
                 FROM information_schema.tables
-                WHERE table_schema = _schema
-                AND table_name = _entity )
+                WHERE table_schema = entity_schema
+                AND table_name = entity_name )
                 INTO has_table;
 
             IF NOT has_table THEN
                     EXECUTE format( 'CREATE TABLE %I.%I ( id uuid PRIMARY KEY DEFAULT gen_random_uuid(), created_at timestamptz DEFAULT now(),
-                     updated_at timestamptz DEFAULT now() )', _schema, _entity);
+                     updated_at timestamptz DEFAULT now() )', entity_schema, entity_name);
                 END IF;
-                FOR k, v IN SELECT key, value FROM jsonb_each(_entity_json)
+                FOR k, v IN SELECT key, value FROM jsonb_each(entity_json)
                     LOOP
                         coltype := CASE jsonb_typeof(v)
                                 WHEN 'number' THEN 'numeric'
@@ -422,13 +422,13 @@ BEGIN
                               END;
                     IF NOT EXISTS ( SELECT 1
                             FROM information_schema.columns
-                            WHERE table_schema = _schema
-                            AND table_name = _entity
+                            WHERE table_schema = entity_schema
+                            AND table_name = entity_name
                             AND column_name = k ) THEN
-                        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN %I %s', _schema, _entity, k, coltype);
+                        EXECUTE format('ALTER TABLE %I.%I ADD COLUMN %I %s', entity_schema, entity_name, k, coltype);
                     END IF;
                    END LOOP;
-            PERFORM %I._upsert_entity(_schema, _entity, _entity_json);
+            PERFORM %I._upsert_entity(entity_schema, entity_name, entity_json);
         END;
         $inner$;
 
@@ -437,15 +437,15 @@ BEGIN
         CREATE OR REPLACE FUNCTION %I.upsert_entity(
           p_schema TEXT,
           p_entity TEXT,
-          p_entity_json    JSONB
+          pentity_json    JSONB
         )
         RETURNS VOID
         LANGUAGE plpgsql
         AS $inner$
         BEGIN
 
-          INSERT INTO %I.entity(schema, entity, entity_json)
-          VALUES (p_schema, p_entity, p_entity_json)
+          INSERT INTO %I.entity(entity_schema, entity, entity_json)
+          VALUES (p_schema, p_entity, pentity_json)
           ON CONFLICT (entity)
           DO UPDATE SET entity_json = EXCLUDED.entity_json;
         END;
@@ -464,7 +464,7 @@ BEGIN
           SELECT entity_json INTO result
           FROM %I.entity
           WHERE entity = p_entity
-            AND schema = p_schema;
+            AND entity_schema = p_schema;
 
           RETURN COALESCE(result, '{}'::jsonb);
         END;
@@ -478,14 +478,14 @@ BEGIN
         LANGUAGE sql AS $inner$
           SELECT entity
           FROM %I.entity
-          WHERE schema = p_schema;
+          WHERE entity_schema = p_schema;
         $inner$
         ALTER FUNCTION %I.list_entities(TEXT) OWNER TO %I;
 
         CREATE OR REPLACE FUNCTION %I.manage_entity(
-          schema text,
-          entity text,
+          entity_schema text,
           operation text,
+          name text,
           id uuid DEFAULT NULL,
           data json DEFAULT NULL
         )
@@ -507,7 +507,7 @@ BEGIN
         BEGIN
           operation := lower(coalesce(operation,''));
           entity := lower(coalesce(entity,''));
-          schema := lower(coalesce(schema,''));
+          entity_schema := lower(coalesce(entity_schema,''));
 
 
           -- CREATE
@@ -515,7 +515,7 @@ BEGIN
             FOR col IN
               SELECT column_name, data_type
               FROM information_schema.columns
-              WHERE table_schema = schema
+              WHERE table_schema = entity_schema
                 AND table_name = table_name
                 AND column_name <> 'id'
                 AND column_name NOT IN ('last_updated_at', 'last_updated_by')
@@ -543,14 +543,14 @@ BEGIN
             IF col_names = '' THEN
               query := format(
                 'INSERT INTO %I.%I DEFAULT VALUES RETURNING to_jsonb(%I.*)',
-                schema, table_name, table_name
+                entity_schema, table_name, table_name
               );
             ELSE
               col_names := left(col_names, length(col_names) - 2);
               col_values := left(col_values, length(col_values) - 2);
               query := format(
                 'INSERT INTO %I.%I (%s) VALUES (%s) RETURNING to_jsonb(%I.*)',
-                schema, table_name, col_names, col_values, table_name
+                entity_schema, table_name, col_names, col_values, table_name
               );
             END IF;
             EXECUTE query INTO result;
@@ -560,12 +560,12 @@ BEGIN
             IF id IS NULL OR id = zero_uuid THEN
               query := format(
                 'SELECT COALESCE(json_agg(to_jsonb(t.*)), ''[]''::json) FROM %I.%I t',
-                schema, table_name
+                entity_schema, table_name
               );
             ELSE
               query := format(
                 'SELECT to_jsonb(t.*) FROM %I.%I t WHERE id = %L::uuid',
-                schema, table_name, id::text
+                entity_schema, table_name, id::text
               );
             END IF;
             EXECUTE query INTO result;
@@ -574,7 +574,7 @@ BEGIN
           ELSIF operation IN ('list', 'select') THEN
             query := format(
               'SELECT COALESCE(json_agg(to_jsonb(t.*)), ''[]''::json) FROM %I.%I t',
-              schema, table_name
+              entity_schema, table_name
             );
             EXECUTE query INTO result;
 
@@ -587,7 +587,7 @@ BEGIN
             FOR col IN
               SELECT column_name, data_type
               FROM information_schema.columns
-              WHERE table_schema = schema
+              WHERE table_schema = entity_schema
                 AND table_name = table_name
                 AND column_name <> 'id'
                 AND column_name NOT IN ('last_updated_at', 'last_updated_by')
@@ -614,7 +614,7 @@ BEGIN
             update_pairs := left(update_pairs, length(update_pairs) - 2);
             query := format(
               'UPDATE %I.%I SET %s WHERE id = %L::uuid RETURNING to_jsonb(%I.*)',
-              schema, table_name, update_pairs, id::text, table_name
+              entity_schema, table_name, update_pairs, id::text, table_name
             );
             EXECUTE query INTO result;
 
@@ -625,7 +625,7 @@ BEGIN
             END IF;
             query := format(
               'DELETE FROM %I.%I WHERE id = %L::uuid RETURNING to_jsonb(%I.*)',
-              schema, table_name, id::text, table_name
+              entity_schema, table_name, id::text, table_name
             );
             EXECUTE query INTO result;
 
@@ -888,11 +888,11 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  INSERT INTO ec.tenant(sub, schema,  org_Id, roles , permissions, memberships )
+  INSERT INTO ec.tenant(sub, entity_schema,  org_Id, roles , permissions, memberships )
   VALUES (p_sub, p_schema,p_org_id , p_roles , p_permissions , p_memberships)
   ON CONFLICT (sub)
   DO UPDATE SET sub = EXCLUDED.sub,
-      schema = EXCLUDED.schema,
+      entity_schema = EXCLUDED.entity_schema,
       org_id = EXCLUDED.org_id ,
       roles = EXCLUDED.roles,
       permissions =  EXCLUDED.permissions,
@@ -927,11 +927,11 @@ DECLARE
   v_permissions text[];
   v_memberships jsonb;
 BEGIN
-  -- 1?? Normalize schema key
+  -- 1?? Normalize entity_schema key
   p_schema := lower(trim(coalesce(p_schema, 'public')));
   p_email  := lower(p_email);
 
-  -- 2?? Ensure schema exists
+  -- 2?? Ensure entity_schema exists
   EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION CURRENT_USER', p_schema);
 
   -- 3?? Ensure baseline tables
@@ -981,7 +981,7 @@ BEGIN
   -- 9?? Return unified summary
   v_app_metadata := jsonb_build_object(
     'sub', p_sub,
-    'schema', p_schema,
+    'entity_schema', p_schema,
     'org_id', v_org_id,
     'roles', p_roles,
     'permissions', p_permissions,
