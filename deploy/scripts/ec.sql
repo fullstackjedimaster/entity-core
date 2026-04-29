@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS ec.entity(
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_idx
-  ON ec.entity_name(lower(entity_schema), lower(entity_name));
+  ON ec.entity(lower(entity_schema), lower(entity_name));
 
 
 CREATE OR REPLACE FUNCTION ec.create_entity(entity_schema TEXT, entity_name TEXT, entity_json JSONB )
