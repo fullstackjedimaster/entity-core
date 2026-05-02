@@ -726,7 +726,7 @@ BEGIN
 
           RETURN result;
         END;
-        $$inner$$;
+        $inner$;
 
         ALTER FUNCTION %1$I.manage_entity(text, text, text, uuid, jsonb) OWNER TO %1$I;
 
