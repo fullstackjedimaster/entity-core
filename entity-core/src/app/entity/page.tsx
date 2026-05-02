@@ -6,7 +6,7 @@ import { useApi } from '@/lib/apiEntity';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface EntityInfo {
-  entity: string;
+  entity_name: string;
 }
 
 export default function EntityIndexPage() {
@@ -65,10 +65,10 @@ export default function EntityIndexPage() {
 
       <ul className="border divide-y rounded">
         {entities.map((ent) => (
-          <li key={ent.entity} className="p-4 flex justify-between">
-            <span>{ent.entity}</span>
+          <li key={ent.entity_name} className="p-4 flex justify-between">
+            <span>{ent.entity_name}</span>
             <Link
-              href={`/entity/${ent.entity}`}
+              href={`/entity/${ent.entity_name}`}
               className="text-blue-600 hover:underline"
             >
               View / Edit →

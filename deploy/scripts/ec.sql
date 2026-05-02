@@ -20,11 +20,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS tenant_sub_idx
 CREATE TABLE IF NOT EXISTS ec.entity(
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   entity_schema TEXT NOT NULL,
-  entity_name TEXT UNIQUE NOT NULL,
+  entity_name TEXT  NOT NULL,
   entity_json JSONB NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_idx
+CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_name_idx
   ON ec.entity(lower(entity_schema), lower(entity_name));
 
 
@@ -73,55 +73,81 @@ ALTER FUNCTION ec.create_entity(TEXT, TEXT, JSONB) OWNER TO ec;
 
 -- 2. Insert/update function with full JSON payload (meta-wrapped)
 CREATE OR REPLACE FUNCTION ec._upsert_entity(
-  p_schema TEXT,
-  p_entity TEXT,
-  pentity_json    JSONB
+  p_entity_schema TEXT,
+  p_entity_name TEXT,
+  p_entity_json    JSONB
 )
 RETURNS VOID
 LANGUAGE plpgsql
 AS $$
 BEGIN
   INSERT INTO ec.entity(entity_schema, entity_name, entity_json)
-  VALUES (p_schema, p_entity, pentity_json)
-  ON CONFLICT (entity_name)
+  VALUES (p_entity_schema, p_entity_name, p_entity_json)
+  ON CONFLICT (entity_schema, entity_name)
   DO UPDATE SET entity_json = EXCLUDED.entity_json;
 END;
 $$;
 
 ALTER FUNCTION ec._upsert_entity(TEXT, TEXT, JSONB) OWNER TO ec;
 
-CREATE OR REPLACE FUNCTION ec.get_entity(
-  p_schema TEXT,
-  p_entity TEXT
-) RETURNS JSONB AS $$
+
+
+CREATE OR REPLACE FUNCTION ec.list_entities(
+  p_entity_schema TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+AS $$
 DECLARE
   result JSONB;
 BEGIN
-  SELECT entity_json INTO result
+  SELECT COALESCE(
+    jsonb_agg(
+      jsonb_build_object(
+        'entity_name', entity_name
+      )
+      ORDER BY entity_name
+    ),
+    '[]'::jsonb
+  )
+  INTO result
   FROM ec.entity
-  WHERE entity = p_entity
-    AND entity_schema = p_schema;
+  WHERE entity_schema = p_entity_schema;
 
-  RETURN COALESCE(result, '{}'::jsonb);
+  RETURN result;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
+ALTER FUNCTION ec.list_entities(TEXT) OWNER TO ec;
+
+CREATE OR REPLACE FUNCTION ec.get_entity(
+  p_entity_schema TEXT,
+  p_entity_name TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  result JSONB;
+BEGIN
+  SELECT jsonb_build_object(
+    'entity_name', entity_name,
+    'entity_json', entity_json
+  )
+  INTO result
+  FROM ec.entity
+  WHERE entity_schema = p_entity_schema
+    AND entity_name = p_entity_name;
+
+  RETURN result;
+END;
+$$;
 
 ALTER FUNCTION ec.get_entity(TEXT, TEXT) OWNER TO ec;
 
-CREATE OR REPLACE FUNCTION ec.list_entities(p_schema TEXT)
-RETURNS TABLE (entity TEXT)
-LANGUAGE sql AS $$
-  SELECT entity
-  FROM ec.entity
-  WHERE entity_schema = p_schema;
-$$;
-ALTER FUNCTION ec.list_entities(TEXT) OWNER TO ec;
-
-
 CREATE OR REPLACE FUNCTION ec.manage_entity(
   entity_schema text,
-  entity text,
+  entity_name text,
   operation text,
   id uuid DEFAULT NULL,
   data jsonb DEFAULT NULL
@@ -139,8 +165,6 @@ DECLARE
   update_pairs text := '';
   query text;
   zero_uuid constant uuid := '00000000-0000-0000-0000-000000000000'::uuid;
-  target_schema text :=lower(coalesce(entity_schema,''));
-  table_name text :=  lower(coalesce(entity,''));
   arg_list text := '';
     arg text;
     i int := 0;
@@ -153,7 +177,7 @@ BEGIN
       SELECT column_name, data_type
       FROM information_schema.columns
       WHERE table_schema = entity_schema
-        AND table_name = table_name
+        AND table_name = entity_name
         AND column_name <> 'id'
         AND column_name NOT IN ('last_updated_at', 'last_updated_by')
       ORDER BY ordinal_position
@@ -180,14 +204,14 @@ BEGIN
     IF col_names = '' THEN
       query := format(
         'INSERT INTO %I.%I DEFAULT VALUES RETURNING to_jsonb(%I.*)',
-        entity_schema, table_name, table_name
+        entity_schema, entity_name, entity_name
       );
     ELSE
       col_names := left(col_names, length(col_names) - 2);
       col_values := left(col_values, length(col_values) - 2);
       query := format(
         'INSERT INTO %I.%I (%s) VALUES (%s) RETURNING to_jsonb(%I.*)',
-        entity_schema, table_name, col_names, col_values, table_name
+        entity_schema, entity_name, col_names, col_values, entity_name
       );
     END IF;
     EXECUTE query INTO result;
@@ -197,12 +221,12 @@ BEGIN
     IF id IS NULL OR id = zero_uuid THEN
       query := format(
         'SELECT COALESCE(json_agg(to_jsonb(t.*)), ''[]''::json) FROM %I.%I t',
-        entity_schema, table_name
+        entity_schema, entity_name
       );
     ELSE
       query := format(
         'SELECT to_jsonb(t.*) FROM %I.%I t WHERE id = %L::uuid',
-        entity_schema, table_name, id::text
+        entity_schema, entity_name, id::text
       );
     END IF;
     EXECUTE query INTO result;
@@ -211,7 +235,7 @@ BEGIN
   ELSIF operation IN ('list', 'select') THEN
     query := format(
       'SELECT COALESCE(json_agg(to_jsonb(t.*)), ''[]''::json) FROM %I.%I t',
-      entity_schema, table_name
+      entity_schema, entity_name
     );
     EXECUTE query INTO result;
 
@@ -225,7 +249,7 @@ BEGIN
       SELECT column_name, data_type
       FROM information_schema.columns
       WHERE table_schema = entity_schema
-        AND table_name = table_name
+        AND table_name = entity_name
         AND column_name <> 'id'
         AND column_name NOT IN ('last_updated_at', 'last_updated_by')
       ORDER BY ordinal_position
@@ -251,7 +275,7 @@ BEGIN
     update_pairs := left(update_pairs, length(update_pairs) - 2);
     query := format(
       'UPDATE %I.%I SET %s WHERE id = %L::uuid RETURNING to_jsonb(%I.*)',
-      entity_schema, table_name, update_pairs, id::text, table_name
+      entity_schema, entity_name, update_pairs, id::text, entity_name
     );
     EXECUTE query INTO result;
 
@@ -262,7 +286,7 @@ BEGIN
     END IF;
     query := format(
       'DELETE FROM %I.%I WHERE id = %L::uuid RETURNING to_jsonb(%I.*)',
-      entity_schema, table_name, id::text, table_name
+      entity_schema, entity_name, id::text, entity_name
     );
     EXECUTE query INTO result;
 
@@ -286,13 +310,13 @@ BEGIN
         query := format(
           'SELECT to_jsonb(%I.%I())',
           entity_schema,
-          entity
+          entity_name
         );
       ELSE
         query := format(
           'SELECT to_jsonb(%I.%I(%s))',
           entity_schema,
-          entity,
+          entity_name,
           arg_list
         );
       END IF;
@@ -308,13 +332,14 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION ec.manage_entity(text, text, text, uuid, json) OWNER TO ec;
+ALTER FUNCTION ec.manage_entity(text, text, text, uuid, jsonb) OWNER TO ec;
 
 
-CREATE OR REPLACE FUNCTION ec._ensure_tenant_objects(p_schema text)
+CREATE OR REPLACE FUNCTION ec._ensure_tenant_objects(p_entity_schema text)
 RETURNS void
 LANGUAGE plpgsql
-VOLATILE SECURITY DEFINER PARALLEL UNSAFE
+SECURITY DEFINER
+SET search_path = ec, public
 AS $$
 BEGIN
 
@@ -379,20 +404,22 @@ BEGIN
             PRIMARY KEY (role_id, permission_id)
         );
 
-        CREATE TABLE IF NOT EXISTS %I.entity(
+        CREATE TABLE IF NOT EXISTS %1$I.entity(
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           entity_schema TEXT NOT NULL,
-          entity TEXT UNIQUE NOT NULL,
+          entity_name TEXT NOT NULL,
           entity_json JSONB NOT NULL
         );
 
 
         CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_idx
-          ON %I.entity(lower(entity_schema), lower(entity));
+          ON %1$I.entity(lower(entity_schema), lower(entity_name));
 
-        CREATE OR REPLACE FUNCTION ec.create_entity(entity_schema TEXT, entity_name TEXT, entity_json JSONB )
+        CREATE OR REPLACE FUNCTION %1$I.create_entity(entity_schema TEXT, entity_name TEXT, entity_json JSONB )
         RETURNS VOID
         LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = %1$I, ec, public
         AS
         $inner$
         DECLARE k TEXT;
@@ -428,71 +455,103 @@ BEGIN
                         EXECUTE format('ALTER TABLE %I.%I ADD COLUMN %I %s', entity_schema, entity_name, k, coltype);
                     END IF;
                    END LOOP;
-            PERFORM %I._upsert_entity(entity_schema, entity_name, entity_json);
+            PERFORM %1$I._upsert_entity(entity_schema, entity_name, entity_json);
         END;
         $inner$;
 
-        ALTER FUNCTION %I.create_entity(TEXT, TEXT, JSONB) OWNER TO %I;
+        ALTER FUNCTION %1$I.create_entity(TEXT, TEXT, JSONB) OWNER TO %1$I;
 
-        CREATE OR REPLACE FUNCTION %I.upsert_entity(
-          p_schema TEXT,
-          p_entity TEXT,
-          pentity_json    JSONB
+        CREATE OR REPLACE FUNCTION %1$I.upsert_entity(
+          p_entity_schema TEXT,
+          p_entity_name TEXT,
+          p_entity_json    JSONB
         )
         RETURNS VOID
         LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = %1$I, ec, public
         AS $inner$
         BEGIN
 
-          INSERT INTO %I.entity(entity_schema, entity, entity_json)
-          VALUES (p_schema, p_entity, pentity_json)
-          ON CONFLICT (entity)
+          INSERT INTO %1$I.entity(entity_schema, entity_name, entity_json)
+          VALUES (p_entity_schema, p_entity_name, p_entity_json)
+          ON CONFLICT (entity_schema, entity_name)
           DO UPDATE SET entity_json = EXCLUDED.entity_json;
         END;
-        $inner$
+        $inner$;
 
-        ALTER FUNCTION %I.upsert_entity(TEXT, TEXT, JSONB) OWNER TO %I;
+        ALTER FUNCTION %1$I.upsert_entity(TEXT, TEXT, JSONB) OWNER TO %1$I;
 
 
-        CREATE OR REPLACE FUNCTION %I.get_entity(
-          p_schema TEXT,
-          p_entity TEXT
-        ) RETURNS JSONB AS $inner$
+        CREATE OR REPLACE FUNCTION %1$I.get_entity(
+          p_entity_schema TEXT,
+          p_entity_name TEXT
+        )
+        RETURNS JSONB
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = %1$I, ec, public
+        AS $inner$
         DECLARE
           result JSONB;
         BEGIN
-          SELECT entity_json INTO result
-          FROM %I.entity
-          WHERE entity = p_entity
-            AND entity_schema = p_schema;
+          SELECT jsonb_build_object(
+            'entity_name', entity_name,
+            'entity_json', entity_json
+          )
+          INTO result
+          FROM %1$I.entity
+          WHERE entity_schema = p_entity_schema
+            AND entity_name = p_entity_name;
 
-          RETURN COALESCE(result, '{}'::jsonb);
+          RETURN result;
         END;
-        $inner$ LANGUAGE plpgsql;
+        $inner$;
+
+        ALTER FUNCTION %1$I.get_entity(TEXT, TEXT) OWNER TO %1$I;
+
+        CREATE OR REPLACE FUNCTION %1$I.list_entities(
+          p_entity_schema TEXT
+        )
+        RETURNS JSONB
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = %1$I, ec, public
+        AS $inner$
+        DECLARE
+          result JSONB;
+        BEGIN
+          SELECT COALESCE(
+            jsonb_agg(
+              jsonb_build_object(
+                'entity_name', entity_name
+              )
+              ORDER BY entity_name
+            ),
+            '[]'::jsonb
+          )
+          INTO result
+          FROM %1$I.entity
+          WHERE entity_schema = p_entity_schema;
+
+          RETURN result;
+        END;
+        $inner$;
+
+        ALTER FUNCTION %1$I.list_entities(TEXT) OWNER TO %1$I;
 
 
-        ALTER FUNCTION %I.get_entity(TEXT, TEXT) OWNER TO %I;
-
-        CREATE OR REPLACE FUNCTION %I.list_entities(p_schema TEXT)
-        RETURNS TABLE (entity TEXT)
-        LANGUAGE sql AS $inner$
-          SELECT entity
-          FROM %I.entity
-          WHERE entity_schema = p_schema;
-        $inner$
-        ALTER FUNCTION %I.list_entities(TEXT) OWNER TO %I;
-
-        CREATE OR REPLACE FUNCTION %I.manage_entity(
+        CREATE OR REPLACE FUNCTION ec.manage_entity(
           entity_schema text,
+          entity_name text,
           operation text,
-          name text,
           id uuid DEFAULT NULL,
-          data json DEFAULT NULL
+          data jsonb DEFAULT NULL
         )
         RETURNS json
         LANGUAGE plpgsql
         SECURITY DEFINER
-        SET search_path = %I, public
+        SET search_path = %1$I, ec, public
         AS $inner$
         DECLARE
           result json;
@@ -502,13 +561,11 @@ BEGIN
           update_pairs text := '';
           query text;
           zero_uuid constant uuid := '00000000-0000-0000-0000-000000000000'::uuid;
-          target_schema text := lower(NULLIF(data->>'__schema',''));
-          table_name text := entity;
+          arg_list text := '';
+            arg text;
+            i int := 0;
         BEGIN
           operation := lower(coalesce(operation,''));
-          entity := lower(coalesce(entity,''));
-          entity_schema := lower(coalesce(entity_schema,''));
-
 
           -- CREATE
           IF operation = 'create' THEN
@@ -516,7 +573,7 @@ BEGIN
               SELECT column_name, data_type
               FROM information_schema.columns
               WHERE table_schema = entity_schema
-                AND table_name = table_name
+                AND table_name = entity_name
                 AND column_name <> 'id'
                 AND column_name NOT IN ('last_updated_at', 'last_updated_by')
               ORDER BY ordinal_position
@@ -543,14 +600,14 @@ BEGIN
             IF col_names = '' THEN
               query := format(
                 'INSERT INTO %I.%I DEFAULT VALUES RETURNING to_jsonb(%I.*)',
-                entity_schema, table_name, table_name
+                entity_schema, entity_name, entity_name
               );
             ELSE
               col_names := left(col_names, length(col_names) - 2);
               col_values := left(col_values, length(col_values) - 2);
               query := format(
                 'INSERT INTO %I.%I (%s) VALUES (%s) RETURNING to_jsonb(%I.*)',
-                entity_schema, table_name, col_names, col_values, table_name
+                entity_schema, entity_name, col_names, col_values, entity_name
               );
             END IF;
             EXECUTE query INTO result;
@@ -560,12 +617,12 @@ BEGIN
             IF id IS NULL OR id = zero_uuid THEN
               query := format(
                 'SELECT COALESCE(json_agg(to_jsonb(t.*)), ''[]''::json) FROM %I.%I t',
-                entity_schema, table_name
+                entity_schema, entity_name
               );
             ELSE
               query := format(
                 'SELECT to_jsonb(t.*) FROM %I.%I t WHERE id = %L::uuid',
-                entity_schema, table_name, id::text
+                entity_schema, entity_name, id::text
               );
             END IF;
             EXECUTE query INTO result;
@@ -574,7 +631,7 @@ BEGIN
           ELSIF operation IN ('list', 'select') THEN
             query := format(
               'SELECT COALESCE(json_agg(to_jsonb(t.*)), ''[]''::json) FROM %I.%I t',
-              entity_schema, table_name
+              entity_schema, entity_name
             );
             EXECUTE query INTO result;
 
@@ -588,7 +645,7 @@ BEGIN
               SELECT column_name, data_type
               FROM information_schema.columns
               WHERE table_schema = entity_schema
-                AND table_name = table_name
+                AND table_name = entity_name
                 AND column_name <> 'id'
                 AND column_name NOT IN ('last_updated_at', 'last_updated_by')
               ORDER BY ordinal_position
@@ -614,7 +671,7 @@ BEGIN
             update_pairs := left(update_pairs, length(update_pairs) - 2);
             query := format(
               'UPDATE %I.%I SET %s WHERE id = %L::uuid RETURNING to_jsonb(%I.*)',
-              entity_schema, table_name, update_pairs, id::text, table_name
+              entity_schema, entity_name, update_pairs, id::text, entity_name
             );
             EXECUTE query INTO result;
 
@@ -625,9 +682,42 @@ BEGIN
             END IF;
             query := format(
               'DELETE FROM %I.%I WHERE id = %L::uuid RETURNING to_jsonb(%I.*)',
-              entity_schema, table_name, id::text, table_name
+              entity_schema, entity_name, id::text, entity_name
             );
             EXECUTE query INTO result;
+
+          ELSIF operation = 'execute' THEN
+
+
+              -- Build argument list
+              IF data ? 'args' THEN
+                FOR arg IN SELECT json_array_elements_text(data->'args')
+                LOOP
+                  arg_list := arg_list || format('%L, ', arg);
+                END LOOP;
+
+                IF arg_list <> '' THEN
+                  arg_list := left(arg_list, length(arg_list) - 2);
+                END IF;
+              END IF;
+
+              -- Build query
+              IF arg_list = '' THEN
+                query := format(
+                  'SELECT to_jsonb(%I.%I())',
+                  entity_schema,
+                  entity_name
+                );
+              ELSE
+                query := format(
+                  'SELECT to_jsonb(%I.%I(%s))',
+                  entity_schema,
+                  entity_name,
+                  arg_list
+                );
+              END IF;
+
+              EXECUTE query INTO result;
 
           -- Unsupported
           ELSE
@@ -636,15 +726,17 @@ BEGIN
 
           RETURN result;
         END;
-        $inner$;
+        $$inner$$;
 
-    $ddl$, p_schema);
+        ALTER FUNCTION %1$I.manage_entity(text, text, text, uuid, jsonb) OWNER TO %1$I;
+
+    $ddl$, p_entity_schema);
  END;
  $$;
 
 
 CREATE OR REPLACE FUNCTION ec._seed_roles_and_permissions(
-		p_schema text
+		p_entity_schema text
 	)
 RETURNS void
 LANGUAGE 'plpgsql'
@@ -662,7 +754,7 @@ BEGIN
 			('crud:update', 'Update records'),
 			('crud:delete', 'Delete records')
 		ON CONFLICT (key) DO NOTHING;
-	$sql$, p_schema);
+	$sql$, p_entity_schema);
 
 	EXECUTE format($sql$ INSERT INTO %1$I.role (
 		org_id,
@@ -674,7 +766,7 @@ BEGIN
 			(NULL, 'editor', 'Editor', 'Modify records'),
 			(NULL, 'viewer', 'Viewer', 'Read-only access')
 		ON CONFLICT (org_id, key) DO NOTHING;
-	$sql$, p_schema);
+	$sql$, p_entity_schema);
 
 	EXECUTE format($sql$ INSERT INTO %1$I.role_permission (
 		role_id,
@@ -686,7 +778,7 @@ BEGIN
 		OR (r.key = 'editor' AND p.key IN ('crud:read','crud:update'))
 		OR (r.key = 'viewer' AND p.key = 'crud:read')
 		ON CONFLICT DO NOTHING;
-	$sql$, p_schema);
+	$sql$, p_entity_schema);
 END;
 $$;
 
@@ -694,7 +786,7 @@ ALTER FUNCTION ec._seed_roles_and_permissions(text) OWNER TO ec;
 
 
 CREATE OR REPLACE FUNCTION ec._apply_roles_and_permissions(
-    p_schema text,
+    p_entity_schema text,
     p_user_id uuid,
     p_org_id uuid,
     p_roles text[] DEFAULT '{}'::text[],
@@ -717,7 +809,7 @@ DECLARE
 BEGIN
   EXECUTE format(
     'SELECT org_key FROM %I.organization WHERE id = $1',
-    p_schema
+    p_entity_schema
   )
   INTO v_root_org_key
   USING p_org_id;
@@ -729,7 +821,7 @@ BEGIN
       FROM unnest($1::text[]) p
       ON CONFLICT (key) DO UPDATE
         SET updated_at = now();
-    $fmt$, p_schema)
+    $fmt$, p_entity_schema)
     USING p_permissions;
   END IF;
 
@@ -743,11 +835,11 @@ BEGIN
         INSERT INTO %1$I.organization (org_key, name)
         VALUES (%2$L, %2$L)
         ON CONFLICT (org_key) DO NOTHING;
-      $fmt$, p_schema, v_parent_key);
+      $fmt$, p_entity_schema, v_parent_key);
 
       EXECUTE format(
         'SELECT id FROM %I.organization WHERE org_key = %L',
-        p_schema,
+        p_entity_schema,
         v_parent_key
       )
       INTO v_parent_id;
@@ -761,11 +853,11 @@ BEGIN
       ON CONFLICT (org_key) DO UPDATE
         SET parent_org_id = COALESCE(%3$L, %1$I.organization.parent_org_id),
             updated_at = now();
-    $fmt$, p_schema, v_org_key, v_parent_id);
+    $fmt$, p_entity_schema, v_org_key, v_parent_id);
 
     EXECUTE format(
       'SELECT id FROM %I.organization WHERE org_key = %L',
-      p_schema,
+      p_entity_schema,
       v_org_key
     )
     INTO v_org_id;
@@ -774,7 +866,7 @@ BEGIN
       INSERT INTO %1$I.user_org (user_id, org_id)
       VALUES ($1, $2)
       ON CONFLICT DO NOTHING;
-    $fmt$, p_schema)
+    $fmt$, p_entity_schema)
     USING p_user_id, v_org_id;
 
     IF array_length(v_roles, 1) IS NOT NULL THEN
@@ -784,7 +876,7 @@ BEGIN
         FROM unnest($2::text[]) r
         ON CONFLICT (org_id, key) DO UPDATE
           SET updated_at = now();
-      $fmt$, p_schema)
+      $fmt$, p_entity_schema)
       USING v_org_id, v_roles;
 
       EXECUTE format($fmt$
@@ -794,7 +886,7 @@ BEGIN
         WHERE r.org_id = $2
           AND r.key = ANY($3::text[])
         ON CONFLICT DO NOTHING;
-      $fmt$, p_schema)
+      $fmt$, p_entity_schema)
       USING p_user_id, v_org_id, v_roles;
     END IF;
 
@@ -833,7 +925,7 @@ BEGIN
     )
     FROM %1$I."user" u
     WHERE u.id = $1;
-  $fmt$, p_schema);
+  $fmt$, p_entity_schema);
 
   EXECUTE v_sql USING p_user_id INTO v_user;
   RETURN v_user;
@@ -844,7 +936,7 @@ ALTER FUNCTION ec._apply_roles_and_permissions(text, uuid, uuid, text[], text[])
     OWNER TO ec;
 
 CREATE OR REPLACE FUNCTION ec._assign_role(
-	p_schema text,
+	p_entity_schema text,
 	p_user uuid,
 	p_org uuid,
 	p_role_key text
@@ -855,17 +947,17 @@ VOLATILE PARALLEL UNSAFE
 AS $$
 DECLARE v_role_id uuid;
 BEGIN
-	EXECUTE format('SELECT id FROM %I.role WHERE key=%L LIMIT 1', p_schema, p_role_key)
+	EXECUTE format('SELECT id FROM %I.role WHERE key=%L LIMIT 1', p_entity_schema, p_role_key)
 	INTO v_role_id;
 	IF v_role_id IS NULL THEN
-		RAISE NOTICE 'Role % not found in %', p_role_key, p_schema;
+		RAISE NOTICE 'Role % not found in %', p_role_key, p_entity_schema;
 		RETURN;
 	END IF;
 
-	EXECUTE format('INSERT INTO %I.user_org(user_id, org_id) VALUES($1,$2) ON CONFLICT DO NOTHING', p_schema)
+	EXECUTE format('INSERT INTO %I.user_org(user_id, org_id) VALUES($1,$2) ON CONFLICT DO NOTHING', p_entity_schema)
 	USING p_user, p_org;
 
-	EXECUTE format('INSERT INTO %I.user_org_role(user_id, org_id, role_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', p_schema)
+	EXECUTE format('INSERT INTO %I.user_org_role(user_id, org_id, role_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', p_entity_schema)
 	USING p_user, p_org, v_role_id;
 END;
 $$;
@@ -877,7 +969,7 @@ ALTER FUNCTION ec._assign_role(text, uuid, uuid,  text)
 -- 2. Insert/update function with full JSON payload (meta-wrapped)
 CREATE OR REPLACE FUNCTION ec._upsert_tenant(
   p_sub TEXT,
-  p_schema TEXT,
+  p_entity_schema TEXT,
    p_org_id UUID,
   p_roles TEXT[],
    p_permissions TEXT[],
@@ -889,7 +981,7 @@ SECURITY DEFINER
 AS $$
 BEGIN
   INSERT INTO ec.tenant(sub, entity_schema,  org_Id, roles , permissions, memberships )
-  VALUES (p_sub, p_schema,p_org_id , p_roles , p_permissions , p_memberships)
+  VALUES (p_sub, p_entity_schema,p_org_id , p_roles , p_permissions , p_memberships)
   ON CONFLICT (sub)
   DO UPDATE SET sub = EXCLUDED.sub,
       entity_schema = EXCLUDED.entity_schema,
@@ -903,7 +995,7 @@ $$;
 ALTER FUNCTION ec._upsert_tenant(TEXT, TEXT, UUID, TEXT[], TEXT[], JSONB) OWNER TO ec;
 
 CREATE OR REPLACE FUNCTION ec.provision_tenant(
-    p_schema text,
+    p_entity_schema text,
     p_sub text,
     p_email text,
     p_name text DEFAULT NULL::text,
@@ -928,26 +1020,26 @@ DECLARE
   v_memberships jsonb;
 BEGIN
   -- 1?? Normalize entity_schema key
-  p_schema := lower(trim(coalesce(p_schema, 'public')));
+  p_entity_schema := lower(trim(coalesce(p_entity_schema, 'public')));
   p_email  := lower(p_email);
 
   -- 2?? Ensure entity_schema exists
-  EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION CURRENT_USER', p_schema);
+  EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION CURRENT_USER', p_entity_schema);
 
   -- 3?? Ensure baseline tables
-  PERFORM ec._ensure_tenant_objects(p_schema);
+  PERFORM ec._ensure_tenant_objects(p_entity_schema);
 
   -- 4?? Seed baseline roles and permissions
-  PERFORM ec._seed_roles_and_permissions(p_schema);
+  PERFORM ec._seed_roles_and_permissions(p_entity_schema);
 
   -- 5?? Root organization
   EXECUTE format($org$
     INSERT INTO %1$I.organization (org_key, name)
     VALUES (%2$L, %2$L)
     ON CONFLICT (org_key) DO NOTHING;
-  $org$, p_schema, p_schema);
+  $org$, p_entity_schema, p_entity_schema);
 
-  EXECUTE format('SELECT id FROM %I.organization WHERE org_key=%L', p_schema, p_schema)
+  EXECUTE format('SELECT id FROM %I.organization WHERE org_key=%L', p_entity_schema, p_entity_schema)
     INTO v_org_id;
 
   -- 6?? Upsert initial user
@@ -957,31 +1049,31 @@ BEGIN
     ON CONFLICT (auth0_sub)
       DO UPDATE SET email=$2, name=$3, picture_url=$4, given_name=$5, family_name=$6, locale=$7, last_login_at=now(), updated_at=now()
     RETURNING id;
-  $usr$, p_schema)
+  $usr$, p_entity_schema)
   USING p_sub, p_email, p_name, p_picture, p_given_name, p_family_name, p_locale
   INTO v_user_id;
 
   -- 7?? Assign creator role to root org
-  PERFORM ec._assign_role(p_schema, v_user_id, v_org_id, 'creator');
+  PERFORM ec._assign_role(p_entity_schema, v_user_id, v_org_id, 'creator');
 
   -- 8?? Apply extended roles and permissions (from Auth0)
   v_user := ec._apply_roles_and_permissions(
-      p_schema,
+      p_entity_schema,
       v_user_id,
       v_org_id,
       p_roles,
       p_permissions
   );
 
-  v_memberships := v_user->>'memberships';
+  v_memberships := v_user->'memberships';
 
 
---  PERFORM ec._upsert_tenant(p_sub, p_schema, v_org_id, v_roles, p_permissions, v_memberships);
+--  PERFORM ec._upsert_tenant(p_sub, p_entity_schema, v_org_id, v_roles, p_permissions, v_memberships);
 
   -- 9?? Return unified summary
   v_app_metadata := jsonb_build_object(
     'sub', p_sub,
-    'entity_schema', p_schema,
+    'entity_schema', p_entity_schema,
     'org_id', v_org_id,
     'roles', p_roles,
     'permissions', p_permissions,

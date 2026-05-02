@@ -20,7 +20,7 @@ class RequestEnvelope(BaseModel):
 
 
 class EntityResponse(BaseModel):
-    entity: Any = None
+    entity: str = None
 
 
 class RequestResult(BaseModel):
@@ -68,7 +68,7 @@ class ProvisionPayload(BaseModel):
 
 
 class FormMetadataResponse(BaseModel):
-    entity: str
+    entity_name: str
     entity_json: Dict[str, Any]
 
 
@@ -79,7 +79,7 @@ class TenantBody(BaseModel):
 
 class CreateEntityBody(BaseModel):
     entity_schema: str
-    entity: str
+    entity_name: str
     entity_json: Dict[str, Any]
 
 

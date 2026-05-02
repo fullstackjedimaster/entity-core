@@ -97,10 +97,50 @@ async def get_entity(request: Request,  entity_name: str, token_payload: dict = 
         return EntityResponse(
             entity=ent["entity"]
         )
+    return None
 
-    return EntityResponse(entity=entity)
+@router.get("")
+async def list_entities(request: Request, token_payload: dict = Depends(require_jwt)):
+    entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
+    internal_token = issue_internal_token(request)
+
+    envelope = RequestEnvelope(
+        operation="execute",
+        target="ec.list_entities",
+        id=None,
+        args={
+            "entity_schema": entity_schema,
+        },
+        meta={"source": "entity-core:/api/entities"},
+    )
+
+    data = await call_model_manage(envelope, token=internal_token)
+    return _unwrap_result(data, "entity-server failed list_entities")
 
 
+@router.get("/{entity_name}")
+async def get_entity(request: Request, entity_name: str, token_payload: dict = Depends(require_jwt)):
+    entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
+    internal_token = issue_internal_token(request)
+
+    envelope = RequestEnvelope(
+        operation="execute",
+        target="ec.get_entity",
+        id=None,
+        args={
+            "entity_schema": entity_schema,
+            "entity_name": entity_name,
+        },
+        meta={"source": "entity-core:/api/entities/{entity_name}"},
+    )
+
+    data = await call_model_manage(envelope, token=internal_token)
+    ent = _unwrap_result(data, "entity-server failed get_entity")
+
+    if not ent:
+        raise HTTPException(status_code=404, detail="Entity not found")
+
+    return ent
 # ---------------------------------------------------------------------------
 # Create entity
 # ---------------------------------------------------------------------------
@@ -116,10 +156,6 @@ async def create_entity(
 
     entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
 
-    print("SCHEMA:", entity_schema)
-    print("ENTITY_JSON TYPE:", type(body.entity_json))
-    print("ENTITY_JSON VALUE:", body.entity_json)
-
     internal_token = issue_internal_token(request)
 
     envelope = RequestEnvelope(
@@ -128,7 +164,7 @@ async def create_entity(
         id=None,
         args={
             "entity_schema": entity_schema,
-            "entity": body.entity,
+            "entity_name": body.entity_name,
             "entity_json": body.entity_json,
         },
         meta={"source": "entity-core:/api/entities/{entity}:POST"},
