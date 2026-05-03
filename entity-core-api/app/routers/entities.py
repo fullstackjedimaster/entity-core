@@ -38,37 +38,6 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
     return data.get("result")
 
 
-# ---------------------------------------------------------------------------
-# List entities
-# ---------------------------------------------------------------------------
-
-@router.get("")
-async def list_entities(request: Request, token_payload: dict = Depends(require_jwt())):
-    entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
-    internal_token = issue_internal_token(request)
-
-
-    envelope = RequestEnvelope(
-        operation="execute",
-        target="ec.list_entities",
-        id=None,
-        args= {"entity_schema": entity_schema},
-        meta={"source": "entity-core:/api/entities"},
-    )
-
-    data = await call_model_manage(envelope, token=internal_token)
-    result = _unwrap_result(data, "entity-server failed listing entities")
-
-    rows = result.get("rows", [])
-
-    return {
-        "entities": [
-            r["entity"]
-            for r in rows
-            if isinstance(r, dict) and "entity" in r
-        ]
-    }
-
 
 # ---------------------------------------------------------------------------
 # Get entity template

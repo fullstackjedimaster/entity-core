@@ -21,7 +21,7 @@ set +a
 docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml build --no-cache
 
 echo "[up] Starting stack"
-docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml up --force-recreate
+docker compose -p "$COMPOSE_PROJECT_NAME" -f "$DEPLOY_DIR"/compose.yml up -d --force-recreate
 
 docker compose logs -f
 
