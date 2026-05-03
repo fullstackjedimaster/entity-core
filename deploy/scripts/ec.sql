@@ -1302,4 +1302,3 @@ GRANT EXECUTE ON FUNCTION ec._assign_role(TEXT, UUID, UUID, TEXT) TO ec_app;
 GRANT EXECUTE ON FUNCTION ec._apply_roles_and_permissions(TEXT, UUID, UUID, TEXT[], TEXT[]) TO ec_app;
 GRANT EXECUTE ON FUNCTION ec._upsert_tenant(TEXT, TEXT, UUID, TEXT[], TEXT[], JSONB) TO ec_app;
 GRANT EXECUTE ON FUNCTION ec.provision_tenant(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT[], TEXT[]) TO ec_app;
-```
