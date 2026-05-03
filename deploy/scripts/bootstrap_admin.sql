@@ -3,6 +3,13 @@ WHERE NOT EXISTS (
   SELECT 1 FROM pg_roles WHERE rolname = :'app_owner'
 )\gexec
 
+
+SELECT format(
+  'GRANT %I TO postgres',
+  :'app_owner'
+)\gexec
+
+
 SELECT format(
   'CREATE ROLE %I LOGIN PASSWORD %L INHERIT',
   :'app_user',
