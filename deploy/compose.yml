@@ -57,9 +57,6 @@ services:
     env_file:
       - ./env/entity-core-api.env
       - ./env/postgres.env
-    environment:
-      DATABASE_URL: ${APP_DATABASE_URL}
-      POSTGRES_DATABASE_URL: ""
     restart: unless-stopped
     ports:
       - "127.0.0.1:8004:8004"
