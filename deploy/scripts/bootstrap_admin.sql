@@ -1,5 +1,5 @@
 SELECT format(
-  'CREATE ROLE %I LOGIN PASSWORD %L',
+  'CREATE ROLE %I LOGIN CREATEROLE PASSWORD %L ',
   :'app_user',
   :'app_password'
 )
