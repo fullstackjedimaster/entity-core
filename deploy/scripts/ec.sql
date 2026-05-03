@@ -1,6 +1,10 @@
+SET ROLE ec;
+
 CREATE SCHEMA IF NOT EXISTS ec AUTHORIZATION ec;
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+SET search_path = ec, public;
+
+
 
 -- =========================================================
 -- GLOBAL TABLES

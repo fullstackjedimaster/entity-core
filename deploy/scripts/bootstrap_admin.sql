@@ -36,3 +36,5 @@ SELECT format(
   :'app_db',
   :'app_user'
 )\gexec
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
