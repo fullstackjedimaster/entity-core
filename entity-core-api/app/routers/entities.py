@@ -43,7 +43,7 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 # ---------------------------------------------------------------------------
 
 @router.get("")
-async def list_entities(request: Request, token_payload: dict = Depends(require_jwt)):
+async def list_entities(request: Request, token_payload: dict = Depends(require_jwt())):
     entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
     internal_token = issue_internal_token(request)
 
@@ -75,7 +75,7 @@ async def list_entities(request: Request, token_payload: dict = Depends(require_
 # ---------------------------------------------------------------------------
 
 @router.get("/{entity}", response_model=EntityResponse)
-async def get_entity(request: Request,  entity_name: str, token_payload: dict = Depends(require_jwt)):
+async def get_entity(request: Request,  entity_name: str, token_payload: dict = Depends(require_jwt())):
     entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
     internal_token = issue_internal_token(request)
     envelope = RequestEnvelope(
@@ -100,7 +100,10 @@ async def get_entity(request: Request,  entity_name: str, token_payload: dict = 
     return None
 
 @router.get("")
-async def list_entities(request: Request, token_payload: dict = Depends(require_jwt)):
+async def list_entities(
+    request: Request,
+    token_payload: dict = Depends(require_jwt()),
+):
     entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
     internal_token = issue_internal_token(request)
 
@@ -119,7 +122,7 @@ async def list_entities(request: Request, token_payload: dict = Depends(require_
 
 
 @router.get("/{entity_name}")
-async def get_entity(request: Request, entity_name: str, token_payload: dict = Depends(require_jwt)):
+async def get_entity(request: Request, entity_name: str, token_payload: dict = Depends(require_jwt())):
     entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
     internal_token = issue_internal_token(request)
 
@@ -149,7 +152,7 @@ async def get_entity(request: Request, entity_name: str, token_payload: dict = D
 async def create_entity(
     request: Request,
     body: CreateEntityBody,
-    token_payload: dict = Depends(require_jwt),
+    token_payload: dict = Depends(require_jwt()),
 ):
     if not body.entity_json:
         raise HTTPException(status_code=400, detail="Missing entity_json")
