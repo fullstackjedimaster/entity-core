@@ -399,18 +399,23 @@ BEGIN
   p_entity_schema := lower(trim(p_entity_schema));
 
   IF NOT EXISTS (
-    SELECT 1
-    FROM pg_roles
-    WHERE rolname = p_entity_schema
-  ) THEN
-    EXECUTE format('CREATE ROLE %I NOLOGIN', p_entity_schema);
-  END IF;
+      SELECT 1
+      FROM pg_roles
+      WHERE rolname = p_entity_schema
+    ) THEN
+      EXECUTE format('CREATE ROLE %I NOLOGIN', p_entity_schema);
+    END IF;
 
-  EXECUTE format(
-    'CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION %I',
-    p_entity_schema,
-    p_entity_schema
-  );
+    EXECUTE format(
+      'GRANT %I TO ec',
+      p_entity_schema
+    );
+
+    EXECUTE format(
+      'CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION %I',
+      p_entity_schema,
+      p_entity_schema
+    );
 
   EXECUTE format($sql$
     CREATE TABLE IF NOT EXISTS %1$I.organization (
