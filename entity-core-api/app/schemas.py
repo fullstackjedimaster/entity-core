@@ -25,8 +25,8 @@ class EntityResponse(BaseModel):
 
 class RequestResult(BaseModel):
     ok: bool
-    message: Optional[str] = None
-    result: Optional[Dict[str, Any]] = None
+    result: Any = None
+    error: str | None = None
 
 
 # ------------------------------------------------------------

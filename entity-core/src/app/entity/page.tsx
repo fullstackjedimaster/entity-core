@@ -33,7 +33,7 @@ export default function EntityIndexPage() {
         setError(null);
 
         const data = await api.entities.list();
-        setEntities(data.entities.map((e: string) => ({ entity: e })));
+        setEntities(data);
       } catch (err: any) {
         console.error(err);
         setError(err.message);
