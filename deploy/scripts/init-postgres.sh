@@ -22,27 +22,41 @@ You can also set SQL_FILE explicitly."
   fi
 fi
 
-POSTGRES_HOST=entity-core-postgres
-POSTGRES_PORT=5432
-POSTGRES_DB="${POSTGRES_DB:-postgres}"
-POSTGRES_USER="${POSTGRES_USER:-postgres}"
-POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
+# -------------------------------------------------------------------
+# Bootstrap/admin connection inputs
+# -------------------------------------------------------------------
+POSTGRES_HOST="${POSTGRES_HOST:-${DATABASE_HOST:-postgres}}"
+POSTGRES_PORT="${POSTGRES_PORT:-${DATABASE_PORT:-5432}}"
 
-POSTGRES_DATABASE_URL="${POSTGRES_DATABASE_URL:-}"
 
-if [[ -z "$POSTGRES_DATABASE_URL" ]]; then
+# -------------------------------------------------------------------
+# App connection inputs
+# -------------------------------------------------------------------
+APP_POSTGRES_DB="${APP_POSTGRES_DB:-ec}"
+APP_POSTGRES_USER="${APP_POSTGRES_USER:-ec}"
+APP_POSTGRES_PASSWORD="${APP_POSTGRES_PASSWORD:-}"
 
-  POSTGRES_DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable"
+APP_DATABASE_URL="${APP_DATABASE_URL:-}"
+
+if [[ -z "$APP_DATABASE_URL" ]]; then
+  : "${POSTGRES_HOST:?POSTGRES_HOST is required}"
+  : "${POSTGRES_PORT:?POSTGRES_PORT is required}"
+  : "${APP_POSTGRES_DB:?APP_POSTGRES_DB is required}"
+  : "${APP_POSTGRES_USER:?APP_POSTGRES_USER is required}"
+  : "${APP_POSTGRES_PASSWORD:?APP_POSTGRES_PASSWORD is required}"
+
+  APP_DATABASE_URL="postgresql://${APP_POSTGRES_USER}:${APP_POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${APP_POSTGRES_DB}?sslmode=disable"
 fi
 
 
-log "Using POSTGRES_DATABASE_URL=$POSTGRES_DATABASE_URL"
+
+log "Using APP_DATABASE_URL=$APP_DATABASE_URL"
 log "Using SQL_FILE=$SQL_FILE"
 
 
 
 
-psql "$POSTGRES_DATABASE_URL" -f /scripts/ec.sql
+psql "$APP_DATABASE_URL" -f /scripts/ec.sql
 
 
 log "Done."
