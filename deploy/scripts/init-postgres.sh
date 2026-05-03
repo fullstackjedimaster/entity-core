@@ -56,7 +56,4 @@ psql "$APP_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$SQL_FILE"
 
 
 
-psql "$APP_DATABASE_URL" -f /scripts/ec.sql
-
-
 log "Done."
