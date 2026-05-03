@@ -43,30 +43,6 @@ def _unwrap_result(data: Dict[str, Any], error_msg: str):
 # Get entity template
 # ---------------------------------------------------------------------------
 
-@router.get("/{entity}", response_model=EntityResponse)
-async def get_entity(request: Request,  entity_name: str, token_payload: dict = Depends(require_jwt())):
-    entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
-    internal_token = issue_internal_token(request)
-    envelope = RequestEnvelope(
-        operation="execute",
-        target="ec.get_entity",
-        id=None,
-        args={"entity_schema":entity_schema,
-            "entity_name": entity_name},
-        meta={"source": "entity-core:/api/entities/{entity_name}"},
-    )
-
-    data = await call_model_manage(envelope, token=internal_token )
-    ent = _unwrap_result(data, "entity-server failed get_entity")
-
-    if ent is None:
-        raise HTTPException(status_code=404, detail="Template not found")
-
-    if isinstance(ent, dict) and "entity" in ent:
-        return EntityResponse(
-            entity=ent["entity"]
-        )
-    return None
 
 @router.get("")
 async def list_entities(
@@ -93,8 +69,16 @@ async def list_entities(
     }
 
 @router.get("/{entity_name}")
-async def get_entity(request: Request, entity_name: str, token_payload: dict = Depends(require_jwt())):
+async def get_entity(
+    request: Request,
+    entity_name: str,
+    token_payload: dict = Depends(require_jwt()),
+):
     entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
+
+    if not entity_schema:
+        raise HTTPException(status_code=400, detail="Missing entity_schema claim")
+
     internal_token = issue_internal_token(request)
 
     envelope = RequestEnvelope(
