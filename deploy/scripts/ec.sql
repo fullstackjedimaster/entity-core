@@ -1,14 +1,12 @@
 CREATE SCHEMA IF NOT EXISTS ec AUTHORIZATION ec;
 
-ALTER ROLE ec SET search_path = ec, public;
-
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS ec.tenant(
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sub TEXT UNIQUE NOT NULL,
   entity_schema TEXT NOT NULL,
-  org_id TEXT NOT NULL,
+  org_id uuid NOT NULL,
   roles text[] DEFAULT '{}'::text[],
   permissions text[] DEFAULT '{}'::text[],
    memberships jsonb DEFAULT '[]'::jsonb
@@ -17,6 +15,8 @@ CREATE TABLE IF NOT EXISTS ec.tenant(
 CREATE UNIQUE INDEX IF NOT EXISTS tenant_sub_idx
   ON ec.tenant(lower(sub));
 
+ALTER TABLE ec.tenant OWNER TO ec;
+
 CREATE TABLE IF NOT EXISTS ec.entity(
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   entity_schema TEXT NOT NULL,
@@ -24,13 +24,20 @@ CREATE TABLE IF NOT EXISTS ec.entity(
   entity_json JSONB NOT NULL
 );
 
+ALTER TABLE ec.entity
+  ADD CONSTRAINT entity_schema_entity_name_unique
+  UNIQUE (entity_schema, entity_name);
+
 CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_name_idx
   ON ec.entity(lower(entity_schema), lower(entity_name));
 
+ALTER TABLE ec.entity OWNER TO ec;
 
 CREATE OR REPLACE FUNCTION ec.create_entity(entity_schema TEXT, entity_name TEXT, entity_json JSONB )
 RETURNS VOID
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ec, public
 AS
 $$
 DECLARE k TEXT;
@@ -70,6 +77,7 @@ END;
 $$;
 
 ALTER FUNCTION ec.create_entity(TEXT, TEXT, JSONB) OWNER TO ec;
+GRANT EXECUTE ON FUNCTION ec.create_entity(TEXT, TEXT, JSONB) TO ec_app;
 
 -- 2. Insert/update function with full JSON payload (meta-wrapped)
 CREATE OR REPLACE FUNCTION ec._upsert_entity(
@@ -79,6 +87,8 @@ CREATE OR REPLACE FUNCTION ec._upsert_entity(
 )
 RETURNS VOID
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ec, public
 AS $$
 BEGIN
   INSERT INTO ec.entity(entity_schema, entity_name, entity_json)
@@ -89,7 +99,7 @@ END;
 $$;
 
 ALTER FUNCTION ec._upsert_entity(TEXT, TEXT, JSONB) OWNER TO ec;
-
+GRANT EXECUTE ON FUNCTION ec._upsert_entity(TEXT, TEXT, JSONB) TO ec_app;
 
 
 CREATE OR REPLACE FUNCTION ec.list_entities(
@@ -97,6 +107,8 @@ CREATE OR REPLACE FUNCTION ec.list_entities(
 )
 RETURNS JSONB
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ec, public
 AS $$
 DECLARE
   result JSONB;
@@ -119,6 +131,8 @@ END;
 $$;
 
 ALTER FUNCTION ec.list_entities(TEXT) OWNER TO ec;
+GRANT EXECUTE ON FUNCTION ec.list_entities(TEXT) TO ec_app;
+
 
 CREATE OR REPLACE FUNCTION ec.get_entity(
   p_entity_schema TEXT,
@@ -126,6 +140,8 @@ CREATE OR REPLACE FUNCTION ec.get_entity(
 )
 RETURNS JSONB
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ec, public
 AS $$
 DECLARE
   result JSONB;
@@ -144,6 +160,7 @@ END;
 $$;
 
 ALTER FUNCTION ec.get_entity(TEXT, TEXT) OWNER TO ec;
+GRANT EXECUTE ON FUNCTION ec.get_entity(TEXT, TEXT) TO ec_app;
 
 CREATE OR REPLACE FUNCTION ec.manage_entity(
   entity_schema text,
@@ -333,6 +350,7 @@ END;
 $$;
 
 ALTER FUNCTION ec.manage_entity(text, text, text, uuid, jsonb) OWNER TO ec;
+GRANT EXECUTE ON FUNCTION ec.manage_entity(text, text, text, uuid, jsonb) TO ec_app;
 
 
 CREATE OR REPLACE FUNCTION ec._ensure_tenant_objects(p_entity_schema text)
@@ -414,6 +432,9 @@ BEGIN
           entity_json JSONB NOT NULL
         );
 
+        ALTER TABLE %1$I.entity
+         ADD CONSTRAINT entity_schema_entity_name_unique
+         UNIQUE (entity_schema, entity_name);
 
         CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_idx
           ON %1$I.entity(lower(entity_schema), lower(entity_name));
@@ -749,11 +770,6 @@ BEGIN
         GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA %I TO ec;
         GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA %I TO ec;
 
-    $ddl$, p_entity_schema);
-
-
- END;
- $$;
 
 
 CREATE OR REPLACE FUNCTION ec._seed_roles_and_permissions(
@@ -805,7 +821,7 @@ END;
 $$;
 
 ALTER FUNCTION ec._seed_roles_and_permissions(text) OWNER TO ec;
-
+GRANT EXECUTE ON FUNCTION ec._seed_roles_and_permissions(text) TO ec_app;
 
 CREATE OR REPLACE FUNCTION ec._apply_roles_and_permissions(
     p_entity_schema text,
@@ -957,6 +973,7 @@ $$;
 
 ALTER FUNCTION ec._apply_roles_and_permissions(text, uuid, uuid, text[], text[])
     OWNER TO ec;
+GRANT EXECUTE ON FUNCTION ec._apply_roles_and_permissions(text, uuid, uuid, text[], text[]) TO ec_app;
 
 CREATE OR REPLACE FUNCTION ec._assign_role(
 	p_entity_schema text,
@@ -988,7 +1005,7 @@ $$;
 
 ALTER FUNCTION ec._assign_role(text, uuid, uuid,  text)
     OWNER TO ec;
-
+GRANT EXECUTE ON FUNCTION ec._assign_role(text, uuid, uuid,  text) TO ec_app;
 
 -- 2. Insert/update function with full JSON payload (meta-wrapped)
 CREATE OR REPLACE FUNCTION ec._upsert_tenant(
@@ -1105,6 +1122,28 @@ BEGIN
   RETURN v_app_metadata;
 END;
 $$;
+
+ALTER FUNCTION ec.provision_tenant(
+  TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT[], TEXT[]
+) OWNER TO ec;
+
+
+GRANT EXECUTE ON FUNCTION ec.provision_tenant(
+  TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT[], TEXT[]
+) TO ec_app;
+
+REVOKE ALL ON SCHEMA ec FROM PUBLIC;
+GRANT USAGE ON SCHEMA ec TO ec_app;
+
+REVOKE ALL ON ALL TABLES IN SCHEMA ec FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ec.tenant TO ec_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ec.entity TO ec_app;
+
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA ec FROM PUBLIC;
+
+
+
+
 
 
 
