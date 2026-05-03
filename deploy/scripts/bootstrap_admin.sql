@@ -12,7 +12,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM pg_roles WHERE rolname = :'app_user'
 )\gexec
 
-ALTER ROLE :"app_user" WITH LOGIN PASSWORD :'app_password';
 
 ALTER ROLE :"app_owner" SET search_path = :"app_owner", public;
 ALTER ROLE :"app_user" SET search_path = :"app_owner", public;

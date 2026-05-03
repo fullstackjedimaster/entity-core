@@ -21,7 +21,7 @@ fi
 # App connection inputs
 # -------------------------------------------------------------------
 APP_POSTGRES_DB="${APP_POSTGRES_DB:-ec}"
-APP_POSTGRES_USER="${APP_POSTGRES_USER:-ec}"
+APP_POSTGRES_USER="${APP_POSTGRES_USER:-ec_app}"
 APP_POSTGRES_PASSWORD="${APP_POSTGRES_PASSWORD:-}"
 
 APP_DATABASE_URL="${APP_DATABASE_URL:-}"
