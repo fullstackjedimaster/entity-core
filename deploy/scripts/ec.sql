@@ -1041,7 +1041,7 @@ BEGIN
   p_entity_schema := lower(trim(coalesce(p_entity_schema, 'public')));
   p_email  := lower(p_email);
 
-  EXECUTE format('CREATE ROLE IF NOT EXISTS %I NOLOGIN', p_entity_schema);
+  EXECUTE format('CREATE ROLE %I NOLOGIN', p_entity_schema);
   EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION %I', p_entity_schema, p_entity_schema);
 
 
