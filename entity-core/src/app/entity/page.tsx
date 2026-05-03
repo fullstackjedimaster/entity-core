@@ -32,13 +32,13 @@ export default function EntityIndexPage() {
         setLoading(true);
         setError(null);
 
-        const data = await api.entities.list();
-        setEntities(data);
+      const data = await api.entities.list();
+      setEntities(data.entities ?? []);
       } catch (err: any) {
-        console.error(err);
-        setError(err.message);
+          console.error(err);
+          setError(err.message);
       } finally {
-        setLoading(false);
+          setLoading(false);
       }
     }
 

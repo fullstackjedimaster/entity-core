@@ -118,8 +118,11 @@ async def list_entities(
     )
 
     data = await call_model_manage(envelope, token=internal_token)
-    return _unwrap_result(data, "entity-server failed list_entities")
+    result = _unwrap_result(data, "entity-server failed list_entities")
 
+    return {
+        "entities": result or []
+    }
 
 @router.get("/{entity_name}")
 async def get_entity(request: Request, entity_name: str, token_payload: dict = Depends(require_jwt())):
