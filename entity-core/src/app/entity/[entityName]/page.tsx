@@ -71,6 +71,8 @@ function EntityInner() {
 
         await saveEntity(entityName, parsed);
 
+        router.push("/entity");
+
     } catch (e) {
         console.error("❌ FULL ERROR:", e);
         alert("JSON PARSE FAILED — check console");
