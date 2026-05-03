@@ -103,9 +103,10 @@ async def get_entity(
 # Create entity
 # ---------------------------------------------------------------------------
 
-@router.post("/{entity}")
+@router.post("/{entity_name}")
 async def create_entity(
     request: Request,
+    entity_name: str,
     body: CreateEntityBody,
     token_payload: dict = Depends(require_jwt()),
 ):
@@ -113,6 +114,8 @@ async def create_entity(
         raise HTTPException(status_code=400, detail="Missing entity_json")
 
     entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
+    if not entity_schema:
+        raise HTTPException(status_code=400, detail="Missing entity_schema claim")
 
     internal_token = issue_internal_token(request)
 
@@ -122,15 +125,16 @@ async def create_entity(
         id=None,
         args={
             "entity_schema": entity_schema,
-            "entity_name": body.entity_name,
+            "entity_name": entity_name,
             "entity_json": body.entity_json,
         },
-        meta={"source": "entity-core:/api/entities/{entity}:POST"},
+        meta={"source": "entity-core:/api/entities/{entity_name}:POST"},
     )
 
     data = await call_model_manage(envelope, token=internal_token)
     _unwrap_result(data, "entity-server failed create_entity")
 
-    return {"status": "ok"}
-
-
+    return {
+        "entity_name": entity_name,
+        "entity_json": body.entity_json,
+    }
