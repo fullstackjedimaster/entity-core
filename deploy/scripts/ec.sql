@@ -460,6 +460,8 @@ BEGIN
         $inner$;
 
         ALTER FUNCTION %1$I.create_entity(TEXT, TEXT, JSONB) OWNER TO %1$I;
+        REVOKE ALL ON FUNCTION %1$I.create_entity(TEXT, TEXT, JSONB) FROM PUBLIC;
+        GRANT EXECUTE ON FUNCTION %1$I.create_entity(TEXT, TEXT, JSONB) TO %1$I;
 
         CREATE OR REPLACE FUNCTION %1$I.upsert_entity(
           p_entity_schema TEXT,
@@ -481,6 +483,8 @@ BEGIN
         $inner$;
 
         ALTER FUNCTION %1$I.upsert_entity(TEXT, TEXT, JSONB) OWNER TO %1$I;
+        REVOKE ALL ON FUNCTION %1$I.upsert_entity(TEXT, TEXT, JSONB) FROM PUBLIC;
+        GRANT EXECUTE ON FUNCTION %1$I.upsert_entity(TEXT, TEXT, JSONB) TO %1$I;
 
 
         CREATE OR REPLACE FUNCTION %1$I.get_entity(
@@ -509,6 +513,8 @@ BEGIN
         $inner$;
 
         ALTER FUNCTION %1$I.get_entity(TEXT, TEXT) OWNER TO %1$I;
+        REVOKE ALL ON FUNCTION %1$I.get_entity(TEXT, TEXT) FROM PUBLIC;
+        GRANT EXECUTE ON FUNCTION %1$I.get_entity(TEXT, TEXT) TO %1$I;
 
         CREATE OR REPLACE FUNCTION %1$I.list_entities(
           p_entity_schema TEXT
@@ -538,7 +544,10 @@ BEGIN
         END;
         $inner$;
 
-        ALTER FUNCTION %1$I.list_entities(TEXT) OWNER TO %1$I;
+
+        ALTER FUNCTION %1$I.list_entities(TEXT)  OWNER TO %1$I;
+        REVOKE ALL ON FUNCTION %1$I.list_entities(TEXT)  FROM PUBLIC;
+        GRANT EXECUTE ON FUNCTION %1$I.list_entities(TEXT)  TO %1$I;
 
 
         CREATE OR REPLACE FUNCTION ec.manage_entity(
@@ -728,9 +737,18 @@ BEGIN
         END;
         $inner$;
 
-        ALTER FUNCTION %1$I.manage_entity(text, text, text, uuid, jsonb) OWNER TO %1$I;
+        ALTER FUNCTION %1$I.manage_entity(text, text, text, uuid, jsonb)   OWNER TO %1$I;
+        REVOKE ALL ON FUNCTION %1$I.manage_entity(text, text, text, uuid, jsonb)  FROM PUBLIC;
+        GRANT EXECUTE ON FUNCTION %1$I.manage_entity(text, text, text, uuid, jsonb)   TO %1$I;
+
+        ALTER SCHEMA %I OWNER TO %I;
+        GRANT USAGE ON SCHEMA %I TO ec;
+        GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA %I TO ec;
+        GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA %I TO ec;
 
     $ddl$, p_entity_schema);
+
+
  END;
  $$;
 
@@ -1023,8 +1041,9 @@ BEGIN
   p_entity_schema := lower(trim(coalesce(p_entity_schema, 'public')));
   p_email  := lower(p_email);
 
-  -- 2?? Ensure entity_schema exists
-  EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION CURRENT_USER', p_entity_schema);
+  EXECUTE format('CREATE ROLE IF NOT EXISTS %I NOLOGIN', p_entity_schema);
+  EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION %I', p_entity_schema, p_entity_schema);
+
 
   -- 3?? Ensure baseline tables
   PERFORM ec._ensure_tenant_objects(p_entity_schema);
