@@ -343,15 +343,18 @@ SET search_path = ec, public
 AS $$
 BEGIN
 
-	EXECUTE format($ddl$ CREATE TABLE IF NOT EXISTS %1$I.organization (
+	EXECUTE format($ddl$
+	    CREATE ROLE %I NOLOGIN;
+        CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION %I;
+
+        CREATE TABLE IF NOT EXISTS %1$I.organization (
 		id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 		org_key text UNIQUE NOT NULL,
 		name text NOT NULL,
 		parent_org_id uuid NULL REFERENCES %1$I.organization(id),
 		created_at timestamptz DEFAULT now(),
 		updated_at timestamptz DEFAULT now()
-	);
-
+	    );
 
         CREATE TABLE IF NOT EXISTS %1$I."user" (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -757,8 +760,9 @@ CREATE OR REPLACE FUNCTION ec._seed_roles_and_permissions(
 		p_entity_schema text
 	)
 RETURNS void
-LANGUAGE 'plpgsql'
-VOLATILE PARALLEL UNSAFE
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ec, public
 AS $$
 
 BEGIN
@@ -812,7 +816,8 @@ CREATE OR REPLACE FUNCTION ec._apply_roles_and_permissions(
 )
 RETURNS jsonb
 LANGUAGE plpgsql
-VOLATILE SECURITY DEFINER PARALLEL UNSAFE
+SECURITY DEFINER
+SET search_path = ec, public
 AS $$
 DECLARE
   v_item jsonb;
@@ -961,7 +966,8 @@ CREATE OR REPLACE FUNCTION ec._assign_role(
 	)
 RETURNS void
 LANGUAGE plpgsql
-VOLATILE PARALLEL UNSAFE
+SECURITY DEFINER
+SET search_path = ec, public
 AS $$
 DECLARE v_role_id uuid;
 BEGIN
@@ -996,6 +1002,7 @@ CREATE OR REPLACE FUNCTION ec._upsert_tenant(
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ec, public
 AS $$
 BEGIN
   INSERT INTO ec.tenant(sub, entity_schema,  org_Id, roles , permissions, memberships )
@@ -1026,7 +1033,8 @@ CREATE OR REPLACE FUNCTION ec.provision_tenant(
 )
 RETURNS jsonb
 LANGUAGE plpgsql
-VOLATILE SECURITY DEFINER PARALLEL UNSAFE
+SECURITY DEFINER
+SET search_path = ec, public
 AS $$
 DECLARE
   v_org_id uuid;
@@ -1040,10 +1048,6 @@ BEGIN
   -- 1?? Normalize entity_schema key
   p_entity_schema := lower(trim(coalesce(p_entity_schema, 'public')));
   p_email  := lower(p_email);
-
-  EXECUTE format('CREATE ROLE %I NOLOGIN', p_entity_schema);
-  EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION %I', p_entity_schema, p_entity_schema);
-
 
   -- 3?? Ensure baseline tables
   PERFORM ec._ensure_tenant_objects(p_entity_schema);
