@@ -105,15 +105,14 @@ async def list_entities(
     token_payload: dict = Depends(require_jwt()),
 ):
     entity_schema = token_payload.get("https://fullstackjedi.dev/entity_schema")
+
     internal_token = issue_internal_token(request)
 
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.list_entities",
         id=None,
-        args={
-            "entity_schema": entity_schema,
-        },
+        args={"entity_schema": entity_schema},
         meta={"source": "entity-core:/api/entities"},
     )
 
