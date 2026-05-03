@@ -3,6 +3,7 @@ anyio==4.9.0
 asyncpg
 click==8.2.1
 dnspython==2.7.0
+dotenv
 fastapi==0.110.0
 h11==0.16.0
 httptools==0.6.4
