@@ -399,23 +399,20 @@ BEGIN
   p_entity_schema := lower(trim(p_entity_schema));
 
   IF NOT EXISTS (
-      SELECT 1
-      FROM pg_roles
-      WHERE rolname = p_entity_schema
-    ) THEN
-      EXECUTE format('CREATE ROLE %I NOLOGIN', p_entity_schema);
-    END IF;
+    SELECT 1
+    FROM pg_roles
+    WHERE rolname = p_entity_schema
+  ) THEN
+    EXECUTE format('CREATE ROLE %I NOLOGIN', p_entity_schema);
+  END IF;
 
-    EXECUTE format(
-      'GRANT %I TO ec',
-      p_entity_schema
-    );
+  EXECUTE format('GRANT %I TO ec', p_entity_schema);
 
-    EXECUTE format(
-      'CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION %I',
-      p_entity_schema,
-      p_entity_schema
-    );
+  EXECUTE format(
+    'CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION %I',
+    p_entity_schema,
+    p_entity_schema
+  );
 
   EXECUTE format($sql$
     CREATE TABLE IF NOT EXISTS %1$I.organization (
@@ -516,10 +513,6 @@ BEGIN
   EXECUTE format('ALTER TABLE %1$I.role_permission OWNER TO %1$I', p_entity_schema);
   EXECUTE format('ALTER TABLE %1$I.entity OWNER TO %1$I', p_entity_schema);
 
-  -- -----------------------------------------------------
-  -- tenant upsert_entity
-  -- -----------------------------------------------------
-
   EXECUTE format($sql$
     CREATE OR REPLACE FUNCTION %1$I.upsert_entity(
       p_entity_schema TEXT,
@@ -544,10 +537,6 @@ BEGIN
   EXECUTE format('REVOKE ALL ON FUNCTION %1$I.upsert_entity(TEXT, TEXT, JSONB) FROM PUBLIC', p_entity_schema);
   EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.upsert_entity(TEXT, TEXT, JSONB) TO ec_app', p_entity_schema);
   EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.upsert_entity(TEXT, TEXT, JSONB) TO %1$I', p_entity_schema);
-
-  -- -----------------------------------------------------
-  -- tenant create_entity
-  -- -----------------------------------------------------
 
   EXECUTE format($sql$
     CREATE OR REPLACE FUNCTION %1$I.create_entity(
@@ -576,7 +565,7 @@ BEGIN
 
       IF NOT has_table THEN
         EXECUTE format(
-          'CREATE TABLE %I.%I (
+          'CREATE TABLE %%I.%%I (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
             created_at timestamptz DEFAULT now(),
             updated_at timestamptz DEFAULT now()
@@ -605,7 +594,7 @@ BEGIN
             AND column_name = k
         ) THEN
           EXECUTE format(
-            'ALTER TABLE %I.%I ADD COLUMN %I %s',
+            'ALTER TABLE %%I.%%I ADD COLUMN %%I %%s',
             entity_schema,
             entity_name,
             k,
@@ -623,10 +612,6 @@ BEGIN
   EXECUTE format('REVOKE ALL ON FUNCTION %1$I.create_entity(TEXT, TEXT, JSONB) FROM PUBLIC', p_entity_schema);
   EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.create_entity(TEXT, TEXT, JSONB) TO ec_app', p_entity_schema);
   EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.create_entity(TEXT, TEXT, JSONB) TO %1$I', p_entity_schema);
-
-  -- -----------------------------------------------------
-  -- tenant get_entity
-  -- -----------------------------------------------------
 
   EXECUTE format($sql$
     CREATE OR REPLACE FUNCTION %1$I.get_entity(
@@ -659,10 +644,6 @@ BEGIN
   EXECUTE format('REVOKE ALL ON FUNCTION %1$I.get_entity(TEXT, TEXT) FROM PUBLIC', p_entity_schema);
   EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_entity(TEXT, TEXT) TO ec_app', p_entity_schema);
   EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_entity(TEXT, TEXT) TO %1$I', p_entity_schema);
-
-  -- -----------------------------------------------------
-  -- tenant list_entities
-  -- -----------------------------------------------------
 
   EXECUTE format($sql$
     CREATE OR REPLACE FUNCTION %1$I.list_entities(
@@ -699,10 +680,6 @@ BEGIN
   EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.list_entities(TEXT) TO ec_app', p_entity_schema);
   EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.list_entities(TEXT) TO %1$I', p_entity_schema);
 
-  -- -----------------------------------------------------
-  -- tenant manage_entity
-  -- -----------------------------------------------------
-
   EXECUTE format($sql$
     CREATE OR REPLACE FUNCTION %1$I.manage_entity(
       entity_schema TEXT,
@@ -728,7 +705,6 @@ BEGIN
       operation := lower(coalesce(operation, ''));
 
       IF operation = 'create' THEN
-
         FOR col IN
           SELECT column_name, data_type
           FROM information_schema.columns
@@ -738,21 +714,21 @@ BEGIN
             AND column_name NOT IN ('created_at', 'updated_at', 'last_updated_at', 'last_updated_by')
           ORDER BY ordinal_position
         LOOP
-          col_names := col_names || format('%I, ', col.column_name);
+          col_names := col_names || format('%%I, ', col.column_name);
 
           col_values := col_values || COALESCE(
             CASE col.data_type
-              WHEN 'uuid' THEN format('%L::uuid', data->>col.column_name)
-              WHEN 'integer' THEN format('%L::int', data->>col.column_name)
-              WHEN 'bigint' THEN format('%L::bigint', data->>col.column_name)
-              WHEN 'numeric' THEN format('%L::numeric', data->>col.column_name)
-              WHEN 'boolean' THEN format('%L::boolean', data->>col.column_name)
-              WHEN 'json' THEN format('%L::json', data->>col.column_name)
-              WHEN 'jsonb' THEN format('%L::jsonb', data->>col.column_name)
-              WHEN 'date' THEN format('%L::date', data->>col.column_name)
-              WHEN 'timestamp without time zone' THEN format('%L::timestamp', data->>col.column_name)
-              WHEN 'timestamp with time zone' THEN format('%L::timestamptz', data->>col.column_name)
-              ELSE format('%L', data->>col.column_name)
+              WHEN 'uuid' THEN format('%%L::uuid', data->>col.column_name)
+              WHEN 'integer' THEN format('%%L::int', data->>col.column_name)
+              WHEN 'bigint' THEN format('%%L::bigint', data->>col.column_name)
+              WHEN 'numeric' THEN format('%%L::numeric', data->>col.column_name)
+              WHEN 'boolean' THEN format('%%L::boolean', data->>col.column_name)
+              WHEN 'json' THEN format('%%L::json', data->>col.column_name)
+              WHEN 'jsonb' THEN format('%%L::jsonb', data->>col.column_name)
+              WHEN 'date' THEN format('%%L::date', data->>col.column_name)
+              WHEN 'timestamp without time zone' THEN format('%%L::timestamp', data->>col.column_name)
+              WHEN 'timestamp with time zone' THEN format('%%L::timestamptz', data->>col.column_name)
+              ELSE format('%%L', data->>col.column_name)
             END,
             'NULL'
           ) || ', ';
@@ -760,7 +736,7 @@ BEGIN
 
         IF col_names = '' THEN
           query := format(
-            'INSERT INTO %I.%I DEFAULT VALUES RETURNING row_to_json(%I.*)',
+            'INSERT INTO %%I.%%I DEFAULT VALUES RETURNING row_to_json(%%I.*)',
             entity_schema,
             entity_name,
             entity_name
@@ -770,7 +746,7 @@ BEGIN
           col_values := left(col_values, length(col_values) - 2);
 
           query := format(
-            'INSERT INTO %I.%I (%s) VALUES (%s) RETURNING row_to_json(%I.*)',
+            'INSERT INTO %%I.%%I (%%s) VALUES (%%s) RETURNING row_to_json(%%I.*)',
             entity_schema,
             entity_name,
             col_names,
@@ -782,16 +758,15 @@ BEGIN
         EXECUTE query INTO result;
 
       ELSIF operation = 'read' THEN
-
         IF id IS NULL OR id = zero_uuid THEN
           query := format(
-            'SELECT COALESCE(json_agg(row_to_json(t)), ''[]''::json) FROM %I.%I t',
+            'SELECT COALESCE(json_agg(row_to_json(t)), ''[]''::json) FROM %%I.%%I t',
             entity_schema,
             entity_name
           );
         ELSE
           query := format(
-            'SELECT row_to_json(t) FROM %I.%I t WHERE id = %L::uuid',
+            'SELECT row_to_json(t) FROM %%I.%%I t WHERE id = %%L::uuid',
             entity_schema,
             entity_name,
             id::text
@@ -801,9 +776,8 @@ BEGIN
         EXECUTE query INTO result;
 
       ELSIF operation IN ('list', 'select') THEN
-
         query := format(
-          'SELECT COALESCE(json_agg(row_to_json(t)), ''[]''::json) FROM %I.%I t',
+          'SELECT COALESCE(json_agg(row_to_json(t)), ''[]''::json) FROM %%I.%%I t',
           entity_schema,
           entity_name
         );
@@ -811,7 +785,6 @@ BEGIN
         EXECUTE query INTO result;
 
       ELSIF operation = 'update' THEN
-
         IF id IS NULL OR id = zero_uuid THEN
           RAISE EXCEPTION 'update requires a valid id';
         END IF;
@@ -825,19 +798,19 @@ BEGIN
             AND column_name NOT IN ('created_at', 'updated_at', 'last_updated_at', 'last_updated_by')
           ORDER BY ordinal_position
         LOOP
-          update_pairs := update_pairs || format('%I = ', col.column_name) || COALESCE(
+          update_pairs := update_pairs || format('%%I = ', col.column_name) || COALESCE(
             CASE col.data_type
-              WHEN 'uuid' THEN format('%L::uuid', data->>col.column_name)
-              WHEN 'integer' THEN format('%L::int', data->>col.column_name)
-              WHEN 'bigint' THEN format('%L::bigint', data->>col.column_name)
-              WHEN 'numeric' THEN format('%L::numeric', data->>col.column_name)
-              WHEN 'boolean' THEN format('%L::boolean', data->>col.column_name)
-              WHEN 'json' THEN format('%L::json', data->>col.column_name)
-              WHEN 'jsonb' THEN format('%L::jsonb', data->>col.column_name)
-              WHEN 'date' THEN format('%L::date', data->>col.column_name)
-              WHEN 'timestamp without time zone' THEN format('%L::timestamp', data->>col.column_name)
-              WHEN 'timestamp with time zone' THEN format('%L::timestamptz', data->>col.column_name)
-              ELSE format('%L', data->>col.column_name)
+              WHEN 'uuid' THEN format('%%L::uuid', data->>col.column_name)
+              WHEN 'integer' THEN format('%%L::int', data->>col.column_name)
+              WHEN 'bigint' THEN format('%%L::bigint', data->>col.column_name)
+              WHEN 'numeric' THEN format('%%L::numeric', data->>col.column_name)
+              WHEN 'boolean' THEN format('%%L::boolean', data->>col.column_name)
+              WHEN 'json' THEN format('%%L::json', data->>col.column_name)
+              WHEN 'jsonb' THEN format('%%L::jsonb', data->>col.column_name)
+              WHEN 'date' THEN format('%%L::date', data->>col.column_name)
+              WHEN 'timestamp without time zone' THEN format('%%L::timestamp', data->>col.column_name)
+              WHEN 'timestamp with time zone' THEN format('%%L::timestamptz', data->>col.column_name)
+              ELSE format('%%L', data->>col.column_name)
             END,
             'NULL'
           ) || ', ';
@@ -846,7 +819,7 @@ BEGIN
         update_pairs := left(update_pairs, length(update_pairs) - 2);
 
         query := format(
-          'UPDATE %I.%I SET %s WHERE id = %L::uuid RETURNING row_to_json(%I.*)',
+          'UPDATE %%I.%%I SET %%s WHERE id = %%L::uuid RETURNING row_to_json(%%I.*)',
           entity_schema,
           entity_name,
           update_pairs,
@@ -857,13 +830,12 @@ BEGIN
         EXECUTE query INTO result;
 
       ELSIF operation = 'delete' THEN
-
         IF id IS NULL OR id = zero_uuid THEN
           RAISE EXCEPTION 'delete requires a valid id';
         END IF;
 
         query := format(
-          'DELETE FROM %I.%I WHERE id = %L::uuid RETURNING row_to_json(%I.*)',
+          'DELETE FROM %%I.%%I WHERE id = %%L::uuid RETURNING row_to_json(%%I.*)',
           entity_schema,
           entity_name,
           id::text,
@@ -873,7 +845,7 @@ BEGIN
         EXECUTE query INTO result;
 
       ELSE
-        RAISE EXCEPTION 'Unsupported operation: %', operation;
+        RAISE EXCEPTION 'Unsupported operation: %%', operation;
       END IF;
 
       RETURN result;
@@ -1254,14 +1226,14 @@ BEGIN
 
   v_memberships := v_user->'memberships';
 
-  PERFORM ec._upsert_tenant(
-    p_sub,
-    p_entity_schema,
-    v_org_id,
-    p_roles,
-    p_permissions,
-    v_memberships
-  );
+  --PERFORM ec._upsert_tenant(
+  --  p_sub,
+  --  p_entity_schema,
+   -- v_org_id,
+  --  p_roles,
+  --  p_permissions,
+  --  v_memberships
+  --);
 
   v_app_metadata := jsonb_build_object(
     'sub', p_sub,
