@@ -1,139 +1,233 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
-import { useApiFetch } from "@/hooks/useApiFetch";
+import React, {
+    Suspense,
+    useEffect,
+    useState,
+    useCallback,
+} from "react";
+import { useSearchParams } from "next/navigation";
+export const dynamic = 'force-dynamic';
 
+import EntityComponent from "@/components/EntityComponent";
+import { settings } from "@/lib/settings";
 
-type RecordRow = { id?: string; [k: string]: any };
+type EmbedConfig = {
+    token: string | null;
+    schema: string | null;
+    apiBase: string;
+};
 
-function pickLabel(r: RecordRow): string {
+/**
+ * Inner component that uses useSearchParams and all the embed logic.
+ * Wrapped in <Suspense> by the page component below.
+ */
+function EmbedContent() {
+    const searchParams = useSearchParams();
+    const entity = searchParams.get("entity") ?? "";
+    const id = searchParams.get("id"); // optional, edit mode
+
+    const [config, setConfig] = useState<EmbedConfig | null>(null);
+    const [ready, setReady] = useState(false);
+
+    // ---------------------------------------------------------------------
+    // 1) Initial config from querystring (?token=&schema=&apiBase=)
+    // ---------------------------------------------------------------------
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        // const qsToken = searchParams.get("token");
+        // const qsSchema = searchParams.get("schema");
+        // const qsApiBase = searchParams.get("apiBase");
+        //
+        // if (!qsToken && !qsSchema && !qsApiBase) {
+        //     return;
+        // }
+        //
+        // const apiBase =
+        //     qsApiBase && qsApiBase.trim().length > 0
+        //         ? qsApiBase.trim()
+        //         : settings.API_BASE_URL;
+        //
+        // if (qsToken && qsToken.trim()) {
+        //     window.__ENTITY_CORE_JWT__ = qsToken.trim();
+        // }
+        //
+        // if (qsSchema && qsSchema.trim()) {
+        //     (window as any).__ENTITY_CORE_SCHEMA__ = qsSchema.trim();
+        // }
+        //
+        // setConfig((prev) =>
+        //     prev ??
+        //     {
+        //         token: qsToken ? qsToken.trim() : null,
+        //         schema: qsSchema ? qsSchema.trim() : null,
+        //         apiBase,
+        //     },
+        // );
+        //
+        // setReady(true);
+    }, [searchParams]);
+
+    // ---------------------------------------------------------------------
+    // 2) Notify parent that the embed is ready to receive config
+    // ---------------------------------------------------------------------
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const t = setTimeout(() => {
+            // Newer, EntityCore-ish name:
+            window.parent.postMessage({ type: "ENTITY_FORM_EMBED_READY" }, "*");
+            // Backwards-compatible legacy name (safe no-op if unused):
+            window.parent.postMessage({ type: "CRUD_EMBED_READY" }, "*");
+        }, 0);
+
+        return () => clearTimeout(t);
+    }, []);
+
+    // ---------------------------------------------------------------------
+    // 3) Listen for config from parent (token/schema/apiBase overrides)
+    // ---------------------------------------------------------------------
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        function handler(event: MessageEvent) {
+            const msg = event.data as any;
+            if (!msg || typeof msg !== "object") return;
+
+            // New contract: ENTITY_FORM_SET_CONFIG
+            if (msg.type === "ENTITY_FORM_SET_CONFIG") {
+                const token =
+                    typeof msg.token === "string" && msg.token.trim()
+                        ? msg.token.trim()
+                        : null;
+                const schema =
+                    typeof msg.schema === "string" && msg.schema.trim()
+                        ? msg.schema.trim()
+                        : null;
+                const apiBase =
+                    typeof msg.apiBase === "string" && msg.apiBase.trim().length > 0
+                        ? msg.apiBase.trim()
+                        : settings.API_BASE_URL;
+
+                // if (token) {
+                //     window.__ENTITY_CORE_JWT__ = token;
+                // }
+                if (schema) {
+                    (window as any).__ENTITY_CORE_SCHEMA__ = schema;
+                }
+
+                setConfig({ token, schema, apiBase });
+                setReady(true);
+                return;
+            }
+
+            // Legacy contract: CRUD_EMBED_CONFIG
+            if (msg.type === "CRUD_EMBED_CONFIG") {
+                const token =
+                    typeof msg.token === "string" && msg.token.trim()
+                        ? msg.token.trim()
+                        : null;
+                const schema =
+                    typeof msg.schema === "string" && msg.schema.trim()
+                        ? msg.schema.trim()
+                        : null;
+                const apiBase =
+                    typeof msg.apiBase === "string" && msg.apiBase.trim().length > 0
+                        ? msg.apiBase.trim()
+                        : settings.API_BASE_URL;
+
+                // if (token) {
+                //     window.__ENTITY_CORE_JWT__ = token;
+                // }
+                if (schema) {
+                    (window as any).__ENTITY_CORE_SCHEMA__ = schema;
+                }
+
+                setConfig({ token, schema, apiBase });
+                setReady(true);
+                return;
+            }
+        }
+
+        window.addEventListener("message", handler);
+        return () => window.removeEventListener("message", handler);
+    }, []);
+
+    // ---------------------------------------------------------------------
+    // 4) Notify parent when the form successfully saves (optional flow)
+    // ---------------------------------------------------------------------
+    const handleSaved = useCallback((payload: unknown) => {
+        if (typeof window === "undefined") return;
+        window.parent.postMessage(
+            {
+                type: "ENTITY_FORM_SAVED",
+                payload,
+            },
+            "*",
+        );
+    }, []);
+
+    // ---------------------------------------------------------------------
+    // 5) Render states
+    // ---------------------------------------------------------------------
+
+    if (!entity) {
+        return (
+            <div className="p-4 text-sm">
+                <h1 className="font-semibold mb-2">EntityCore Embed</h1>
+                <p>
+                    Missing <code>?entity=</code> query parameter.
+                </p>
+            </div>
+        );
+    }
+
+    if (!ready || !config) {
+        return (
+            <div className="p-4 text-sm">
+                <h1 className="font-semibold mb-2">EntityCore Embed</h1>
+                <p>Waiting for configuration from host application…</p>
+            </div>
+        );
+    }
+
+    // NOTE: EntityComponent currently reads API base + token indirectly
+    // via api.ts (settings + window.__ENTITY_CORE_JWT__). Once you add
+    // explicit props like apiBase/getToken/getSchema, you can do:
+    //
+    //   <EntityComponent
+    //     entity={entity}
+    //     id={id ?? undefined}
+    //     onSaved={handleSaved}
+    //     apiBase={config.apiBase}
+    //     getToken={async () => config.token}
+    //     getSchema={() => config.schema}
+    //   />
+    //
+    // For now, we just render the basic component.
     return (
-        r.full_name ??
-        r.name ??
-        r.title ??
-        r.email ??
-        r.code ??
-        r.id ??
-        'Untitled'
+        <div className="w-full h-full p-4">
+            <EntityComponent entityName={entity} />
+        </div>
     );
 }
 
-export default function EntityIndex() {
-    const rawParams = useParams();
-    const entity = useMemo(() => {
-        const val = rawParams?.['entityName'];
-        return typeof val === 'string' ? val : '';
-    }, [rawParams]);
-
-    const { isAuthenticated, login, getToken } = useAuth();
-
-    const [rows, setRows] = useState<RecordRow[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [err, setErr] = useState<string | null>(null);
-    const { apiFetch } = useApiFetch();
-
-
-    useEffect(() => {
-        if (!entity || !isAuthenticated) return; // ✅ stop early if not ready
-
-        (async () => {
-            setLoading(true);
-            setErr(null);
-            try {
-                const res = await apiFetch("/api/data", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        operation: "select",
-                        name: entity,
-                        id: null,
-                        data: {},
-                    }),
-                });
-
-                const { ok, result } = await res.json();
-                setRows(Array.isArray(result) ? result : []);
-            } catch (e: any) {
-                console.error(e);
-                setErr(e?.message || "Failed to load");
-            } finally {
-                setLoading(false);
-            }
-        })();
-    }, [entity, isAuthenticated]);
-
-    if (!entity) return <p style={{ padding: 16 }}>Missing entity name in route.</p>;
-    if (loading) return <p style={{ padding: 16 }}>Loading {entity}…</p>;
-    if (err)
-        return (
-            <p style={{ padding: 16, color: 'crimson' }}>
-                ⚠️ Error loading {entity}: {err}
-            </p>
-        );
-
+/**
+ * Page component that wraps the content in Suspense so Next is
+ * satisfied with useSearchParams() bailouts.
+ */
+export default function EmbedPage() {
     return (
-        <main style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
-            <header
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    marginBottom: 16,
-                    justifyContent: 'space-between',
-                }}
-            >
-                <div>
-                    <h1 style={{ margin: 0, textTransform: 'capitalize' }}>{entity}</h1>
-                    <p style={{ margin: 0, opacity: 0.6 }}>
-                        {rows.length} {rows.length === 1 ? 'record' : 'records'} found
-                    </p>
+        <Suspense
+            fallback={
+                <div className="p-4 text-sm">
+                    <h1 className="font-semibold mb-2">EntityCore Embed</h1>
+                    <p>Loading…</p>
                 </div>
-                <Link href={`/${entity}/00000000-0000-0000-0000-000000000000`}>
-          <span
-              style={{
-                  padding: '6px 10px',
-                  border: '1px solid #ddd',
-                  borderRadius: 8,
-                  background: '#0070f3',
-                  color: 'white',
-                  textDecoration: 'none',
-              }}
-          >
-            + Add New
-          </span>
-                </Link>
-            </header>
-
-            {rows.length === 0 ? (
-                <p style={{ opacity: 0.6 }}>No {entity} found.</p>
-            ) : (
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, borderTop: '1px solid #eee' }}>
-                    {rows.map((r, i) => {
-                        const id = r.id ?? r.uuid ?? r._id ?? String(i);
-                        return (
-                            <li
-                                key={id}
-                                style={{
-                                    padding: '10px 0',
-                                    borderBottom: '1px solid #eee',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                }}
-                            >
-                                <Link href={`/${entity}/${id}`}>
-                  <span style={{ color: '#0070f3', fontWeight: 500 }}>
-                    {pickLabel(r)}
-                  </span>
-                                </Link>
-                                <code style={{ opacity: 0.5, fontSize: '0.8em', userSelect: 'all' }}>{id}</code>
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
-        </main>
+            }
+        >
+            <EmbedContent />
+        </Suspense>
     );
 }

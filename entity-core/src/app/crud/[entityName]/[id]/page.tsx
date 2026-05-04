@@ -1,204 +1,259 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
+import React, { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+
+import EntityComponent from '@/components/EntityComponent';
+import { apiFetchRaw } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
-const EntityFormElement = "entity-form" as any;
+export const dynamic = 'force-dynamic';
 
-// 🔧 Where the form engine (entity-core-ui / crud-client) lives.
-// You can point this at entity-core-ui when that DNS is ready.
-const ENTITY_UI_ORIGIN =
-    process.env.NEXT_PUBLIC_ENTITY_UI_ORIGIN ??
-    'https://crud-client.fullstackjedi.dev';
-
-// -----------------------------------------------------------------------------
-// Custom element interface for ref typing
-// -----------------------------------------------------------------------------
-interface EntityFormElement extends HTMLElement {
-    jwt?: string | null;
+interface ManageResultPayload {
+    result?: unknown;
 }
 
-// -----------------------------------------------------------------------------
-// Define <entity-form> web component
-// -----------------------------------------------------------------------------
-function defineEntityFormElement() {
-    if (typeof window === 'undefined') return;
-    if (customElements.get('entity-form')) return;
-
-    class EntityFormElementImpl extends HTMLElement {
-        private iframe: HTMLIFrameElement | null = null;
-        private token: string | null = null;
-
-        static get observedAttributes() {
-            return ['entity', 'entity-id'];
-        }
-
-        connectedCallback() {
-            // Shadow root + iframe
-            if (!this.iframe) {
-                const shadow = this.attachShadow({ mode: 'open' });
-                const iframe = document.createElement('iframe');
-
-                iframe.style.border = '0';
-                iframe.style.width = '100%';
-                iframe.style.minHeight = '600px';
-                iframe.setAttribute('title', 'Entity form');
-
-                shadow.appendChild(iframe);
-                this.iframe = iframe;
-            }
-            this.updateIframeSrc();
-        }
-
-        attributeChangedCallback(
-            name: string,
-            oldValue: string | null,
-            newValue: string | null
-        ) {
-            if (oldValue !== newValue) {
-                this.updateIframeSrc();
-            }
-        }
-
-        // Property setter for JWT (so token is NOT exposed as an attribute)
-        set jwt(value: string | null) {
-            this.token = value;
-            this.postToken();
-        }
-
-        private updateIframeSrc() {
-            if (!this.iframe) return;
-
-            const entity = this.getAttribute('entity') ?? '';
-            const id = this.getAttribute('entity-id') ?? '';
-
-            const params = new URLSearchParams();
-            if (entity) params.set('entity', entity);
-            if (id) params.set('id', id);
-
-            const origin = ENTITY_UI_ORIGIN.replace(/\/$/, '');
-            const url = `${origin}/embed/entity?${params.toString()}`;
-
-            this.iframe.src = url;
-
-            // When iframe loads, send token (if we have one)
-            this.iframe.addEventListener(
-                'load',
-                () => {
-                    this.postToken();
-                },
-                { once: true }
-            );
-        }
-
-        private postToken() {
-            if (!this.iframe || !this.token) return;
-
-            try {
-                this.iframe.contentWindow?.postMessage(
-                    {
-                        type: 'ENTITY_FORM_SET_TOKEN',
-                        token: this.token,
-                    },
-                    ENTITY_UI_ORIGIN
-                );
-            } catch (err) {
-                console.error(
-                    '[entity-form] Failed to post token to iframe:',
-                    err
-                );
-            }
-        }
-    }
-
-    customElements.define('entity-form', EntityFormElementImpl);
+interface ManageResponse {
+    ok: boolean;
+    result?: ManageResultPayload;
+    message?: string;
 }
 
-// -----------------------------------------------------------------------------
-// Page component
-// -----------------------------------------------------------------------------
-export default function EntityDetailPage() {
-    const params = useParams() as { entityName?: string; id?: string };
-    const entityName = params.entityName ?? '';
-    const id = params.id ?? '';
+function EntityPageContent() {
+    const searchParams = useSearchParams();
 
-    const { getToken } = useAuth();
-    const [token, setToken] = useState<string | null>(null);
-    const [tokenError, setTokenError] = useState<string | null>(null);
-    const formRef = useRef<EntityFormElement | null>(null);
+    const entity = searchParams.get('entity') ?? '';
+    const id = searchParams.get('id') ?? '';
 
-    // Define custom element once on client
+    const {
+        isAuthenticated,
+        loading: authLoading,
+        login,
+        getToken,
+        disableAuth,
+    } = useAuth();
+
+    const [initialValues, setInitialValues] =
+        useState<Record<string, unknown> | null>(null);
+
+    const [loadingRow, setLoadingRow] = useState(false);
+    const [rowError, setRowError] = useState<string | null>(null);
+
+    // ---------------------------------------------------------------------
+    // Require login
+    // ---------------------------------------------------------------------
+
     useEffect(() => {
-        defineEntityFormElement();
-    }, []);
+        if (authLoading) return;
 
-    // Fetch JWT from AuthContext
+        if (!disableAuth && !isAuthenticated) {
+            login();
+        }
+    }, [authLoading, disableAuth, isAuthenticated, login]);
+
+    // ---------------------------------------------------------------------
+    // Load existing entity row
+    // ---------------------------------------------------------------------
+
     useEffect(() => {
+        if (!entity || !id) return;
+
+        if (authLoading) return;
+
+        if (!disableAuth && !isAuthenticated) return;
+
         let cancelled = false;
 
-        (async () => {
+        async function loadEntityRow() {
+            setLoadingRow(true);
+            setRowError(null);
+
             try {
-                const t = await getToken();
-                if (!cancelled) {
-                    setToken(t ?? null);
-                    if (!t) {
-                        setTokenError('No access token available.');
-                    }
+                // ---------------------------------------------------------
+                // Get Auth0 access token
+                // ---------------------------------------------------------
+
+                const token = disableAuth
+                    ? null
+                    : await getToken();
+
+                if (!disableAuth && !token) {
+                    throw new Error('Failed to obtain access token');
                 }
-            } catch (err) {
-                console.error('[EntityDetailPage] getToken error:', err);
+
+                // ---------------------------------------------------------
+                // Load entity row
+                // ---------------------------------------------------------
+
+                const resp = await apiFetchRaw(
+                    '/manage',
+                    token ?? '',
+                    {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            operation: 'read',
+                            target: entity,
+                            id,
+                            args: {},
+                            meta: {
+                                source: 'entity/page',
+                            },
+                        }),
+                    },
+                );
+
+                if (!resp.ok) {
+                    const text = await resp.text();
+
+                    throw new Error(
+                        `manage read failed: ${resp.status} ${resp.statusText}${
+                            text ? ` - ${text}` : ''
+                        }`,
+                    );
+                }
+
+                const json = (await resp.json()) as ManageResponse;
+
+                if (!json.ok) {
+                    throw new Error(
+                        json.message || 'manage returned !ok',
+                    );
+                }
+
+                const inner = json.result ?? {};
+
+                const row = (inner.result ??
+                    null) as Record<string, unknown> | null;
+
                 if (!cancelled) {
-                    setTokenError('Failed to acquire access token.');
-                    setToken(null);
+                    setInitialValues(row);
+                }
+            } catch (err: unknown) {
+                console.error(
+                    '[entity/page] Failed to load row:',
+                    err,
+                );
+
+                if (!cancelled) {
+                    setRowError(
+                        err instanceof Error
+                            ? err.message
+                            : 'Unknown error loading entity',
+                    );
+
+                    setInitialValues(null);
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoadingRow(false);
                 }
             }
-        })();
+        }
+
+        loadEntityRow();
 
         return () => {
             cancelled = true;
         };
-    }, [getToken]);
+    }, [
+        entity,
+        id,
+        authLoading,
+        disableAuth,
+        isAuthenticated,
+        getToken,
+    ]);
 
-    // Push JWT into the web component via property setter
-    useEffect(() => {
-        if (!formRef.current) return;
-        if (!token) return;
+    // ---------------------------------------------------------------------
+    // UI states
+    // ---------------------------------------------------------------------
 
-        formRef.current.jwt = token;
-    }, [token]);
-
-    if (!entityName || !id) {
+    if (authLoading) {
         return (
-            <div className="p-4">
-                <h1 className="text-xl font-semibold mb-2">Entity detail</h1>
-                <p className="text-sm text-gray-600">
-                    Missing entity type or id in the URL.
+            <main className="p-6 max-w-3xl mx-auto">
+                <p className="text-gray-600">
+                    Initializing authentication...
                 </p>
-            </div>
+            </main>
         );
     }
 
-    return (
-        <div className="p-4 space-y-3">
-            <h1 className="text-xl font-semibold">Entity detail</h1>
-
-            {tokenError && (
-                <p className="text-sm text-red-600">
-                    {tokenError} Forms may not be able to load data.
+    if (!disableAuth && !isAuthenticated) {
+        return (
+            <main className="p-6 max-w-3xl mx-auto">
+                <p className="text-gray-600">
+                    Redirecting to login...
                 </p>
-            )}
+            </main>
+        );
+    }
 
-            {/* Web component host */}
-            {/* Web component host */}
-            <EntityFormElement
-                ref={formRef as any}
-                entity={entityName}
-                entity-id={id}
-                /* same props as before */
-            >
-            </EntityFormElement>
+    if (!entity) {
+        return (
+            <main className="p-6 max-w-3xl mx-auto">
+                <h1 className="text-xl font-semibold mb-2">
+                    Entity form
+                </h1>
 
-        </div>
+                <p className="text-gray-600">
+                    Missing <code>entity</code> query parameter.
+                </p>
+            </main>
+        );
+    }
+
+    if (id && loadingRow) {
+        return (
+            <main className="p-6 max-w-3xl mx-auto">
+                <h1 className="text-xl font-semibold mb-2">
+                    Edit {entity}
+                </h1>
+
+                <p className="text-gray-600">
+                    Loading existing record...
+                </p>
+            </main>
+        );
+    }
+
+    if (id && rowError) {
+        return (
+            <main className="p-6 max-w-3xl mx-auto">
+                <h1 className="text-xl font-semibold mb-2">
+                    Edit {entity}
+                </h1>
+
+                <p className="text-red-600 mb-2">
+                    Could not load existing record: {rowError}
+                </p>
+            </main>
+        );
+    }
+
+    // ---------------------------------------------------------------------
+    // Render entity form
+    // ---------------------------------------------------------------------
+
+    return (
+        <main className="p-6 max-w-3xl mx-auto">
+            <EntityComponent
+                entityName={entity}
+                initialValues={initialValues ?? undefined}
+            />
+        </main>
+    );
+}
+
+export default function EntityPage() {
+    return (
+        <Suspense
+            fallback={
+                <main className="p-6 max-w-3xl mx-auto">
+                    <p className="text-gray-600">Loading...</p>
+                </main>
+            }
+        >
+            <EntityPageContent />
+        </Suspense>
     );
 }

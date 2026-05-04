@@ -47,12 +47,19 @@ export function useAuthInfo() {
         claims?.permissions ||
         [];
 
+    const entity_schema =
+        claims?.["https://fullstackjedi.dev/entity_schema"] ||
+        claims?.permissions ||
+        [];
+
     return {
         user,
         token,
         claims,
         roles,
         permissions,
+        org_id,
+        entity_schema,
         isAuthenticated,
         logout,
         login,
