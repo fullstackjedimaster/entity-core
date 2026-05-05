@@ -23,12 +23,12 @@ export function useApi() {
           },
 
           get: async (id:string, entityName: string) => {
-            const resp = await authedFetch(`/api/entities/${entityName}/${id}`);
+            const resp = await authedFetch(`/api/${entityName}/${id}`);
             return handle(resp);
           },
 
           create: async (entityName:string, payload: any) => {
-            const resp = await authedFetch(`/api/entities/${entityName}`, {
+            const resp = await authedFetch(`/api/${entityName}`, {
               method: 'POST',
               body: JSON.stringify(payload),
             });
@@ -36,7 +36,7 @@ export function useApi() {
           },
 
           update: async (entityName: string, id:string, payload: any) => {
-            const resp = await authedFetch(`/api/entities/${entityName}/${id}`, {
+            const resp = await authedFetch(`/api/${entityName}/${id}`, {
               method: 'PUT',
               body: JSON.stringify(payload),
             });
@@ -44,7 +44,7 @@ export function useApi() {
           },
 
           delete: async (entityName: string) => {
-            const resp = await authedFetch(`/api/entities/${entityName}`, {
+            const resp = await authedFetch(`/api/${entityName}`, {
               method: 'DELETE',
             });
             return handle(resp);

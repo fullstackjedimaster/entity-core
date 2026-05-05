@@ -7,7 +7,6 @@ import { useApi } from '@/lib/apiCrud';
 
 interface EntityItemInfo {
     id:string;
-    entity_name: string;
 }
 
 import { useParams } from "next/navigation";
@@ -83,10 +82,10 @@ function EntityItemIndexInner() {
 
       <ul className="border divide-y rounded">
         {items.map((item) => (
-          <li key={item.entity_name} className="p-4 flex justify-between">
-            <span>{item.entity_name}</span>
+          <li key={item.id} className="p-4 flex justify-between">
+            <span>{item.id}</span>
             <Link
-              href={`/${item.entity_name}/${item.id}`}
+              href={`/${item.id}`}
               className="text-blue-600 hover:underline"
             >
               View / Edit →
