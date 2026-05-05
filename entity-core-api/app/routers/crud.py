@@ -9,7 +9,7 @@ from app.core.model_client import call_model_manage
 from app.schemas import CreateEntityBody, RequestEnvelope, EntityResponse
 
 router = APIRouter(
-    prefix="/api",
+    prefix="/api/crud",
     dependencies=[Depends(require_jwt())]
 )
 

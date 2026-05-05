@@ -18,17 +18,17 @@ export function useApi() {
       return {
         items: {
           list: async (entityName: string) => {
-            const resp = await authedFetch(`/api/${entityName}`);
+            const resp = await authedFetch(`/api/crud/${entityName}`);
             return handle(resp);
           },
 
           get: async (id:string, entityName: string) => {
-            const resp = await authedFetch(`/api/${entityName}/${id}`);
+            const resp = await authedFetch(`/api/crud/${entityName}/${id}`);
             return handle(resp);
           },
 
           create: async (entityName:string, payload: any) => {
-            const resp = await authedFetch(`/api/${entityName}`, {
+            const resp = await authedFetch(`/api/crud/${entityName}`, {
               method: 'POST',
               body: JSON.stringify(payload),
             });
@@ -36,7 +36,7 @@ export function useApi() {
           },
 
           update: async (entityName: string, id:string, payload: any) => {
-            const resp = await authedFetch(`/api/${entityName}/${id}`, {
+            const resp = await authedFetch(`/api/crud/${entityName}/${id}`, {
               method: 'PUT',
               body: JSON.stringify(payload),
             });
@@ -44,7 +44,7 @@ export function useApi() {
           },
 
           delete: async (entityName: string) => {
-            const resp = await authedFetch(`/api/${entityName}`, {
+            const resp = await authedFetch(`/api/crud/${entityName}`, {
               method: 'DELETE',
             });
             return handle(resp);
