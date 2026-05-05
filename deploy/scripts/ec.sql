@@ -931,9 +931,6 @@ BEGIN
       WHERE entity_schema = p_entity_schema
         AND entity_name = p_entity_name;
 
-      IF tmpl IS NULL THEN
-        RAISE EXCEPTION 'No entity_json found ';
-
       RETURN QUERY EXECUTE format(
         'SELECT DISTINCT j->>%%L AS value
          FROM jsonb_array_elements($1->%%L->%%L) AS j
