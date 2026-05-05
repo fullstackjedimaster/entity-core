@@ -54,12 +54,7 @@ export default function EntityCrudIndexPage() {
     <div className="p-6 max-w-2xl mx-auto space-y-6">
       <h1 className="text-2xl font-semibold">Entities</h1>
 
-      <Link
-        href="/entity/new"
-        className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-      >
-        + Create New Entity
-      </Link>
+
 
       {loading && <p>Loading…</p>}
       {error && <p className="text-red-600">Error: {error}</p>}
@@ -78,15 +73,16 @@ export default function EntityCrudIndexPage() {
             >
               View / Edit →
             </Link>
-          </li>
-        ))}
-      </ul>
-            <Link
+               <Link
               href={`/${entityParam}/{00000000-0000-0000-0000-000000000000}`}
               className="text-blue-600 hover:underline"
             >
               Create →
             </Link>
+          </li>
+        ))}
+      </ul>
+
     </div>
   );
 }
