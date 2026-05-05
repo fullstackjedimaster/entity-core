@@ -30,7 +30,7 @@ export default function EntityItemIndexPage() {
 function EntityItemIndexInner() {
 
     const params = useParams();
-    const entityParam = params?.entity as string;
+    const entityParam = params?.entityName as string;
 
   const api = useApi();
   const { isAuthenticated, login, loading: authLoading, disableAuth } = useAuth();
