@@ -13,7 +13,7 @@ class RequestEnvelope(BaseModel):
     operation: Operation
     target: str                      # entity name OR action name
     id: Optional[str] = None         # GUID row id or correlation id
-    args: Optional[Dict[str, Any]] = None  # data payload
+    data: Optional[Dict[str, Any]] = None  # data payload
     meta: Optional[Dict[str, Any]] = None  # tracing or UI state
 
 

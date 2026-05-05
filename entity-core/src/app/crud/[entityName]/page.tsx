@@ -55,7 +55,7 @@ function EntityDataItemIndexInner() {
         setError(null);
 
       const data = await api.entityDataItems.list(entityParam);
-      setEntityDataItems(data.entityDataItems ?? []);
+      setEntityDataItems(data.items ?? []);
       } catch (err: any) {
           console.error(err);
           setError(err.message);
@@ -85,13 +85,13 @@ function EntityDataItemIndexInner() {
           <li key={entityDataItem.id} className="p-4 flex justify-between">
             <span>{entityDataItem.id}</span>
             <Link
-              href={`/${entityDataItem.id}`}
+             href={`/crud/${entityParam}/${entityDataItem.id}`}
               className="text-blue-600 hover:underline"
             >
               View / Edit →
             </Link>
                <Link
-              href={`/${entityParam}/{00000000-0000-0000-0000-000000000000}`}
+              href={`/crud/${entityParam}/00000000-0000-0000-0000-000000000000`}
               className="text-blue-600 hover:underline"
             >
               Create →
