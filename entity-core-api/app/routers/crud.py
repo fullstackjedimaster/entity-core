@@ -53,7 +53,7 @@ async def list_items(
 
     envelope = RequestEnvelope(
         operation="list",
-        target=f"{entity_schema}.{entity}",
+        target=f"{entity}",
         id=None,
         args=None,
         meta={"source": "entity-core:/api/entities"},
