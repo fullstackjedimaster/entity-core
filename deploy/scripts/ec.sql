@@ -903,86 +903,94 @@ BEGIN
       RETURN result;
     END;
     $fn$
+  $sql$, p_entity_schema);
 
-    $sql$, p_entity_schema);
+  EXECUTE format('ALTER FUNCTION %1$I.manage_entity(TEXT, TEXT, TEXT, UUID, JSONB) OWNER TO %1$I', p_entity_schema);
+  EXECUTE format('REVOKE ALL ON FUNCTION %1$I.manage_entity(TEXT, TEXT, TEXT, UUID, JSONB) FROM PUBLIC', p_entity_schema);
+  EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.manage_entity(TEXT, TEXT, TEXT, UUID, JSONB) TO ec_app', p_entity_schema);
+  EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.manage_entity(TEXT, TEXT, TEXT, UUID, JSONB) TO %1$I', p_entity_schema);
 
+  EXECUTE format($sql$
+    CREATE OR REPLACE FUNCTION %1$I.get_column_options(
+      p_entity_schema TEXT,
+      p_entity_name TEXT,
+      p_column_name TEXT,
+      p_filter TEXT DEFAULT NULL
+    )
+    RETURNS TABLE (value TEXT)
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = %1$I, public
+    AS $opt$
+    DECLARE
+      tmpl JSONB;
+    BEGIN
+      SELECT entity_json
+      INTO tmpl
+      FROM %1$I.entity
+      WHERE entity_schema = p_entity_schema
+        AND entity_name = p_entity_name;
 
-    EXECUTE format('ALTER FUNCTION %1$I.manage_entity(TEXT, TEXT, TEXT, UUID, JSONB) OWNER TO %1$I', p_entity_schema);
-    EXECUTE format('REVOKE ALL ON FUNCTION %1$I.manage_entity(TEXT, TEXT, TEXT, UUID, JSONB) FROM PUBLIC', p_entity_schema);
-    EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.manage_entity(TEXT, TEXT, TEXT, UUID, JSONB) TO ec_app', p_entity_schema);
-    EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.manage_entity(TEXT, TEXT, TEXT, UUID, JSONB) TO %1$I', p_entity_schema);
+      IF tmpl IS NULL THEN
+        RAISE EXCEPTION 'No entity_json found for schema %, entity %',
+          p_entity_schema,
+          p_entity_name;
+      END IF;
 
-
-    EXECUTE format($sql$
-        CREATE OR REPLACE FUNCTION %1$I.get_column_options(
-        p_entity_schema TEXT,
-        p_entity_name TEXT,
-        p_column_name TEXT,
-        p_filter TEXT DEFAULT NULL
-        )
-        RETURNS TABLE (value TEXT)
-        LANGUAGE plpgsql AS $opt$
-        DECLARE
-        tmpl JSONB;
-        BEGIN
-        -- Fetch entity for schema + entity
-        SELECT entity_json INTO tmpl
-        FROM %1$I.entity
-        WHERE entity_schema = p_entity_schema AND entity_name = p_entity_name;
-
-        IF tmpl IS NULL THEN
-        RAISE EXCEPTION 'No entity_json found for  ', p_entity_schema, p_entity_name;
-        END IF;
-
-        RETURN QUERY EXECUTE format(
-        'SELECT DISTINCT j->>%L AS value
-         FROM jsonb_array_elements($1->''entity_json''->%L->%L) AS j
-         WHERE j->>%L IS NOT NULL %s
+      RETURN QUERY EXECUTE format(
+        'SELECT DISTINCT j->>%%L AS value
+         FROM jsonb_array_elements($1->%%L->%%L) AS j
+         WHERE j->>%%L IS NOT NULL %%s
          ORDER BY value',
-         p_column_name, p_entity_name, p_column_name, p_column_name,
-         CASE WHEN p_filter IS NOT NULL THEN
-           format('AND j->>%L ILIKE ''%%%s%%''', p_column_name, p_filter)
-         ELSE
-           ''
-         END
-        ) USING tmpl;
-        END;
-        $opt$
-    $sql$, p_entity_schema);
+        p_column_name,
+        p_entity_name,
+        p_column_name,
+        p_column_name,
+        CASE
+          WHEN p_filter IS NOT NULL THEN
+            format('AND j->>%%L ILIKE %%L', p_column_name, '%%' || p_filter || '%%')
+          ELSE
+            ''
+        END
+      ) USING tmpl;
+    END;
+    $opt$
+  $sql$, p_entity_schema);
 
-    EXECUTE format('ALTER FUNCTION %1$I.get_column_options(TEXT, TEXT, TEXT, TEXT) OWNER TO %1$I', p_entity_schema);
-    EXECUTE format('REVOKE ALL ON FUNCTION %1$I.get_column_options(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC', p_entity_schema);
-    EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_column_options(TEXT, TEXT, TEXT, TEXT) TO ec_app', p_entity_schema);
-    EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_column_options(TEXT, TEXT, TEXT,TEXT) TO %1$I', p_entity_schema);
+  EXECUTE format('ALTER FUNCTION %1$I.get_column_options(TEXT, TEXT, TEXT, TEXT) OWNER TO %1$I', p_entity_schema);
+  EXECUTE format('REVOKE ALL ON FUNCTION %1$I.get_column_options(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC', p_entity_schema);
+  EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_column_options(TEXT, TEXT, TEXT, TEXT) TO ec_app', p_entity_schema);
+  EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_column_options(TEXT, TEXT, TEXT, TEXT) TO %1$I', p_entity_schema);
 
+  EXECUTE format($sql$
+    CREATE OR REPLACE FUNCTION %1$I.get_form_metadata(
+      p_entity_schema TEXT,
+      p_entity_name TEXT
+    )
+    RETURNS TABLE (entity_json JSONB)
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = %1$I, public
+    AS $form$
+    BEGIN
+      RETURN QUERY
+      SELECT e.entity_json
+      FROM %1$I.entity e
+      WHERE e.entity_schema = p_entity_schema
+        AND e.entity_name = p_entity_name;
+    END;
+    $form$
+  $sql$, p_entity_schema);
 
-    EXECUTE format($sql$
-        CREATE OR REPLACE FUNCTION %1$I.get_form_metadata(
-        p_entity_schema TEXT,
-        p_entity_name TEXT
-        )
-        RETURNS TABLE (entity_json JSONB)
-        LANGUAGE plpgsql AS $form$
-        BEGIN
-        SELECT entity_json
-        FROM %1$I.entity
-        WHERE entity_schema = p_entity_schema AND entity_name = p_entity_name;
-        END;
-        $form$
-    $sql$, p_entity_schema);
-
-    EXECUTE format('ALTER FUNCTION %1$I.get_form_metadata(TEXT, TEXT) OWNER TO %1$I', p_entity_schema);
-    EXECUTE format('REVOKE ALL ON FUNCTION %1$I.get_form_metadata(TEXT, TEXT) FROM PUBLIC', p_entity_schema);
-    EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_form_metadata(TEXT, TEXT) TO ec_app', p_entity_schema);
-    EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_form_metadata(TEXT, TEXT) TO %1$I', p_entity_schema);
-
-
+  EXECUTE format('ALTER FUNCTION %1$I.get_form_metadata(TEXT, TEXT) OWNER TO %1$I', p_entity_schema);
+  EXECUTE format('REVOKE ALL ON FUNCTION %1$I.get_form_metadata(TEXT, TEXT) FROM PUBLIC', p_entity_schema);
+  EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_form_metadata(TEXT, TEXT) TO ec_app', p_entity_schema);
+  EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_form_metadata(TEXT, TEXT) TO %1$I', p_entity_schema);
 
   EXECUTE format('ALTER SCHEMA %1$I OWNER TO %1$I', p_entity_schema);
   EXECUTE format('GRANT USAGE ON SCHEMA %1$I TO ec_app', p_entity_schema);
   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA %1$I TO ec_app', p_entity_schema);
   EXECUTE format('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA %1$I TO ec_app', p_entity_schema);
-
 END;
 $$;
 
