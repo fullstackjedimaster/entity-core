@@ -81,7 +81,7 @@ class TenantBody(BaseModel):
 
 
 class CreateEntityBody(BaseModel):
-    data:  Dict[str, Any]
+    entity_json:  Dict[str, Any]
 
 @dataclass
 class TenantContext:
