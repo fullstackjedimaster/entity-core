@@ -24,7 +24,7 @@ type EmbedConfig = {
  */
 function EmbedContent() {
     const searchParams = useSearchParams();
-    const entity = searchParams.get("entity") ?? "";
+    const entityName = searchParams.get("entityName") ?? "";
     const id = searchParams.get("id"); // optional, edit mode
 
     const [config, setConfig] = useState<EmbedConfig | null>(null);
@@ -172,7 +172,7 @@ function EmbedContent() {
     // 5) Render states
     // ---------------------------------------------------------------------
 
-    if (!entity) {
+    if (!entityName) {
         return (
             <div className="p-4 text-sm">
                 <h1 className="font-semibold mb-2">EntityCore Embed</h1>
@@ -208,7 +208,7 @@ function EmbedContent() {
     // For now, we just render the basic component.
     return (
         <div className="w-full h-full p-4">
-            <EntityComponent entityName={entity} />
+            <EntityComponent entityName={entityName} />
         </div>
     );
 }
