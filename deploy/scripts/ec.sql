@@ -383,9 +383,9 @@ ALTER FUNCTION ec.manage_entity(TEXT, TEXT, TEXT, UUID, JSONB) OWNER TO ec;
 GRANT EXECUTE ON FUNCTION ec.manage_entity(TEXT, TEXT, TEXT, UUID, JSONB) TO ec_app;
 
 CREATE OR REPLACE FUNCTION ec.get_column_options(
-  p_schema TEXT,
-  p_entity TEXT,
-  p_column TEXT,
+  p_entity_schema TEXT,
+  p_entity_name TEXT,
+  p_column_name TEXT,
   p_filter TEXT DEFAULT NULL
 )
 RETURNS TABLE (value TEXT)
@@ -396,10 +396,10 @@ BEGIN
   -- Fetch entity for schema + entity
   SELECT entity_json INTO tmpl
   FROM ec.entity
-  WHERE schema = p_schema AND entity = p_entity;
+  WHERE entity_schema = p_entity_schema AND entity_name = p_entity_name;
 
   IF tmpl IS NULL THEN
-    RAISE EXCEPTION 'No entity_json found for %.%', p_schema, p_entity;
+    RAISE EXCEPTION 'No entity_json found for %.%', p_entity_schema, p_entity_name;
   END IF;
 
   RETURN QUERY EXECUTE format(
@@ -407,9 +407,9 @@ BEGIN
      FROM jsonb_array_elements($1->''entity_json''->%L->%L) AS j
      WHERE j->>%L IS NOT NULL %s
      ORDER BY value',
-     p_column, p_entity, p_column, p_column,
+     p_column_name, p_entity_name, p_column_name, p_column_name,
      CASE WHEN p_filter IS NOT NULL THEN
-       format('AND j->>%L ILIKE ''%%%s%%''', p_column, p_filter)
+       format('AND j->>%L ILIKE ''%%%s%%''', p_column_name, p_filter)
      ELSE
        ''
      END
@@ -421,20 +421,20 @@ ALTER FUNCTION ec.get_column_options(TEXT, TEXT, TEXT, TEXT) OWNER TO ec;
 GRANT EXECUTE ON FUNCTION ec.get_column_options(TEXT, TEXT, TEXT, TEXT) TO ec_app;
 
 CREATE OR REPLACE FUNCTION ec.get_form_metadata(
-  p_schema TEXT,
-  p_entity TEXT
+  p_entity_schema TEXT,
+  p_entity_name TEXT
 )
 RETURNS TABLE (entity_json JSONB)
 LANGUAGE plpgsql AS $form$
 BEGIN
   SELECT entity_json
   FROM ec.entity
-  WHERE schema = p_schema AND entity = p_entity;
+  WHERE entity_schema = p_entity_schema AND entity_name = p_entity_name;
 END;
 $form$;
 
-ALTER FUNCTION ec.get_form_metadata(TEXT, TEXT, TEXT, TEXT) OWNER TO ec;
-GRANT EXECUTE ON FUNCTION ec.get_form_metadata(TEXT, TEXT, TEXT, TEXT) TO ec_app;
+ALTER FUNCTION ec.get_form_metadata(TEXT, TEXT) OWNER TO ec;
+GRANT EXECUTE ON FUNCTION ec.get_form_metadata(TEXT, TEXT) TO ec_app;
 -- =========================================================
 -- TENANT BOOTSTRAP
 -- =========================================================
