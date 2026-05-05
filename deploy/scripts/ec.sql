@@ -969,13 +969,14 @@ BEGIN
         WHERE entity_schema = p_entity_schema AND entity_name = p_entity_name;
         END;
         $form$;
+    $sql$, p_entity_schema);
 
     EXECUTE format('ALTER FUNCTION %1$I.get_form_metadata(TEXT, TEXT) OWNER TO %1$I', p_entity_schema);
     EXECUTE format('REVOKE ALL ON FUNCTION %1$I.get_form_metadata(TEXT, TEXT) FROM PUBLIC', p_entity_schema);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_form_metadata(TEXT, TEXT) TO ec_app', p_entity_schema);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_form_metadata(TEXT, TEXT) TO %1$I', p_entity_schema);
 
-    $sql$, p_entity_schema);
+
 
   EXECUTE format('ALTER SCHEMA %1$I OWNER TO %1$I', p_entity_schema);
   EXECUTE format('GRANT USAGE ON SCHEMA %1$I TO ec_app', p_entity_schema);
