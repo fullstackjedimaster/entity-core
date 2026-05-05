@@ -455,7 +455,9 @@ BEGIN
     FROM pg_roles
     WHERE rolname = p_entity_schema
   ) THEN
-    EXECUTE format('CREATE ROLE %I NOLOGIN', p_entity_schema);
+    EXECUTE format($sql$
+        CREATE ROLE %1$I NOLOGIN;
+        $sql$, p_entity_schema);
   END IF;
 
   EXECUTE format('GRANT %I TO ec', p_entity_schema);
