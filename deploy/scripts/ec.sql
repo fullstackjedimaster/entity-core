@@ -931,7 +931,7 @@ BEGIN
         WHERE entity_schema = p_entity_schema AND entity_name = p_entity_name;
 
         IF tmpl IS NULL THEN
-        RAISE EXCEPTION 'No entity_json found for %.%', p_entity_schema, p_entity_name;
+        RAISE EXCEPTION 'No entity_json found for  ', p_entity_schema, p_entity_name;
         END IF;
 
         RETURN QUERY EXECUTE format(
