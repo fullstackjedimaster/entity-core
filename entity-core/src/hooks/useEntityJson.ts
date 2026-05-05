@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useApiFetch } from "@/hooks/useApiFetch";
 
 export interface EntityJsonState {
-    entityName: any | null;
+    entity: any | null;
     loading: boolean;
     error: string | null;
 }
@@ -51,5 +51,5 @@ export function useEntityJson(entityName?: string | null): EntityJsonState {
         };
     }, [entityName, apiFetch]);
 
-    return { entityJson, loading, error };
+    return { entity, loading, error };
 }
