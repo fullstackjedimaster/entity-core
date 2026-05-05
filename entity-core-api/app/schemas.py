@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from dataclasses import dataclass
 
 
-Operation = Literal["create", "read", "update", "delete", "execute"]
+Operation = Literal["create", "read", "update", "delete", "list", "execute"]
 
 
 class RequestEnvelope(BaseModel):
@@ -21,6 +21,9 @@ class RequestEnvelope(BaseModel):
 
 class EntityResponse(BaseModel):
     entity: str = None
+
+class EntityItemResponse(BaseModel):
+    entityItem: str = None
 
 
 class RequestResult(BaseModel):
@@ -51,7 +54,7 @@ class DBUserWithAuth(DBUser):
     roles: List[str] = Field(default_factory=list)
     permissions: List[str] = Field(default_factory=list)
     org_id: Optional[str] = None   # ✅ ensures front-end gets org_id cleanly
-
+    entity_schema: Optional[str] = None
 
 # ------------------------------------------------------------
 # Provisioning (during onboarding)
@@ -78,7 +81,7 @@ class TenantBody(BaseModel):
 
 
 class CreateEntityBody(BaseModel):
-    entity_json: dict
+    data:  Dict[str, Any]
 
 @dataclass
 class TenantContext:
