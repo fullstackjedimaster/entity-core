@@ -947,7 +947,7 @@ BEGIN
          END
         ) USING tmpl;
         END;
-        $opt$;
+        $opt$
     $sql$, p_entity_schema);
 
     EXECUTE format('ALTER FUNCTION %1$I.get_column_options(TEXT, TEXT, TEXT, TEXT) OWNER TO %1$I', p_entity_schema);
@@ -968,7 +968,7 @@ BEGIN
         FROM %1$I.entity
         WHERE entity_schema = p_entity_schema AND entity_name = p_entity_name;
         END;
-        $form$;
+        $form$
     $sql$, p_entity_schema);
 
     EXECUTE format('ALTER FUNCTION %1$I.get_form_metadata(TEXT, TEXT) OWNER TO %1$I', p_entity_schema);
