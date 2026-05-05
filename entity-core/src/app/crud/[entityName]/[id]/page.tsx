@@ -86,7 +86,7 @@ function EntityPageContent() {
                 // ---------------------------------------------------------
 
                 const resp = await apiFetchRaw(
-                    '/manage',
+                    '/data',
                     token ?? '',
                     {
                         method: 'POST',

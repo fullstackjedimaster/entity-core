@@ -5,7 +5,7 @@ import { useApi } from '@/lib/apiCrud';
 
 
 
-interface EntityItemInfo {
+interface EntityDataItemInfo {
     id:string;
 }
 
@@ -13,7 +13,7 @@ import { useParams } from "next/navigation";
 import { Suspense, useState, useEffect} from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
-export default function EntityItemIndexPage() {
+export default function EntityDataItemIndexPage() {
     return (
         <Suspense
             fallback={
@@ -22,12 +22,12 @@ export default function EntityItemIndexPage() {
                 </main>
             }
         >
-            <EntityItemIndexInner />
+            <EntityDataItemIndexInner />
         </Suspense>
     );
 }
 
-function EntityItemIndexInner() {
+function EntityDataItemIndexInner() {
 
     const params = useParams();
     const entityParam = params?.entityName as string;
@@ -35,7 +35,7 @@ function EntityItemIndexInner() {
   const api = useApi();
   const { isAuthenticated, login, loading: authLoading, disableAuth } = useAuth();
 
-  const [items, setItems] = useState<EntityItemInfo[]>([]);
+  const [entityDataItems, setEntityDataItems] = useState<EntityDataItemInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,8 +54,8 @@ function EntityItemIndexInner() {
         setLoading(true);
         setError(null);
 
-      const data = await api.items.list(entityParam);
-      setItems(data.items ?? []);
+      const data = await api.entityDataItems.list(entityParam);
+      setEntityDataItems(data.items ?? []);
       } catch (err: any) {
           console.error(err);
           setError(err.message);
@@ -76,16 +76,16 @@ function EntityItemIndexInner() {
       {loading && <p>Loading…</p>}
       {error && <p className="text-red-600">Error: {error}</p>}
 
-      {!loading && !error && items.length === 0 && (
+      {!loading && !error && entityDataItems.length === 0 && (
         <p className="text-gray-600">No entities found.</p>
       )}
 
       <ul className="border divide-y rounded">
-        {items.map((item) => (
-          <li key={item.id} className="p-4 flex justify-between">
-            <span>{item.id}</span>
+        {entityDataItems.map((entityDataItem) => (
+          <li key={entityDataItem.id} className="p-4 flex justify-between">
+            <span>{entityDataItem.id}</span>
             <Link
-              href={`/${item.id}`}
+              href={`/${entityDataItem.id}`}
               className="text-blue-600 hover:underline"
             >
               View / Edit →
