@@ -55,7 +55,7 @@ function EntityDataItemIndexInner() {
         setError(null);
 
       const data = await api.entityDataItems.list(entityParam);
-      setEntityDataItems(data.items ?? []);
+      setEntityDataItems(data.entityDataItems ?? []);
       } catch (err: any) {
           console.error(err);
           setError(err.message);
