@@ -26,7 +26,7 @@ export type FormMetadata = {
  */
 export function useFormMetadata(entityName?: string) {
     const { apiFetch } = useApiFetch();
-    const shouldFetch = !!entity;
+    const shouldFetch = !!entityName;
 
     const fetcher = async (url: string): Promise<FormMetadata> => {
         const res = await apiFetch(url);
