@@ -1,20 +1,38 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 import { useApi } from '@/lib/apiCrud';
-import { useAuth } from '@/contexts/AuthContext';
-import {useParams} from "next/navigation";
 
-const params = useParams();
-const entityParam = params?.entity as string;
+
 
 interface EntityItemInfo {
     id:string;
     entity_name: string;
 }
 
-export default function EntityCrudIndexPage() {
+import { useParams } from "next/navigation";
+import { Suspense, useState, useEffect} from "react";
+import { useAuth } from "@/contexts/AuthContext";
+
+export default function EntityItemIndexPage() {
+    return (
+        <Suspense
+            fallback={
+                <main className="p-6 max-w-md mx-auto">
+                    <p className="text-gray-700">Loading entity…</p>
+                </main>
+            }
+        >
+            <EntityItemIndexInner />
+        </Suspense>
+    );
+}
+
+function EntityItemIndexInner() {
+
+    const params = useParams();
+    const entityParam = params?.entity as string;
+
   const api = useApi();
   const { isAuthenticated, login, loading: authLoading, disableAuth } = useAuth();
 
