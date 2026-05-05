@@ -25,7 +25,7 @@ export function useApi() {
               "id": "00000000-0000-0000-0000-000000000000",
               "data": {}
             }
-             const resp = await authedFetch(`/api/crud`, {
+             const resp = await authedFetch(`/api/crud/${entityName}`, {
               method: 'POST',
               body: JSON.stringify(payload),
             });
