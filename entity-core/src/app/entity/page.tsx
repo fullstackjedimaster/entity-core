@@ -74,7 +74,7 @@ export default function EntityIndexPage() {
               View / Edit →
             </Link>
             <Link
-              href={`/crud/${ent.entity_name}?`}
+              href={`/crud/${ent.entity_name}`}
               className="text-blue-600 hover:underline"
             >
               crud →
