@@ -932,10 +932,7 @@ BEGIN
         AND entity_name = p_entity_name;
 
       IF tmpl IS NULL THEN
-        RAISE EXCEPTION 'No entity_json found for schema %, entity %',
-          p_entity_schema,
-          p_entity_name;
-      END IF;
+        RAISE EXCEPTION 'No entity_json found ';
 
       RETURN QUERY EXECUTE format(
         'SELECT DISTINCT j->>%%L AS value
