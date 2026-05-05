@@ -6,7 +6,7 @@ import React, {
     useState,
     useCallback,
 } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 export const dynamic = 'force-dynamic';
 
 import EntityComponent from "@/components/EntityComponent";
@@ -23,9 +23,9 @@ type EmbedConfig = {
  * Wrapped in <Suspense> by the page component below.
  */
 function EmbedContent() {
-    const searchParams = useSearchParams();
-    const entityName = searchParams.get("entityName") ?? "";
-    const id = searchParams.get("id"); // optional, edit mode
+    const params = useParams();
+    const entityName = params?.entityName as string;
+    const id = params?.id as string;
 
     const [config, setConfig] = useState<EmbedConfig | null>(null);
     const [ready, setReady] = useState(false);
@@ -67,7 +67,7 @@ function EmbedContent() {
         // );
         //
         // setReady(true);
-    }, [searchParams]);
+    }, [params]);
 
     // ---------------------------------------------------------------------
     // 2) Notify parent that the embed is ready to receive config
