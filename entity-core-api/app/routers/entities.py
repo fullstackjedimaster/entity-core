@@ -141,10 +141,8 @@ async def get_form_metadata(
     data = await call_model_manage(envelope, token=internal_token)
     result = _unwrap_result(data, "entity-server failed form_metadata")
 
-    if isinstance(result, dict) and "rows" in result:
-        return result["rows"]
 
-    if isinstance(result, list):
+    if isinstance(result, dict):
         return result
 
     raise HTTPException(status_code=500, detail="Unexpected result format")
