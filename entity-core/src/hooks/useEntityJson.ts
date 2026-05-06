@@ -29,7 +29,7 @@ export function useEntityJson(entityName?: string | null): EntityJsonState {
             setLoading(true);
             setError(null);
             try {
-                const res = await apiFetch(`/api/entity/${entityName}`);
+                const res = await apiFetch(`/entity/${entityName}`);
                 if (!res.ok) {
                     throw new Error(`Failed to load entity: ${res.status} ${res.statusText}`);
                 }

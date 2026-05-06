@@ -1,23 +1,31 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Toaster } from 'sonner';
 
 import { useFormMetadata } from '@/hooks/useFormMetadata';
 import { useSaveEntity } from '@/hooks/useSaveEntity';
 import { useHierarchicalOptions } from '@/hooks/useHierarchicalOptions';
 
-type FormValues = Record<string, any>;
+type Entity = Record<string, any>;
 
 type EntityComponentProps = {
     entityName: string;
-    initialValues?: Record<string, any>;
-    onSavedAction?: (savedValues: Record<string, any>) => Promise<void> | void;
+    id?: string;
+    initialValues?: Entity;
+    onSavedAction?: (savedEntity: Entity) => Promise<void> | void;
     onCancelAction?: () => void;
 };
 
+const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
+
 function labelize(value: string): string {
     return value.replace(/_/g, ' ');
+}
+
+function cloneValue<T>(value: T): T {
+    if (value === undefined || value === null) return value;
+    return JSON.parse(JSON.stringify(value));
 }
 
 function defaultValueForType(type?: string): any {
@@ -34,37 +42,64 @@ function defaultValueForType(type?: string): any {
     }
 }
 
-function cloneValue<T>(value: T): T {
-    if (value === undefined || value === null) return value;
-    return JSON.parse(JSON.stringify(value));
+function buildEntityFromMetadata(metadata: any): Entity {
+    const entity: Entity = {};
+
+    for (const field of metadata?.fields ?? []) {
+        entity[field.name] = defaultValueForType(field.type);
+    }
+
+    return entity;
+}
+
+function normalizeLoadedEntity(payload: any): Entity {
+    if (!payload) return {};
+
+    if (payload.entity && typeof payload.entity === 'object') {
+        return cloneValue(payload.entity);
+    }
+
+    if (payload.result?.entity && typeof payload.result.entity === 'object') {
+        return cloneValue(payload.result.entity);
+    }
+
+    if (payload.result?.data && typeof payload.result.data === 'object') {
+        return cloneValue(payload.result.data);
+    }
+
+    if (payload.data && typeof payload.data === 'object') {
+        return cloneValue(payload.data);
+    }
+
+    if (typeof payload === 'object') {
+        return cloneValue(payload);
+    }
+
+    return {};
 }
 
 export default function EntityComponent({
     entityName,
+    id,
     initialValues,
     onSavedAction,
     onCancelAction,
 }: EntityComponentProps) {
-    const { metadata, isLoading } = useFormMetadata(entityName);
+    const itemId = id || ZERO_UUID;
+    const isNewEntity = itemId === ZERO_UUID;
 
-    const [formValues, setFormValues] = useState<FormValues>(
-        initialValues ? cloneValue(initialValues) : {}
-    );
+    const { metadata, isLoading: metadataLoading } = useFormMetadata(entityName);
 
-    const [addButtonEnabled, setAddButtonEnabled] = useState<
-        Record<string, boolean>
-    >({});
+    const [entity, setEntity] = useState<Entity>({});
+    const [entityLoading, setEntityLoading] = useState(true);
+    const [entityError, setEntityError] = useState<string | null>(null);
 
-    const { save, loading } = useSaveEntity({
+    const [addButtonEnabled, setAddButtonEnabled] = useState<Record<string, boolean>>({});
+
+    const { save, loading: saving } = useSaveEntity({
         entityName,
         primaryKey: metadata?.primaryKey ?? 'id',
     });
-
-    useEffect(() => {
-        if (initialValues) {
-            setFormValues(cloneValue(initialValues));
-        }
-    }, [initialValues]);
 
     const hierarchyFields = useMemo(() => {
         return (
@@ -74,18 +109,68 @@ export default function EntityComponent({
         );
     }, [metadata]);
 
-    const hier = useHierarchicalOptions(
-        entityName,
-        hierarchyFields,
-        'id',
-        'name'
-    );
+    const hier = useHierarchicalOptions(entityName, hierarchyFields, 'id', 'name');
 
-    if (isLoading) return <div>Loading form schema...</div>;
-    if (!metadata) return <div>No metadata found.</div>;
+    const loadEntity = useCallback(async () => {
+        if (!metadata) return;
 
-    const setNestedValue = (path: string[], value: any) => {
-        setFormValues((prev) => {
+        setEntityLoading(true);
+        setEntityError(null);
+
+        try {
+            if (initialValues) {
+                setEntity(cloneValue(initialValues));
+                return;
+            }
+
+            if (isNewEntity) {
+                setEntity(buildEntityFromMetadata(metadata));
+                return;
+            }
+
+            const response = await fetch('/api/manage', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    operation: 'read',
+                    target: entityName,
+                    id: itemId,
+                    args: {},
+                    meta: {
+                        source: 'EntityComponent.loadEntity',
+                    },
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Load failed: ${response.status} ${response.statusText}`);
+            }
+
+            const payload = await response.json();
+            const loadedEntity = normalizeLoadedEntity(payload);
+
+            setEntity(
+                Object.keys(loadedEntity).length > 0
+                    ? loadedEntity
+                    : buildEntityFromMetadata(metadata)
+            );
+        } catch (err) {
+            console.error(`Error loading ${entityName}:`, err);
+            setEntityError(err instanceof Error ? err.message : 'Unable to load entity');
+            setEntity(buildEntityFromMetadata(metadata));
+        } finally {
+            setEntityLoading(false);
+        }
+    }, [entityName, itemId, initialValues, isNewEntity, metadata]);
+
+    useEffect(() => {
+        void loadEntity();
+    }, [loadEntity]);
+
+    const setEntityPath = (path: string[], value: any) => {
+        setEntity((prev) => {
             const updated = cloneValue(prev) || {};
             let ref = updated;
 
@@ -106,11 +191,11 @@ export default function EntityComponent({
         });
     };
 
-    const getNestedValue = (path: string[]) => {
+    const readEntityPath = (path: string[]) => {
         return path.reduce<any>((acc, key) => {
             if (acc === undefined || acc === null) return '';
             return acc[key] !== undefined ? acc[key] : '';
-        }, formValues);
+        }, entity);
     };
 
     const handleInputChange = (
@@ -124,14 +209,14 @@ export default function EntityComponent({
                 ? target.checked
                 : target.value;
 
-        setNestedValue(path, value);
+        setEntityPath(path, value);
     };
 
-    const handleAddRow = (path: string[], templateRow: Record<string, any>) => {
-        const current = getNestedValue(path);
+    const handleAddRow = (path: string[], templateRow: Entity) => {
+        const current = readEntityPath(path);
         const rows = Array.isArray(current) ? current : [];
 
-        setNestedValue(path, [...rows, cloneValue(templateRow)]);
+        setEntityPath(path, [...rows, cloneValue(templateRow)]);
         setAddButtonEnabled((prev) => ({
             ...prev,
             [path.join('.')]: false,
@@ -139,15 +224,15 @@ export default function EntityComponent({
     };
 
     const handleDeleteRow = (path: string[], index: number) => {
-        const current = getNestedValue(path);
+        const current = readEntityPath(path);
         const rows = Array.isArray(current) ? [...current] : [];
 
         rows.splice(index, 1);
-        setNestedValue(path, rows.length > 0 ? rows : []);
+        setEntityPath(path, rows);
     };
 
     const handleBlurRow = (path: string[], index: number) => {
-        const current = getNestedValue(path);
+        const current = readEntityPath(path);
         const rows = Array.isArray(current) ? current : [];
         const row = rows[index] ?? {};
 
@@ -164,6 +249,7 @@ export default function EntityComponent({
     const renderField = (key: string, value: any, path: string[] = []) => {
         const fullPath = [...path, key];
         const fieldName = fullPath.join('.');
+        const disabled = saving || entityLoading;
 
         if (Array.isArray(value)) {
             const templateRow =
@@ -171,20 +257,14 @@ export default function EntityComponent({
                     ? value[0]
                     : {};
 
-            const currentRows = getNestedValue(fullPath);
-            const rows = Array.isArray(currentRows)
-                ? currentRows
-                : value.length > 0
-                  ? cloneValue(value)
-                  : [];
+            const currentRows = readEntityPath(fullPath);
+            const rows = Array.isArray(currentRows) ? currentRows : [];
 
             const columns = Object.keys(templateRow);
 
             return (
                 <div key={fieldName} className="space-y-2">
-                    <h3 className="font-semibold">
-                        {labelize(key).toUpperCase()}
-                    </h3>
+                    <h3 className="font-semibold">{labelize(key).toUpperCase()}</h3>
 
                     <table className="table-auto border border-gray-300 mb-2 w-full text-sm">
                         <thead>
@@ -216,22 +296,13 @@ export default function EntityComponent({
                                                 className="w-full border rounded p-1"
                                                 value={row?.[col] ?? ''}
                                                 onChange={(e) =>
-                                                    setNestedValue(
-                                                        [
-                                                            ...fullPath,
-                                                            String(index),
-                                                            col,
-                                                        ],
+                                                    setEntityPath(
+                                                        [...fullPath, String(index), col],
                                                         e.target.value
                                                     )
                                                 }
-                                                onBlur={() =>
-                                                    handleBlurRow(
-                                                        fullPath,
-                                                        index
-                                                    )
-                                                }
-                                                disabled={loading}
+                                                onBlur={() => handleBlurRow(fullPath, index)}
+                                                disabled={disabled}
                                             />
                                         </td>
                                     ))}
@@ -240,13 +311,8 @@ export default function EntityComponent({
                                         <button
                                             type="button"
                                             className="text-red-600 disabled:opacity-40"
-                                            onClick={() =>
-                                                handleDeleteRow(
-                                                    fullPath,
-                                                    index
-                                                )
-                                            }
-                                            disabled={loading}
+                                            onClick={() => handleDeleteRow(fullPath, index)}
+                                            disabled={disabled}
                                         >
                                             Delete
                                         </button>
@@ -261,9 +327,8 @@ export default function EntityComponent({
                         className="text-green-700 text-sm disabled:opacity-40"
                         onClick={() => handleAddRow(fullPath, templateRow)}
                         disabled={
-                            loading ||
-                            (rows.length > 0 &&
-                                addButtonEnabled[fieldName] === false)
+                            disabled ||
+                            (rows.length > 0 && !addButtonEnabled[fieldName])
                         }
                     >
                         + Add Row
@@ -278,9 +343,7 @@ export default function EntityComponent({
                     key={fieldName}
                     className="relative border border-gray-300 p-3 rounded mt-3 space-y-2"
                 >
-                    <legend className="text-sm font-medium">
-                        {labelize(key)}
-                    </legend>
+                    <legend className="text-sm font-medium">{labelize(key)}</legend>
 
                     {Object.entries(value).map(([childKey, childValue]) =>
                         renderField(childKey, childValue, fullPath)
@@ -294,9 +357,9 @@ export default function EntityComponent({
                 <label key={fieldName} className="flex items-center gap-2">
                     <input
                         type="checkbox"
-                        checked={!!getNestedValue(fullPath)}
+                        checked={!!readEntityPath(fullPath)}
                         onChange={(e) => handleInputChange(fullPath, e)}
-                        disabled={loading}
+                        disabled={disabled}
                     />
                     {labelize(key)}
                 </label>
@@ -308,18 +371,17 @@ export default function EntityComponent({
         if (
             lowerKey.includes('date') ||
             lowerKey.includes('dob') ||
-            (typeof value === 'string' &&
-                /^\d{4}-\d{2}-\d{2}$/.test(value))
+            (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value))
         ) {
             return (
                 <label key={fieldName} className="block">
                     <span className="font-medium">{labelize(key)}</span>
                     <input
                         type="date"
-                        value={String(getNestedValue(fullPath) ?? '')}
+                        value={String(readEntityPath(fullPath) ?? '')}
                         onChange={(e) => handleInputChange(fullPath, e)}
                         className="w-full border rounded p-1 mt-1"
-                        disabled={loading}
+                        disabled={disabled}
                     />
                 </label>
             );
@@ -331,10 +393,10 @@ export default function EntityComponent({
                     <span className="font-medium">{labelize(key)}</span>
                     <input
                         type="number"
-                        value={String(getNestedValue(fullPath) ?? '')}
+                        value={String(readEntityPath(fullPath) ?? '')}
                         onChange={(e) => handleInputChange(fullPath, e)}
                         className="w-full border rounded p-1 mt-1"
-                        disabled={loading}
+                        disabled={disabled}
                     />
                 </label>
             );
@@ -348,14 +410,14 @@ export default function EntityComponent({
                     <span className="font-medium">{labelize(key)}</span>
                     <select
                         name={key}
-                        value={String(getNestedValue(fullPath) ?? '')}
+                        value={String(readEntityPath(fullPath) ?? '')}
                         onChange={(e) => {
                             const selectedValue = e.target.value || null;
                             hier.onChange(key, selectedValue);
-                            setNestedValue(fullPath, selectedValue);
+                            setEntityPath(fullPath, selectedValue);
                         }}
                         className="w-full border rounded p-1 mt-1"
-                        disabled={h?.isLoading || loading}
+                        disabled={h?.isLoading || disabled}
                     >
                         <option value="">Select...</option>
                         {h?.options?.map((opt: any) => (
@@ -373,10 +435,10 @@ export default function EntityComponent({
                 <span className="font-medium">{labelize(key)}</span>
                 <input
                     type="text"
-                    value={String(getNestedValue(fullPath) ?? '')}
+                    value={String(readEntityPath(fullPath) ?? '')}
                     onChange={(e) => handleInputChange(fullPath, e)}
                     className="w-full border rounded p-1 mt-1"
-                    disabled={loading}
+                    disabled={disabled}
                 />
             </label>
         );
@@ -386,16 +448,29 @@ export default function EntityComponent({
         e.preventDefault();
 
         if (onSavedAction) {
-            await onSavedAction(formValues);
+            await onSavedAction(entity);
             return;
         }
 
-        await save(formValues);
+        await save(entity);
     }
 
+    if (metadataLoading || entityLoading) {
+        return <div>Loading {entityName}...</div>;
+    }
+
+    if (!metadata) {
+        return <div>No metadata found for {entityName}.</div>;
+    }
+
+    const renderSource =
+        entity && Object.keys(entity).length > 0
+            ? entity
+            : buildEntityFromMetadata(metadata);
+
     const template =
-        formValues?._template && typeof formValues._template === 'object'
-            ? formValues._template
+        renderSource?._template && typeof renderSource._template === 'object'
+            ? renderSource._template
             : null;
 
     return (
@@ -403,34 +478,37 @@ export default function EntityComponent({
             <Toaster position="bottom-center" richColors />
 
             <div>
-                <h2 className="text-lg font-bold">Edit {entityName}</h2>
-                <p className="text-sm text-gray-600">
-                    Tenant schema is handled by the authenticated token.
-                </p>
+                <h2 className="text-lg font-bold">
+                    {isNewEntity ? 'Create' : 'Edit'} {entityName}
+                </h2>
+
+                {entityError && (
+                    <p className="text-sm text-red-600 mt-1">
+                        {entityError}
+                    </p>
+                )}
             </div>
 
             {template
                 ? Object.entries(template).map(([key, value]) =>
                       renderField(key, value)
                   )
-                : metadata.fields.map((field: any) =>
-                      renderField(
-                          field.name,
-                          defaultValueForType(field.type)
-                      )
-                  )}
+                : Object.entries(renderSource).map(([key, value]) => {
+                      if (key === '_template') return null;
+                      return renderField(key, value);
+                  })}
 
             <div className="flex gap-3">
                 <button
                     type="submit"
                     className={`mt-4 px-4 py-2 rounded text-white ${
-                        loading
+                        saving
                             ? 'bg-gray-400 cursor-wait'
                             : 'bg-blue-600 hover:bg-blue-700'
                     }`}
-                    disabled={loading}
+                    disabled={saving}
                 >
-                    {loading ? 'Saving...' : 'Save'}
+                    {saving ? 'Saving...' : isNewEntity ? `Create ${entityName}` : `Save ${entityName}`}
                 </button>
 
                 {onCancelAction && (
@@ -438,7 +516,7 @@ export default function EntityComponent({
                         type="button"
                         onClick={onCancelAction}
                         className="mt-4 px-4 py-2 rounded border"
-                        disabled={loading}
+                        disabled={saving}
                     >
                         Cancel
                     </button>
