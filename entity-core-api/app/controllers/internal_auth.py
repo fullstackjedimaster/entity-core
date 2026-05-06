@@ -6,7 +6,7 @@ from typing import Optional
 
 EC_SHARED_JWT_SECRET = env("EC_SHARED_JWT_SECRET")
 
-def issue_internal_token(request, entity_schema:Optional[str]):
+def issue_internal_token(request, entity_schema:Optional[str] = None):
     claims = request.state.claims
 
     if claims.get("entity_schema") is not None:
