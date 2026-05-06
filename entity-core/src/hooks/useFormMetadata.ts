@@ -1,7 +1,7 @@
-// src/hooks/useFormMetadata.ts
-"use client";
-import useSWR from "swr";
-import { useEntityApi } from "@/lib/apiEntity";
+'use client';
+
+import useSWR from 'swr';
+import { useEntityApi } from '@/lib/apiEntity';
 
 export type FieldMeta = {
     name: string;
@@ -19,17 +19,54 @@ export type FormMetadata = {
     fields: FieldMeta[];
 };
 
-/**
- * useFormMetadata(entity)
- * Fetches metadata for a given entity type from the CRUD server.
- * Uses the authenticated apiFetch wrapper (AuthContext).
- */
+type FormMetadataResponse =
+    | FormMetadata
+    | {
+          formMetadata?: FormMetadata;
+          metadata?: FormMetadata;
+          result?: FormMetadata | { formMetadata?: FormMetadata; metadata?: FormMetadata };
+      };
+
+function normalizeFormMetadata(payload: FormMetadataResponse): FormMetadata {
+    const data = payload as any;
+
+    return (
+        data?.formMetadata ??
+        data?.metadata ??
+        data?.result?.formMetadata ??
+        data?.result?.metadata ??
+        data?.result ??
+        data
+    );
+}
+
 export function useFormMetadata(entityName: string) {
-      const api = useEntityApi();
+    const api = useEntityApi();
 
-    const data = api.getFormMetadata(entityName);
+    const key = entityName ? ['form-metadata', entityName] : null;
+
+    const {
+        data,
+        error,
+        isLoading,
+        mutate,
+    } = useSWR<FormMetadataResponse>(
+        key,
+        async () => api.getFormMetadata(entityName) as Promise<FormMetadataResponse>,
+        {
+            revalidateOnFocus: false,
+            revalidateOnReconnect: false,
+        }
+    );
+
+    const formMetadata = data ? normalizeFormMetadata(data) : null;
+
     return {
-        formMetadata: data
-
+        formMetadata,
+        metadata: formMetadata,
+        isLoading,
+        loading: isLoading,
+        error,
+        mutate,
     };
 }
