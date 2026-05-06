@@ -55,7 +55,7 @@ async def list_entities(
 
     envelope = RequestEnvelope(
         operation="execute",
-        target="ec.list_entities",
+        target="list_entities",
         id=None,
         data={},
         args={"entity_schema": entity_schema},
@@ -83,7 +83,7 @@ async def get_entity(
 
     envelope = RequestEnvelope(
         operation="execute",
-        target="ec.get_entity",
+        target="get_entity",
         id=None,
         data={},
         args={
