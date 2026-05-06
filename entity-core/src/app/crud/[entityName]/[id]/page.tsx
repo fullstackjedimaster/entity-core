@@ -127,19 +127,20 @@ function EntityDataItemDetailInner() {
 
             {(!isLoading || isNew) && (
                 <EntityComponent
-                    entityName={entityName}
-                    initialValues={initialValues}
-                    onSavedAction={async (savedValues: Record<string, unknown>) => {
-                        await saveEntityData(
-                            isNew ? null : id,
-                            entityName,
-                            savedValues
-                        );
+                entityName={entityName}
+                id={id}
+                initialValues={initialValues}
+                onSavedAction={async (savedValues: Record<string, unknown>) => {
+                    await saveEntityData(
+                        isNew ? null : id,
+                        entityName,
+                        savedValues
+                    );
 
-                        router.push(`/crud/${entityName}`);
-                    }}
-                    onCancelAction={() => router.push(`/crud/${entityName}`)}
-                />
+                    router.push(`/crud/${entityName}`);
+                }}
+                onCancelAction={() => router.push(`/crud/${entityName}`)}
+            />
             )}
         </main>
     );
