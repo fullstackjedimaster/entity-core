@@ -1,73 +1,70 @@
 # app/schemas.py
 from __future__ import annotations
-from typing import Optional, Dict, Any, Literal, List
-from pydantic import BaseModel, Field
 
 from dataclasses import dataclass
+from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import BaseModel, Field
 
 
-Operation = Literal["create", "read", "update", "delete", "list", "execute"]
+Operation = Literal[
+    "create",
+    "read",
+    "update",
+    "delete",
+    "list",
+    "execute",
+]
 
 
 class RequestEnvelope(BaseModel):
+    """
+    Shared request envelope used between entity-core-api and entity-server.
+
+    Rules:
+      - operation = CRUD verb or "execute"
+      - target = entity name for CRUD, action name for execute
+      - id = row UUID when applicable
+      - data = main payload
+      - args = secondary/action args
+      - meta = tracing/debug metadata only
+
+    Tenant/entity_schema should come from JWT claims/internal token,
+    not from request body. args.entity_schema may exist only as fallback.
+    """
+
     operation: Operation
-    target: str                      # entity name OR action name
-    id: Optional[str] = None         # GUID row id or correlation id
-    data: Optional[Dict[str, Any]] = None  # data payload
+    target: str
+    id: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
     args: Optional[Dict[str, Any]] = None
-
-
-
-
-class EntityResponse(BaseModel):
-    entity: str = None
-
-class EntityItemResponse(BaseModel):
-    entityItem: str = None
+    meta: Optional[Dict[str, Any]] = None
 
 
 class RequestResult(BaseModel):
     ok: bool
     result: Any = None
-    error: str | None = None
+    error: Optional[str] = None
+    message: Optional[str] = None
 
 
-# ------------------------------------------------------------
-# User Models
-# ------------------------------------------------------------
-class DBUser(BaseModel):
-    id: str
-    auth0_sub: str
-    email: Optional[str]
-    name: Optional[str]
-    picture_url: Optional[str]
-    given_name: Optional[str]
-    family_name: Optional[str]
-    locale: Optional[str]
-    last_login_at: Optional[str]
-    created_at: Optional[str]
-    updated_at: Optional[str]
+class EntityResponse(BaseModel):
+    entity: Any = None
 
 
-class DBUserWithAuth(DBUser):
+class EntityItemResponse(BaseModel):
+    entityItem: Any = None
 
-    roles: List[str] = Field(default_factory=list)
-    permissions: List[str] = Field(default_factory=list)
-    org_id: Optional[str] = None   # ✅ ensures front-end gets org_id cleanly
-    entity_schema: Optional[str] = None
 
-# ------------------------------------------------------------
-# Provisioning (during onboarding)
-# ------------------------------------------------------------
-# NOTE: You are creating a **single tenant entity_schema**, not multi-org / multi-membership yet.
-# This is the final, simplified shape matching `provision_tenant`.
+class CreateEntityBody(BaseModel):
+    """
+    Body for POST /api/entities/{entity_name}.
 
-class ProvisionPayload(BaseModel):
-    entity_schema: str = Field(..., description="Tenant entity_schema name (org key)")
-    sub: str = Field(..., description="Auth0 user ID")
-    email: str
-    name: str
-    picture: Optional[str] = None
+    entity_schema is intentionally NOT here.
+    It comes from Auth0 claims -> internal token -> entity-server claims.
+    """
+
+    entity_json: Dict[str, Any]
 
 
 class FormMetadataResponse(BaseModel):
@@ -80,12 +77,44 @@ class TenantBody(BaseModel):
     app_metadata: Dict[str, Any]
 
 
-class CreateEntityBody(BaseModel):
-    entity_json:  Dict[str, Any]
+class ProvisionPayload(BaseModel):
+    entity_schema: str = Field(..., description="Tenant schema/org key")
+    sub: str = Field(..., description="Auth0 user ID")
+    email: str
+    name: Optional[str] = None
+    picture: Optional[str] = None
+    given_name: Optional[str] = None
+    family_name: Optional[str] = None
+    locale: Optional[str] = None
+    roles: List[str] = Field(default_factory=list)
+    permissions: List[str] = Field(default_factory=list)
+
+
+class DBUser(BaseModel):
+    id: str
+    auth0_sub: str
+    email: Optional[str] = None
+    name: Optional[str] = None
+    picture_url: Optional[str] = None
+    given_name: Optional[str] = None
+    family_name: Optional[str] = None
+    locale: Optional[str] = None
+    last_login_at: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class DBUserWithAuth(DBUser):
+    roles: List[str] = Field(default_factory=list)
+    permissions: List[str] = Field(default_factory=list)
+    org_id: Optional[str] = None
+    entity_schema: Optional[str] = None
+
 
 @dataclass
 class TenantContext:
     entity_schema: str
     sub: Optional[str] = None
     org_id: Optional[str] = None
-    permissions: list[str] = None
+    permissions: Optional[List[str]] = None
+    roles: Optional[List[str]] = None

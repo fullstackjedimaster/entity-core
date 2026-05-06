@@ -1,33 +1,42 @@
-# app/core/runtime.py
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+from fastapi import HTTPException
 
 from app.core.settings import env
+from app.controllers.internal_auth import normalize_claims
 
-# ---------------------------------------------------------------------------
-#  Lightweight "context" helpers for ec-control
-# ---------------------------------------------------------------------------
-# ec-control does NOT talk to any database directly. It is a pure orchestration
-# layer that:
-#   - validates external JWTs via Auth0 (or other IdP),
-#   - derives tenant/entity_schema/org information from claims,
-#   - calls ec-model over HTTP with a RequestEnvelope and the caller's JWT.
-# ---------------------------------------------------------------------------
+NS = "https://fullstackjedi.dev"
 
-# Name of the claim in the JWT that holds the tenant/entity_schema key.
 SCHEMA_CLAIM = env("EC_SCHEMA_CLAIM") or "entity_schema"
-
-# Default entity_schema to use if the claim is missing.
-DEFAULT_SCHEMA = env("EC_DEFAULT_SCHEMA") or "public"
+DEFAULT_SCHEMA = env("EC_DEFAULT_SCHEMA") or ""
 
 
 def get_effective_schema(claims: Dict[str, Any]) -> str:
-    """
-    Given decoded JWT claims from an authenticated user, determine which
-    logical entity_schema / tenant key to pass down to ec-model.
+    normalized = normalize_claims(claims)
 
-    This does not perform any DB operations; it only computes a string
-    that will typically end up in RequestEnvelope.context or options.
-    """
-    return str(claims.get(SCHEMA_CLAIM) or DEFAULT_SCHEMA)
+    entity_schema = (
+        normalized.get("entity_schema")
+        or normalized.get(f"{NS}/entity_schema")
+        or normalized.get(SCHEMA_CLAIM)
+        or DEFAULT_SCHEMA
+    )
+
+    if not entity_schema:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing entity_schema claim",
+        )
+
+    return str(entity_schema)
+
+
+def attach_claim_context(request, claims: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = normalize_claims(claims)
+    request.state.claims = normalized
+    request.state.entity_schema = get_effective_schema(normalized)
+    request.state.org_id = normalized.get("org_id")
+    request.state.roles = normalized.get("roles") or []
+    request.state.permissions = normalized.get("permissions") or []
+    return normalized

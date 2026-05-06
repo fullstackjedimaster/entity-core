@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import type { User } from '@auth0/auth0-react';
 import {
     useAuth0,
@@ -8,63 +8,113 @@ import {
 } from '@auth0/auth0-react';
 import { settings } from '@/lib/settings';
 
+const NS = 'https://fullstackjedi.dev';
+
+const CLAIMS = {
+    entitySchema: `${NS}/entity_schema`,
+    orgId: `${NS}/org_id`,
+    roles: `${NS}/roles`,
+    permissions: `${NS}/permissions`,
+};
+
+type Claims = Record<string, unknown>;
+type UserWithClaims = User & Claims;
+
 interface AuthContextType {
     disableAuth: boolean;
     user: User | null;
+    claims: Claims | null;
     isAuthenticated: boolean;
     login: () => Promise<void>;
     logout: () => void;
     getToken: () => Promise<string | null>;
-    getIdClaims: () => Promise<Record<string, unknown> | null>;
+    getIdClaims: () => Promise<Claims | null>;
+    getEntitySchema: () => string | null;
     getOrgId: () => string | null;
     getRoles: () => string[];
+    getPermissions: () => string[];
     auth0: Auth0ContextInterface<User> | null;
     loading: boolean;
 }
 
-/**
- * Legacy-compatible provider (no-op wrapper)
- */
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return <>{children}</>;
 };
 
-// Internal helper
-type UserWithClaims = User & Record<string, unknown>;
+function claimString(claims: Claims | null | undefined, ...keys: string[]): string | null {
+    if (!claims) return null;
+
+    for (const key of keys) {
+        const value = claims[key];
+        if (typeof value === 'string' && value.trim()) {
+            return value;
+        }
+    }
+
+    return null;
+}
+
+function claimStringArray(claims: Claims | null | undefined, ...keys: string[]): string[] {
+    if (!claims) return [];
+
+    for (const key of keys) {
+        const value = claims[key];
+
+        if (Array.isArray(value)) {
+            return value.map(String);
+        }
+
+        if (typeof value === 'string' && value.trim()) {
+            return value.split(/\s+/).filter(Boolean);
+        }
+    }
+
+    return [];
+}
 
 export const useAuth = (): AuthContextType => {
     const auth0 = useAuth0<User>();
     const disableAuth = settings.DISABLE_AUTH;
 
-    // --------------------------------------------------
-    // DEV MODE (DISABLE_AUTH=true)
-    // --------------------------------------------------
     if (disableAuth) {
         return {
             disableAuth: true,
             user: null,
+            claims: {
+                entity_schema: settings.DEFAULT_ENTITY_SCHEMA ?? 'public',
+                org_id: 'dev',
+                roles: ['admin'],
+                permissions: [
+                    'crud:create',
+                    'crud:read',
+                    'crud:update',
+                    'crud:delete',
+                ],
+            },
             isAuthenticated: true,
             login: async () => {},
             logout: () => {
                 if (typeof window !== 'undefined') {
-                    try {
-                        localStorage.clear();
-                        sessionStorage.clear();
-                    } catch {}
+                    localStorage.clear();
+                    sessionStorage.clear();
                 }
             },
             getToken: async () => null,
             getIdClaims: async () => null,
-            getOrgId: () => null,
-            getRoles: () => [],
+            getEntitySchema: () => settings.DEFAULT_ENTITY_SCHEMA ?? 'public',
+            getOrgId: () => 'dev',
+            getRoles: () => ['admin'],
+            getPermissions: () => [
+                'crud:create',
+                'crud:read',
+                'crud:update',
+                'crud:delete',
+            ],
             auth0: null,
             loading: false,
         };
     }
 
-    // --------------------------------------------------
-    // AUTH0 MODE
-    // --------------------------------------------------
     const {
         isAuthenticated,
         isLoading,
@@ -75,16 +125,25 @@ export const useAuth = (): AuthContextType => {
         getIdTokenClaims,
     } = auth0;
 
-    const login = async () => {
-        await loginWithRedirect();
-    };
+    const userClaims = (user ?? null) as UserWithClaims | null;
 
-    const logout = () => {
+    const login = useCallback(async () => {
+        await loginWithRedirect({
+            authorizationParams: settings.AUTH0_AUDIENCE
+                ? {
+                      audience: settings.AUTH0_AUDIENCE,
+                      scope: settings.AUTH0_SCOPE,
+                  }
+                : {
+                      scope: settings.AUTH0_SCOPE,
+                  },
+        });
+    }, [loginWithRedirect]);
+
+    const logout = useCallback(() => {
         if (typeof window !== 'undefined') {
-            try {
-                localStorage.clear();
-                sessionStorage.clear();
-            } catch {}
+            localStorage.clear();
+            sessionStorage.clear();
         }
 
         auth0Logout({
@@ -95,21 +154,25 @@ export const useAuth = (): AuthContextType => {
                         : undefined,
             },
         });
-    };
+    }, [auth0Logout]);
 
-    const getToken = async (): Promise<string | null> => {
+    const getToken = useCallback(async (): Promise<string | null> => {
         try {
             const token = await getAccessTokenSilently({
                 authorizationParams: settings.AUTH0_AUDIENCE
-                    ? { audience: settings.AUTH0_AUDIENCE }
-                    : undefined,
+                    ? {
+                          audience: settings.AUTH0_AUDIENCE,
+                          scope: settings.AUTH0_SCOPE,
+                      }
+                    : {
+                          scope: settings.AUTH0_SCOPE,
+                      },
             });
 
             return token ?? null;
         } catch (err: any) {
             console.warn('[Auth] token error:', err?.error || err);
 
-            // ⚠️ Only redirect if truly required
             if (
                 err?.error === 'login_required' ||
                 err?.error === 'consent_required'
@@ -119,51 +182,57 @@ export const useAuth = (): AuthContextType => {
 
             return null;
         }
-    };
+    }, [getAccessTokenSilently, login]);
 
-    const getIdClaims = async (): Promise<Record<string, unknown> | null> => {
+    const getIdClaims = useCallback(async (): Promise<Claims | null> => {
         try {
             const claims = await getIdTokenClaims();
-            return (claims as unknown as Record<string, unknown>) ?? null;
+            return (claims as unknown as Claims) ?? null;
         } catch (err) {
             console.warn('[Auth] getIdClaims error:', err);
             return null;
         }
-    };
+    }, [getIdTokenClaims]);
 
-
-    const getOrgId = (): string | null => {
-        if (!user) return null;
-        const claims = user as UserWithClaims;
-
-        return (
-            (claims['https://fullstackjedi.dev/org_id'] as string) ||
-            (claims['org_id'] as string) ||
-            null
+    const getEntitySchema = useCallback((): string | null => {
+        return claimString(
+            userClaims,
+            CLAIMS.entitySchema,
+            'entity_schema',
+            'schema'
         );
-    };
+    }, [userClaims]);
 
-    const getRoles = (): string[] => {
-        if (!user) return [];
-        const claims = user as UserWithClaims;
+    const getOrgId = useCallback((): string | null => {
+        return claimString(userClaims, CLAIMS.orgId, 'org_id');
+    }, [userClaims]);
 
-        return (
-            (claims['https://fullstackjedi.dev/roles'] as string[]) ||
-            (claims['roles'] as string[]) ||
-            []
+    const getRoles = useCallback((): string[] => {
+        return claimStringArray(userClaims, CLAIMS.roles, 'roles');
+    }, [userClaims]);
+
+    const getPermissions = useCallback((): string[] => {
+        return claimStringArray(
+            userClaims,
+            CLAIMS.permissions,
+            'permissions',
+            'scope'
         );
-    };
+    }, [userClaims]);
 
     return {
         disableAuth: false,
         user: user ?? null,
+        claims: userClaims,
         isAuthenticated,
         login,
         logout,
         getToken,
         getIdClaims,
+        getEntitySchema,
         getOrgId,
         getRoles,
+        getPermissions,
         auth0,
         loading: isLoading,
     };

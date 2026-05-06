@@ -22,8 +22,9 @@ export function useApi() {
             const payload = {
               "operation": "list",
               "target": entityName,
-              "id": "{00000000-0000-0000-0000-000000000000}",
-              "data": {}
+              "id": "00000000-0000-0000-0000-000000000000",
+              "data": {},
+                "args":{"entity_schema":}
             }
              const resp = await authedFetch(`/api/crud/${entityName}`, {
               method: 'POST',
