@@ -35,10 +35,6 @@ async def manage_crud_entity(
         id=body.id,
         data=body.data,
         args=getattr(body, "args", None),
-        meta={
-            **(body.meta or {}),
-            "source": f"entity-core:/api/crud/{entity}:POST",
-        },
     )
 
     data = await call_model_manage(envelope, token=internal_token)

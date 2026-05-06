@@ -57,8 +57,8 @@ async def list_entities(
         operation="execute",
         target="ec.list_entities",
         id=None,
+        data={},
         args={"entity_schema": entity_schema},
-        meta={"source": "entity-core:/api/entities"},
     )
 
     data = await call_model_manage(envelope, token=internal_token)
@@ -85,11 +85,11 @@ async def get_entity(
         operation="execute",
         target="ec.get_entity",
         id=None,
+        data={},
         args={
             "entity_schema": entity_schema,
-            "entity_name": entity_name,
-        },
-        meta={"source": "entity-core:/api/entities/{entity_name}"},
+            "entity_name": entity_name
+        }
     )
 
     data = await call_model_manage(envelope, token=internal_token)
@@ -121,14 +121,13 @@ async def create_entity(
 
     envelope = RequestEnvelope(
         operation="execute",
-        target="ec.create_entity",
+        target="create_entity",
         id=None,
+        data=body.entity_json,
         args={
             "entity_schema": entity_schema,
-            "entity_name": entity_name,
-            "entity_json": body.entity_json,
+            "entity_name": entity_name
         },
-        meta={"source": "entity-core:/api/entities/{entity_name}:POST"},
     )
 
     data = await call_model_manage(envelope, token=internal_token)
@@ -150,10 +149,10 @@ async def get_form_metadata(request: Request, entity: str):
 
     envelope = RequestEnvelope(
         operation="execute",
-        target="ec.get_form_metadata",
+        target="get_form_metadata",
         id=None,
+        data={},
         args={"entity": entity},
-        meta={"source": "entity-core:/api/entities/{entity}/form_metadata"},
     )
 
     data = await call_model_manage(envelope, token= internal_token )
@@ -184,14 +183,14 @@ async def get_column_options(
 
     envelope = RequestEnvelope(
         operation="execute",
-        target="ec.get_column_options",
+        target="get_column_options",
         id=None,
+        data={},
         args={
             "entity": entity,
             "column": column,
             "filter": filter,
-        },
-        meta={"source": "entity-core:/api/entities/options"},
+        }
     )
 
     data = await call_model_manage(envelope, token= internal_token )
