@@ -169,7 +169,7 @@ export default function EntityComponent({
                 return;
             }
 
-            const response = await fetch('/api/manage', {
+            const response = await fetch(`/crud`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -178,6 +178,7 @@ export default function EntityComponent({
                     operation: 'read',
                     target: entityName,
                     id: itemId,
+                    data:{},
                     args: {},
                     meta: {
                         source: 'EntityComponent.loadEntity',
