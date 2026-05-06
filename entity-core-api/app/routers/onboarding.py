@@ -131,7 +131,7 @@ async def provision_tenant(
     # ---- DB call via entity-server --------------------------------------------
     envelope = RequestEnvelope(
         operation="execute",
-        target="ec.provision_tenant",
+        target="provision_tenant",
         id=None,
         data={},
         args={
