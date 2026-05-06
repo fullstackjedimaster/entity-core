@@ -8,13 +8,7 @@ import { useCrudApi, ZERO_UUID, type EntityDataItemInfo } from '@/lib/apiCrud';
 
 export default function EntityDataItemIndexPage() {
     return (
-        <Suspense
-            fallback={
-                <main className="p-6 max-w-md mx-auto">
-                    <p className="text-gray-700">Loading entity data...</p>
-                </main>
-            }
-        >
+        <Suspense fallback={<main className="p-6">Loading entity data...</main>}>
             <EntityDataItemIndexInner />
         </Suspense>
     );
@@ -35,9 +29,12 @@ function EntityDataItemIndexInner() {
         let cancelled = false;
 
         async function load() {
-            if (authLoading || !entityName) return;
+            if (authLoading || !entityName) {
+                return;
+            }
 
             if (!disableAuth && !isAuthenticated) {
+                setLoading(false);
                 await login();
                 return;
             }
@@ -69,7 +66,10 @@ function EntityDataItemIndexInner() {
         return () => {
             cancelled = true;
         };
-    }, [api, authLoading, isAuthenticated, disableAuth, login, entityName]);
+
+        // Do NOT include `api` unless useCrudApi() is memoized.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authLoading, isAuthenticated, disableAuth, entityName]);
 
     return (
         <main className="p-6 max-w-3xl mx-auto space-y-6">
