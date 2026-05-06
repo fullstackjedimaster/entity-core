@@ -1,7 +1,7 @@
 // src/hooks/useFormMetadata.ts
 "use client";
 import useSWR from "swr";
-import { useApiFetch } from "@/hooks/useApiFetch";
+import { useEntityApi } from "@/lib/apiEntity";
 
 export type FieldMeta = {
     name: string;
@@ -24,27 +24,12 @@ export type FormMetadata = {
  * Fetches metadata for a given entity type from the CRUD server.
  * Uses the authenticated apiFetch wrapper (AuthContext).
  */
-export function useFormMetadata(entityName?: string) {
-    const { apiFetch } = useApiFetch();
-    const shouldFetch = !!entityName;
+export function useFormMetadata(entityName: string) {
+      const api = useEntityApi();
 
-    const fetcher = async (url: string): Promise<FormMetadata> => {
-        const res = await apiFetch(url);
-        if (!res.ok) {
-            throw new Error(`Failed to load form metadata: ${res.status} ${res.statusText}`);
-        }
-        return res.json();
-    };
-
-    const { data, error, isLoading, mutate } = useSWR<FormMetadata>(
-        shouldFetch ? `/entities/${entityName}/form_metadata` : null,
-        fetcher
-    );
-
+    const data = api.getFormMetadata(entityName);
     return {
-        metadata: data,
-        isLoading,
-        error,
-        refresh: mutate,
+        formMetadata: data
+
     };
 }

@@ -9,6 +9,18 @@ import { useHierarchicalOptions } from '@/hooks/useHierarchicalOptions';
 
 type Entity = Record<string, any>;
 
+type FormMetadataField = {
+    name: string;
+    type?: string;
+    [key: string]: any;
+};
+
+type FormMetadata = {
+    primaryKey?: string;
+    fields?: FormMetadataField[];
+    [key: string]: any;
+};
+
 type EntityComponentProps = {
     entityName: string;
     id?: string;
@@ -42,14 +54,26 @@ function defaultValueForType(type?: string): any {
     }
 }
 
-function buildEntityFromMetadata(metadata: any): Entity {
+function buildEntityFromMetadata(formMetadata: FormMetadata | null): Entity {
     const entity: Entity = {};
 
-    for (const field of metadata?.fields ?? []) {
+    for (const field of formMetadata?.fields ?? []) {
         entity[field.name] = defaultValueForType(field.type);
     }
 
     return entity;
+}
+
+function normalizeFormMetadata(payload: unknown): FormMetadata {
+    const data = payload as any;
+
+    if (data?.formMetadata) return data.formMetadata;
+    if (data?.metadata) return data.metadata;
+    if (data?.result?.formMetadata) return data.result.formMetadata;
+    if (data?.result?.metadata) return data.result.metadata;
+    if (data?.result) return data.result;
+
+    return data as FormMetadata;
 }
 
 function normalizeLoadedEntity(payload: any): Entity {
@@ -88,7 +112,9 @@ export default function EntityComponent({
     const itemId = id || ZERO_UUID;
     const isNewEntity = itemId === ZERO_UUID;
 
-    const { metadata, isLoading: metadataLoading } = useFormMetadata(entityName);
+    const [formMetadata, setFormMetadata] = useState<FormMetadata | null>(null);
+    const [metadataLoading, setMetadataLoading] = useState(true);
+    const [metadataError, setMetadataError] = useState<string | null>(null);
 
     const [entity, setEntity] = useState<Entity>({});
     const [entityLoading, setEntityLoading] = useState(true);
@@ -96,23 +122,60 @@ export default function EntityComponent({
 
     const [addButtonEnabled, setAddButtonEnabled] = useState<Record<string, boolean>>({});
 
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadFormMetadata() {
+            setMetadataLoading(true);
+            setMetadataError(null);
+
+            try {
+                const payload = await useFormMetadata(entityName);
+                const normalized = normalizeFormMetadata(payload);
+
+                if (!cancelled) {
+                    setFormMetadata(normalized);
+                }
+            } catch (err) {
+                console.error(`Error loading form metadata for ${entityName}:`, err);
+
+                if (!cancelled) {
+                    setMetadataError(
+                        err instanceof Error ? err.message : 'Unable to load form metadata'
+                    );
+                    setFormMetadata(null);
+                }
+            } finally {
+                if (!cancelled) {
+                    setMetadataLoading(false);
+                }
+            }
+        }
+
+        void loadFormMetadata();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [entityName]);
+
     const { save, loading: saving } = useSaveEntity({
         entityName,
-        primaryKey: metadata?.primaryKey ?? 'id',
+        primaryKey: formMetadata?.primaryKey ?? 'id',
     });
 
     const hierarchyFields = useMemo(() => {
         return (
-            metadata?.fields
-                ?.map((field: any) => field.name)
-                .filter((name: string) => /_hier\d+$/.test(name)) ?? []
+            formMetadata?.fields
+                ?.map((field) => field.name)
+                .filter((name) => /_hier\d+$/.test(name)) ?? []
         );
-    }, [metadata]);
+    }, [formMetadata]);
 
     const hier = useHierarchicalOptions(entityName, hierarchyFields, 'id', 'name');
 
     const loadEntity = useCallback(async () => {
-        if (!metadata) return;
+        if (!formMetadata) return;
 
         setEntityLoading(true);
         setEntityError(null);
@@ -124,7 +187,7 @@ export default function EntityComponent({
             }
 
             if (isNewEntity) {
-                setEntity(buildEntityFromMetadata(metadata));
+                setEntity(buildEntityFromMetadata(formMetadata));
                 return;
             }
 
@@ -154,16 +217,16 @@ export default function EntityComponent({
             setEntity(
                 Object.keys(loadedEntity).length > 0
                     ? loadedEntity
-                    : buildEntityFromMetadata(metadata)
+                    : buildEntityFromMetadata(formMetadata)
             );
         } catch (err) {
             console.error(`Error loading ${entityName}:`, err);
             setEntityError(err instanceof Error ? err.message : 'Unable to load entity');
-            setEntity(buildEntityFromMetadata(metadata));
+            setEntity(buildEntityFromMetadata(formMetadata));
         } finally {
             setEntityLoading(false);
         }
-    }, [entityName, itemId, initialValues, isNewEntity, metadata]);
+    }, [entityName, itemId, initialValues, isNewEntity, formMetadata]);
 
     useEffect(() => {
         void loadEntity();
@@ -259,7 +322,6 @@ export default function EntityComponent({
 
             const currentRows = readEntityPath(fullPath);
             const rows = Array.isArray(currentRows) ? currentRows : [];
-
             const columns = Object.keys(templateRow);
 
             return (
@@ -459,14 +521,18 @@ export default function EntityComponent({
         return <div>Loading {entityName}...</div>;
     }
 
-    if (!metadata) {
-        return <div>No metadata found for {entityName}.</div>;
+    if (metadataError) {
+        return <div className="text-red-600">Metadata error: {metadataError}</div>;
+    }
+
+    if (!formMetadata) {
+        return <div>No formMetadata found for {entityName}.</div>;
     }
 
     const renderSource =
         entity && Object.keys(entity).length > 0
             ? entity
-            : buildEntityFromMetadata(metadata);
+            : buildEntityFromMetadata(formMetadata);
 
     const template =
         renderSource?._template && typeof renderSource._template === 'object'
@@ -508,7 +574,11 @@ export default function EntityComponent({
                     }`}
                     disabled={saving}
                 >
-                    {saving ? 'Saving...' : isNewEntity ? `Create ${entityName}` : `Save ${entityName}`}
+                    {saving
+                        ? 'Saving...'
+                        : isNewEntity
+                          ? `Create ${entityName}`
+                          : `Save ${entityName}`}
                 </button>
 
                 {onCancelAction && (
