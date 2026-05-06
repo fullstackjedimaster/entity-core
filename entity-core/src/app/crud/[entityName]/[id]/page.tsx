@@ -129,7 +129,7 @@ function EntityDataItemDetailInner() {
                 <EntityComponent
                     entityName={entityName}
                     initialValues={initialValues}
-                    onSaved={async (savedValues: Record<string, unknown>) => {
+                    onSavedAction={async (savedValues: Record<string, unknown>) => {
                         await saveEntityData(
                             isNew ? null : id,
                             entityName,
@@ -138,7 +138,7 @@ function EntityDataItemDetailInner() {
 
                         router.push(`/crud/${entityName}`);
                     }}
-                    onCancel={() => router.push(`/crud/${entityName}`)}
+                    onCancelAction={() => router.push(`/crud/${entityName}`)}
                 />
             )}
         </main>
