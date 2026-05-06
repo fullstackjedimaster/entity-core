@@ -121,12 +121,7 @@ def issue_internal_token(
     normalized = normalize_claims(source_claims)
 
     entity_schema = normalized.get("entity_schema")
-    if not entity_schema:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot issue internal token without entity_schema",
-        )
-
+ 
     now = datetime.now(timezone.utc)
 
     payload = {
@@ -139,8 +134,8 @@ def issue_internal_token(
         "permissions": normalized.get("permissions")
         or ["crud:create", "crud:read", "crud:update", "crud:delete"],
         "roles": normalized.get("roles") or [],
-        "org_id": normalized.get("org_id"),
-        "entity_schema": entity_schema,
+        "org_id": normalized.get("org_id") or None,
+        "entity_schema": entity_schema or None,
     }
 
     return jwt.encode(payload, EC_SHARED_JWT_SECRET, algorithm=ALGORITHM)
