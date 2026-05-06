@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function EntityIndexPage() {
     const api = useEntityApi();
+
     const {
         isAuthenticated,
         login,
@@ -23,9 +24,12 @@ export default function EntityIndexPage() {
         let cancelled = false;
 
         async function load() {
-            if (authLoading) return;
+            if (authLoading) {
+                return;
+            }
 
             if (!disableAuth && !isAuthenticated) {
+                setLoading(false);
                 await login();
                 return;
             }
@@ -36,15 +40,15 @@ export default function EntityIndexPage() {
             try {
                 const data = await api.list();
 
-                if (!cancelled) {
-                    setEntities(data.entities ?? []);
-                }
+                if (cancelled) return;
+
+                setEntities(data.entities ?? []);
             } catch (err: any) {
                 console.error(err);
 
-                if (!cancelled) {
-                    setError(err?.message ?? 'Failed to load entities');
-                }
+                if (cancelled) return;
+
+                setError(err?.message ?? 'Failed to load entities');
             } finally {
                 if (!cancelled) {
                     setLoading(false);
@@ -57,7 +61,12 @@ export default function EntityIndexPage() {
         return () => {
             cancelled = true;
         };
-    }, [api, authLoading, isAuthenticated, disableAuth, login]);
+
+        // IMPORTANT:
+        // Do not include `api` here unless useEntityApi() returns a memoized object.
+        // Including it causes this page to reload forever.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authLoading, isAuthenticated, disableAuth]);
 
     return (
         <main className="p-6 max-w-3xl mx-auto space-y-6">
