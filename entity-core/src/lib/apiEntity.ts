@@ -24,12 +24,12 @@ export function useEntityApi() {
 
     return {
         list: async () => {
-            const resp = await authedFetch('/api/entities');
+            const resp = await authedFetch('/entities');
             return handle<{ entities: EntityInfo[] }>(resp);
         },
 
         get: async (entityName: string) => {
-            const resp = await authedFetch(`/api/entities/${entityName}`);
+            const resp = await authedFetch(`/entities/${entityName}`);
             return handle<unknown>(resp);
         },
 
@@ -37,7 +37,7 @@ export function useEntityApi() {
             entityName: string,
             entityJson: Record<string, unknown>
         ) => {
-            const resp = await authedFetch(`/api/entities/${entityName}`, {
+            const resp = await authedFetch(`/entities/${entityName}`, {
                 method: 'POST',
                 body: JSON.stringify({
                     entity_json: entityJson,
@@ -49,7 +49,7 @@ export function useEntityApi() {
 
         getFormMetadata: async (entityName: string) => {
             const resp = await authedFetch(
-                `/api/entities/${entityName}/form_metadata`
+                `/entities/${entityName}/form_metadata`
             );
 
             return handle<unknown>(resp);

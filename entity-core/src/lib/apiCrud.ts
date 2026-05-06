@@ -33,7 +33,7 @@ export function useCrudApi() {
     const authedFetch = useAuthedFetch();
 
     const postEnvelope = async <T>(entityName: string, envelope: RequestEnvelope) => {
-        const resp = await authedFetch(`/api/crud/${entityName}`, {
+        const resp = await authedFetch(`/crud/${entityName}`, {
             method: 'POST',
             body: JSON.stringify(envelope),
         });
