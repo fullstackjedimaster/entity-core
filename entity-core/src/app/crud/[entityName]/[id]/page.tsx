@@ -1,11 +1,43 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import  EntityComponent from '@/components/EntityComponent';
+
+import EntityComponent from '@/components/EntityComponent';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntityData } from '@/hooks/useEntityData';
 import { ZERO_UUID } from '@/lib/apiCrud';
+
+function normalizeDateValue(value: unknown): unknown {
+    if (typeof value !== 'string') return value;
+
+    // Converts "2026-05-06T19:20:00.655174+00:00" -> "2026-05-06"
+    if (/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+        return value.slice(0, 10);
+    }
+
+    return value;
+}
+
+function normalizeInitialValues(raw: Record<string, unknown>): Record<string, unknown> {
+    const normalized: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(raw)) {
+        if (Array.isArray(value)) {
+            normalized[key] = value.map((item) =>
+                item && typeof item === 'object' && !Array.isArray(item)
+                    ? normalizeInitialValues(item as Record<string, unknown>)
+                    : normalizeDateValue(item)
+            );
+        } else if (value && typeof value === 'object') {
+            normalized[key] = normalizeInitialValues(value as Record<string, unknown>);
+        } else {
+            normalized[key] = normalizeDateValue(value);
+        }
+    }
+
+    return normalized;
+}
 
 export default function EntityDataItemDetailPage() {
     return (
@@ -30,6 +62,7 @@ function EntityDataItemDetailInner() {
     const isNew = id === ZERO_UUID;
 
     const { isAuthenticated, loading: authLoading, login, disableAuth } = useAuth();
+
     const {
         entityData,
         loadEntityData,
@@ -41,29 +74,41 @@ function EntityDataItemDetailInner() {
     const [initialValues, setInitialValues] =
         useState<Record<string, unknown> | undefined>(undefined);
 
+    const loadedKeyRef = useRef<string | null>(null);
+    const loginStartedRef = useRef(false);
+
     useEffect(() => {
         if (authLoading) return;
 
         if (!disableAuth && !isAuthenticated) {
-            login();
+            if (!loginStartedRef.current) {
+                loginStartedRef.current = true;
+                login();
+            }
             return;
         }
 
         if (!entityName || isNew) {
             setInitialValues(undefined);
+            loadedKeyRef.current = null;
             return;
         }
 
+        const loadKey = `${entityName}:${id}`;
+
+        if (loadedKeyRef.current === loadKey) {
+            return;
+        }
+
+        loadedKeyRef.current = loadKey;
         loadEntityData(id, entityName);
     }, [
         authLoading,
         disableAuth,
         isAuthenticated,
-        login,
         entityName,
         id,
         isNew,
-        loadEntityData,
     ]);
 
     useEffect(() => {
@@ -76,7 +121,7 @@ function EntityDataItemDetailInner() {
             entityData;
 
         if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-            setInitialValues(raw as Record<string, unknown>);
+            setInitialValues(normalizeInitialValues(raw as Record<string, unknown>));
         }
     }, [entityData, isNew]);
 
@@ -127,20 +172,20 @@ function EntityDataItemDetailInner() {
 
             {(!isLoading || isNew) && (
                 <EntityComponent
-                entityName={entityName}
-                id={id}
-                initialValues={initialValues}
-                onSavedAction={async (savedValues: Record<string, unknown>) => {
-                    await saveEntityData(
-                        isNew ? null : id,
-                        entityName,
-                        savedValues
-                    );
+                    entityName={entityName}
+                    id={id}
+                    initialValues={initialValues}
+                    onSavedAction={async (savedValues: Record<string, unknown>) => {
+                        await saveEntityData(
+                            isNew ? null : id,
+                            entityName,
+                            savedValues
+                        );
 
-                    router.push(`/crud/${entityName}`);
-                }}
-                onCancelAction={() => router.push(`/crud/${entityName}`)}
-            />
+                        router.push(`/crud/${entityName}`);
+                    }}
+                    onCancelAction={() => router.push(`/crud/${entityName}`)}
+                />
             )}
         </main>
     );

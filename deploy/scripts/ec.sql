@@ -102,6 +102,7 @@ BEGIN
     );
   END IF;
 
+
   FOR k, v IN
     SELECT key, value FROM jsonb_each(entity_json)
   LOOP
@@ -129,6 +130,8 @@ BEGIN
       );
     END IF;
   END LOOP;
+
+
 
   PERFORM ec._upsert_entity(entity_schema, entity_name, entity_json);
 END;
@@ -687,6 +690,13 @@ BEGIN
         );
       END IF;
 
+      EXECUTE format(
+        'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO ec_app',
+        entity_schema,
+        entity_name
+      );
+
+
       FOR k, v IN
         SELECT key, value FROM jsonb_each(entity_json)
       LOOP
@@ -1045,6 +1055,8 @@ BEGIN
   EXECUTE format('GRANT USAGE ON SCHEMA %1$I TO ec_app', p_entity_schema);
   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA %1$I TO ec_app', p_entity_schema);
   EXECUTE format('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA %1$I TO ec_app', p_entity_schema);
+
+  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE ec IN SCHEMA %1$I  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ec_app', p_entity_schema);
 END;
 $$;
 
