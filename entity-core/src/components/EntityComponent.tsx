@@ -169,7 +169,7 @@ export default function EntityComponent({
                 return;
             }
 
-            const response = await fetch(`/crud`, {
+            const response = await fetch(`/crud/${entityName}/${itemId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
