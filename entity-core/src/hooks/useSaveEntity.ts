@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useApiFetch } from "@/hooks/useApiFetch";
+import { useState } from 'react';
+import { useCrudApi, ZERO_UUID } from '@/lib/apiCrud';
 
 interface UseSaveEntityConfig {
     entityName: string;
@@ -17,48 +17,54 @@ interface SaveResult {
 
 /**
  * useSaveEntity
- *  - Wraps calls to /api/manage_entity
- *  - Decides create vs update based on presence of primaryKey in payload
+ *
+ * Saves entity row data through the normalized CRUD API.
+ *
+ * Tenant/entity_schema is NOT sent in the body.
+ * It comes from:
+ * Auth0 token -> entity-core-api -> internal token -> entity-server claims.
  */
 export function useSaveEntity(config: UseSaveEntityConfig) {
     const { entityName, primaryKey } = config;
-    const { apiFetch } = useApiFetch();
+    const api = useCrudApi();
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<SaveResult | null>(null);
 
-    async function save(data: any): Promise<SaveResult> {
+    async function save(data: Record<string, any>): Promise<SaveResult> {
         setLoading(true);
         setError(null);
+
         try {
-            const id = data?.[primaryKey] ?? null;
-            const operation = id ? "update" : "create";
+            const rawId = data?.[primaryKey];
+            const id =
+                typeof rawId === 'string' && rawId.trim()
+                    ? rawId
+                    : null;
 
-            const res = await apiFetch("/api/manage_entity", {
-                method: "POST",
-                body: JSON.stringify({
-                    operation,
-                    name: entityName,
-                    id,
-                    data,
-                }),
-            });
+            const json =
+                id && id !== ZERO_UUID
+                    ? await api.update(entityName, id, data)
+                    : await api.create(entityName, data);
 
-            if (!res.ok) {
-                throw new Error(`Save failed: ${res.status} ${res.statusText}`);
-            }
+            const saveResult = json as SaveResult;
 
-            const json = (await res.json()) as SaveResult;
-            setResult(json);
-            return json;
+            setResult(saveResult);
+            return saveResult;
         } catch (err: any) {
-            setError(err.message || "Unknown error");
+            const message = err?.message ?? 'Unknown save error';
+            setError(message);
             throw err;
         } finally {
             setLoading(false);
         }
     }
 
-    return { save, loading, error, result };
+    return {
+        save,
+        loading,
+        error,
+        result,
+    };
 }

@@ -2,86 +2,119 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { useApi } from '@/lib/apiEntity';
+import { useEntityApi, type EntityInfo } from '@/lib/apiEntity';
 import { useAuth } from '@/contexts/AuthContext';
 
-interface EntityInfo {
-  entity_name: string;
-}
-
 export default function EntityIndexPage() {
-  const api = useApi();
-  const { isAuthenticated, login, loading: authLoading, disableAuth } = useAuth();
+    const api = useEntityApi();
+    const {
+        isAuthenticated,
+        login,
+        loading: authLoading,
+        disableAuth,
+        getEntitySchema,
+    } = useAuth();
 
-  const [entities, setEntities] = useState<EntityInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+    const [entities, setEntities] = useState<EntityInfo[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        // ⛔ wait for auth system to initialize
-        if (authLoading) return;
+    useEffect(() => {
+        let cancelled = false;
 
-        // 🔐 trigger login if needed
-        if (!disableAuth && !isAuthenticated) {
-          await login();
-          return;
+        async function load() {
+            if (authLoading) return;
+
+            if (!disableAuth && !isAuthenticated) {
+                await login();
+                return;
+            }
+
+            setLoading(true);
+            setError(null);
+
+            try {
+                const data = await api.list();
+
+                if (!cancelled) {
+                    setEntities(data.entities ?? []);
+                }
+            } catch (err: any) {
+                console.error(err);
+
+                if (!cancelled) {
+                    setError(err?.message ?? 'Failed to load entities');
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
         }
 
-        setLoading(true);
-        setError(null);
+        load();
 
-      const data = await api.entities.list();
-      setEntities(data.entities ?? []);
-      } catch (err: any) {
-          console.error(err);
-          setError(err.message);
-      } finally {
-          setLoading(false);
-      }
-    }
+        return () => {
+            cancelled = true;
+        };
+    }, [api, authLoading, isAuthenticated, disableAuth, login]);
 
-    load();
-  }, [authLoading, isAuthenticated, disableAuth]);
+    return (
+        <main className="p-6 max-w-3xl mx-auto space-y-6">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-semibold">Entities</h1>
+                    <p className="text-sm text-gray-600">
+                        Schema: {getEntitySchema() ?? 'unknown'}
+                    </p>
+                </div>
 
-  return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <h1 className="text-2xl font-semibold">Entities</h1>
+                <Link
+                    href="/entity/new"
+                    className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                    Create New Entity
+                </Link>
+            </div>
 
-      <Link
-        href="/entity/new"
-        className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-      >
-        + Create New Entity
-      </Link>
+            {loading && <p>Loading...</p>}
 
-      {loading && <p>Loading…</p>}
-      {error && <p className="text-red-600">Error: {error}</p>}
+            {error && <p className="text-red-600">Error: {error}</p>}
 
-      {!loading && !error && entities.length === 0 && (
-        <p className="text-gray-600">No entities found.</p>
-      )}
+            {!loading && !error && entities.length === 0 && (
+                <p className="text-gray-600">No entities found.</p>
+            )}
 
-      <ul className="border divide-y rounded">
-        {entities.map((ent) => (
-          <li key={ent.entity_name} className="p-4 flex justify-between">
-            <span>{ent.entity_name}</span>
-            <Link
-              href={`/entity/${ent.entity_name}`}
-              className="text-blue-600 hover:underline"
-            >
-              View / Edit →
-            </Link>
-            <Link
-              href={`/crud/${ent.entity_name}`}
-              className="text-blue-600 hover:underline"
-            >
-              crud →
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+            {!loading && !error && entities.length > 0 && (
+                <ul className="border divide-y rounded">
+                    {entities.map((ent) => (
+                        <li
+                            key={ent.entity_name}
+                            className="p-4 flex items-center justify-between gap-4"
+                        >
+                            <span className="font-medium">
+                                {ent.entity_name}
+                            </span>
+
+                            <div className="flex gap-4 text-sm">
+                                <Link
+                                    href={`/entity/${ent.entity_name}`}
+                                    className="text-blue-600 hover:underline"
+                                >
+                                    Edit definition
+                                </Link>
+
+                                <Link
+                                    href={`/crud/${ent.entity_name}`}
+                                    className="text-blue-600 hover:underline"
+                                >
+                                    Manage data
+                                </Link>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </main>
+    );
 }

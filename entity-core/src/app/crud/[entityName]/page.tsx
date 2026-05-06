@@ -1,24 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useApi } from '@/lib/apiCrud';
-
-
-
-interface EntityDataItemInfo {
-    id:string;
-}
-
-import { useParams } from "next/navigation";
-import { Suspense, useState, useEffect} from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { Suspense, useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCrudApi, ZERO_UUID, type EntityDataItemInfo } from '@/lib/apiCrud';
 
 export default function EntityDataItemIndexPage() {
     return (
         <Suspense
             fallback={
                 <main className="p-6 max-w-md mx-auto">
-                    <p className="text-gray-700">Loading entity…</p>
+                    <p className="text-gray-700">Loading entity data...</p>
                 </main>
             }
         >
@@ -28,78 +21,103 @@ export default function EntityDataItemIndexPage() {
 }
 
 function EntityDataItemIndexInner() {
-
     const params = useParams();
-    const entityParam = params?.entityName as string;
+    const entityName = String(params?.entityName ?? '');
 
-  const api = useApi();
-  const { isAuthenticated, login, loading: authLoading, disableAuth } = useAuth();
+    const api = useCrudApi();
+    const { isAuthenticated, login, loading: authLoading, disableAuth } = useAuth();
 
-  const [entityDataItems, setEntityDataItems] = useState<EntityDataItemInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+    const [items, setItems] = useState<EntityDataItemInfo[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        // ⛔ wait for auth system to initialize
-        if (authLoading) return;
+    useEffect(() => {
+        let cancelled = false;
 
-        // 🔐 trigger login if needed
-        if (!disableAuth && !isAuthenticated) {
-          await login();
-          return;
+        async function load() {
+            if (authLoading || !entityName) return;
+
+            if (!disableAuth && !isAuthenticated) {
+                await login();
+                return;
+            }
+
+            setLoading(true);
+            setError(null);
+
+            try {
+                const data = await api.list(entityName);
+
+                if (!cancelled) {
+                    setItems(data.items ?? []);
+                }
+            } catch (err: any) {
+                console.error(err);
+
+                if (!cancelled) {
+                    setError(err?.message ?? 'Failed to load entity data');
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
         }
 
-        setLoading(true);
-        setError(null);
+        load();
 
-      const data = await api.entityDataItems.list(entityParam);
-      setEntityDataItems(data.items ?? []);
-      } catch (err: any) {
-          console.error(err);
-          setError(err.message);
-      } finally {
-          setLoading(false);
-      }
-    }
+        return () => {
+            cancelled = true;
+        };
+    }, [api, authLoading, isAuthenticated, disableAuth, login, entityName]);
 
-    load();
-  }, [authLoading, isAuthenticated, disableAuth]);
+    return (
+        <main className="p-6 max-w-3xl mx-auto space-y-6">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-semibold">
+                        {entityName} Data
+                    </h1>
+                    <p className="text-sm text-gray-600">
+                        Create, edit, and inspect records for this entity.
+                    </p>
+                </div>
 
-  return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <h1 className="text-2xl font-semibold">Entities</h1>
+                <Link
+                    href={`/crud/${entityName}/${ZERO_UUID}`}
+                    className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                    Create Record
+                </Link>
+            </div>
 
+            {loading && <p>Loading...</p>}
 
+            {error && <p className="text-red-600">Error: {error}</p>}
 
-      {loading && <p>Loading…</p>}
-      {error && <p className="text-red-600">Error: {error}</p>}
+            {!loading && !error && items.length === 0 && (
+                <p className="text-gray-600">No records found.</p>
+            )}
 
-      {!loading && !error && entityDataItems.length === 0 && (
-        <p className="text-gray-600">No entities found.</p>
-      )}
+            {!loading && !error && items.length > 0 && (
+                <ul className="border divide-y rounded">
+                    {items.map((item) => (
+                        <li
+                            key={item.id}
+                            className="p-4 flex items-center justify-between gap-4"
+                        >
+                            <span className="font-mono text-sm">{item.id}</span>
 
-      <ul className="border divide-y rounded">
-        {entityDataItems.map((entityDataItem) => (
-          <li key={entityDataItem.id} className="p-4 flex justify-between">
-            <span>{entityDataItem.id}</span>
-            <Link
-             href={`/crud/${entityParam}/${entityDataItem.id}`}
-              className="text-blue-600 hover:underline"
-            >
-              View / Edit →
-            </Link>
-               <Link
-              href={`/crud/${entityParam}/00000000-0000-0000-0000-000000000000`}
-              className="text-blue-600 hover:underline"
-            >
-              Create →
-            </Link>
-          </li>
-        ))}
-      </ul>
-
-    </div>
-  );
+                            <Link
+                                href={`/crud/${entityName}/${item.id}`}
+                                className="text-blue-600 hover:underline"
+                            >
+                                View / Edit
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </main>
+    );
 }

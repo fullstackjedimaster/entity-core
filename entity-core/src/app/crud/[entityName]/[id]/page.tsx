@@ -1,179 +1,95 @@
 'use client';
 
-import React, { Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-
-import EntityComponent from '@/components/EntityComponent';
-import { apiFetchRaw } from '@/lib/api';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import  EntityComponent from '@/components/EntityComponent';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEntityData } from '@/hooks/useEntityData';
+import { ZERO_UUID } from '@/lib/apiCrud';
 
-export const dynamic = 'force-dynamic';
-
-interface ManageResultPayload {
-    result?: unknown;
+export default function EntityDataItemDetailPage() {
+    return (
+        <Suspense
+            fallback={
+                <main className="p-6 max-w-3xl mx-auto">
+                    <p className="text-gray-600">Loading record...</p>
+                </main>
+            }
+        >
+            <EntityDataItemDetailInner />
+        </Suspense>
+    );
 }
 
-interface ManageResponse {
-    ok: boolean;
-    result?: ManageResultPayload;
-    message?: string;
-}
+function EntityDataItemDetailInner() {
+    const router = useRouter();
+    const params = useParams();
 
-function EntityPageContent() {
-    const searchParams = useSearchParams();
+    const entityName = String(params?.entityName ?? '');
+    const id = String(params?.id ?? ZERO_UUID);
+    const isNew = id === ZERO_UUID;
 
-    const entity = searchParams.get('entity') ?? '';
-    const id = searchParams.get('id') ?? '';
-
+    const { isAuthenticated, loading: authLoading, login, disableAuth } = useAuth();
     const {
-        isAuthenticated,
-        loading: authLoading,
-        login,
-        getToken,
-        disableAuth,
-    } = useAuth();
+        entityData,
+        loadEntityData,
+        saveEntityData,
+        isLoading,
+        error,
+    } = useEntityData();
 
     const [initialValues, setInitialValues] =
-        useState<Record<string, unknown> | null>(null);
-
-    const [loadingRow, setLoadingRow] = useState(false);
-    const [rowError, setRowError] = useState<string | null>(null);
-
-    // ---------------------------------------------------------------------
-    // Require login
-    // ---------------------------------------------------------------------
+        useState<Record<string, unknown> | undefined>(undefined);
 
     useEffect(() => {
         if (authLoading) return;
 
         if (!disableAuth && !isAuthenticated) {
             login();
-        }
-    }, [authLoading, disableAuth, isAuthenticated, login]);
-
-    // ---------------------------------------------------------------------
-    // Load existing entity row
-    // ---------------------------------------------------------------------
-
-    useEffect(() => {
-        if (!entity || !id) return;
-
-        if (authLoading) return;
-
-        if (!disableAuth && !isAuthenticated) return;
-
-        let cancelled = false;
-
-        async function loadEntityRow() {
-            setLoadingRow(true);
-            setRowError(null);
-
-            try {
-                // ---------------------------------------------------------
-                // Get Auth0 access token
-                // ---------------------------------------------------------
-
-                const token = disableAuth
-                    ? null
-                    : await getToken();
-
-                if (!disableAuth && !token) {
-                    throw new Error('Failed to obtain access token');
-                }
-
-                // ---------------------------------------------------------
-                // Load entity row
-                // ---------------------------------------------------------
-
-                const resp = await apiFetchRaw(
-                    '/data',
-                    token ?? '',
-                    {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            operation: 'read',
-                            target: entity,
-                            id,
-                            args: {},
-                            meta: {
-                                source: 'entity/page',
-                            },
-                        }),
-                    },
-                );
-
-                if (!resp.ok) {
-                    const text = await resp.text();
-
-                    throw new Error(
-                        `manage read failed: ${resp.status} ${resp.statusText}${
-                            text ? ` - ${text}` : ''
-                        }`,
-                    );
-                }
-
-                const json = (await resp.json()) as ManageResponse;
-
-                if (!json.ok) {
-                    throw new Error(
-                        json.message || 'manage returned !ok',
-                    );
-                }
-
-                const inner = json.result ?? {};
-
-                const row = (inner.result ??
-                    null) as Record<string, unknown> | null;
-
-                if (!cancelled) {
-                    setInitialValues(row);
-                }
-            } catch (err: unknown) {
-                console.error(
-                    '[entity/page] Failed to load row:',
-                    err,
-                );
-
-                if (!cancelled) {
-                    setRowError(
-                        err instanceof Error
-                            ? err.message
-                            : 'Unknown error loading entity',
-                    );
-
-                    setInitialValues(null);
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoadingRow(false);
-                }
-            }
+            return;
         }
 
-        loadEntityRow();
+        if (!entityName || isNew) {
+            setInitialValues(undefined);
+            return;
+        }
 
-        return () => {
-            cancelled = true;
-        };
+        loadEntityData(id, entityName);
     }, [
-        entity,
-        id,
         authLoading,
         disableAuth,
         isAuthenticated,
-        getToken,
+        login,
+        entityName,
+        id,
+        isNew,
+        loadEntityData,
     ]);
 
-    // ---------------------------------------------------------------------
-    // UI states
-    // ---------------------------------------------------------------------
+    useEffect(() => {
+        if (!entityData || isNew) return;
+
+        const raw =
+            entityData?.items ??
+            entityData?.entity ??
+            entityData?.result ??
+            entityData;
+
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+            setInitialValues(raw as Record<string, unknown>);
+        }
+    }, [entityData, isNew]);
+
+    const title = useMemo(() => {
+        return isNew
+            ? `Create ${entityName} Record`
+            : `Edit ${entityName} Record`;
+    }, [entityName, isNew]);
 
     if (authLoading) {
         return (
             <main className="p-6 max-w-3xl mx-auto">
-                <p className="text-gray-600">
-                    Initializing authentication...
-                </p>
+                <p className="text-gray-600">Checking authentication...</p>
             </main>
         );
     }
@@ -181,79 +97,50 @@ function EntityPageContent() {
     if (!disableAuth && !isAuthenticated) {
         return (
             <main className="p-6 max-w-3xl mx-auto">
-                <p className="text-gray-600">
-                    Redirecting to login...
-                </p>
+                <p className="text-gray-600">Redirecting to login...</p>
             </main>
         );
     }
 
-    if (!entity) {
+    if (!entityName) {
         return (
             <main className="p-6 max-w-3xl mx-auto">
-                <h1 className="text-xl font-semibold mb-2">
-                    Entity form
-                </h1>
-
-                <p className="text-gray-600">
-                    Missing <code>entity</code> query parameter.
-                </p>
+                <p className="text-red-600">Missing entity name.</p>
             </main>
         );
     }
-
-    if (id && loadingRow) {
-        return (
-            <main className="p-6 max-w-3xl mx-auto">
-                <h1 className="text-xl font-semibold mb-2">
-                    Edit {entity}
-                </h1>
-
-                <p className="text-gray-600">
-                    Loading existing record...
-                </p>
-            </main>
-        );
-    }
-
-    if (id && rowError) {
-        return (
-            <main className="p-6 max-w-3xl mx-auto">
-                <h1 className="text-xl font-semibold mb-2">
-                    Edit {entity}
-                </h1>
-
-                <p className="text-red-600 mb-2">
-                    Could not load existing record: {rowError}
-                </p>
-            </main>
-        );
-    }
-
-    // ---------------------------------------------------------------------
-    // Render entity form
-    // ---------------------------------------------------------------------
 
     return (
-        <main className="p-6 max-w-3xl mx-auto">
-            <EntityComponent
-                entityName={entity}
-                initialValues={initialValues ?? undefined}
-            />
+        <main className="p-6 max-w-3xl mx-auto space-y-4">
+            <div>
+                <h1 className="text-2xl font-semibold">{title}</h1>
+                <p className="text-sm text-gray-600">
+                    {isNew ? 'New record' : `Record ID: ${id}`}
+                </p>
+            </div>
+
+            {isLoading && !isNew && (
+                <p className="text-gray-600">Loading existing record...</p>
+            )}
+
+            {error && <p className="text-red-600">Error: {error}</p>}
+
+            {(!isLoading || isNew) && (
+                <EntityComponent
+                    entityName={entityName}
+                    initialValues={initialValues}
+                    onSaved={async (savedValues: Record<string, unknown>) => {
+                        await saveEntityData(
+                            isNew ? null : id,
+                            entityName,
+                            savedValues
+                        );
+
+                        router.push(`/crud/${entityName}`);
+                    }}
+                    onCancel={() => router.push(`/crud/${entityName}`)}
+                />
+            )}
         </main>
-    );
-}
-
-export default function EntityPage() {
-    return (
-        <Suspense
-            fallback={
-                <main className="p-6 max-w-3xl mx-auto">
-                    <p className="text-gray-600">Loading...</p>
-                </main>
-            }
-        >
-            <EntityPageContent />
-        </Suspense>
     );
 }

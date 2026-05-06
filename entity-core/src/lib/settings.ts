@@ -40,6 +40,9 @@ export const settings = {
 
   DISABLE_AUTH: process.env.NEXT_PUBLIC_DISABLE_AUTH === "true",
 
+  DEFAULT_ENTITY_SCHEMA:
+    process.env.NEXT_PUBLIC_DEFAULT_ENTITY_SCHEMA || "ec"
+
 
 } as const;
 
