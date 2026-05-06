@@ -12,7 +12,7 @@ from app.core.auth0_mgmt import get_management_token
 from app.controllers.auth import require_jwt
 from app.core.model_client import call_model_manage
 from app.schemas import RequestEnvelope
-
+from app.controllers.internal_auth import issue_internal_token
 from jose import jwt, JWTError
 from app.routers.internal import wait_for_metadata
 from datetime import datetime, timedelta
@@ -126,13 +126,14 @@ async def provision_tenant(
         ]
     perms = payload.get("permissions") or ["crud:read", "crud:create", "crud:update", "crud:delete"]
 
-
+    internal_token = issue_internal_token(request)
 
     # ---- DB call via entity-server --------------------------------------------
     envelope = RequestEnvelope(
         operation="execute",
         target="ec.provision_tenant",
         id=None,
+        data={},
         args={
             "entity_schema": entity_schema,
             "sub": sub,
@@ -145,10 +146,9 @@ async def provision_tenant(
             "roles":roles,
             "permissions": perms,
         },
-        meta={"source": "entity-core:/onboarding/provision_tenant"},
     )
 
-    data: Dict[str, Any] = await call_model_manage(envelope)
+    data: Dict[str, Any] = await call_model_manage(envelope, internal_token)
 
     if not data.get("ok", False):
         raise HTTPException(

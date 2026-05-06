@@ -14,7 +14,7 @@ class RequestEnvelope(BaseModel):
     target: str                      # entity name OR action name
     id: Optional[str] = None         # GUID row id or correlation id
     data: Optional[Dict[str, Any]] = None  # data payload
-    meta: Optional[Dict[str, Any]] = None  # tracing or UI state
+    args: Optional[Dict[str, Any]] = None
 
 
 

@@ -2,12 +2,18 @@
 
 from jose import jwt
 from app.core.settings import env
+from typing import Optional
 
 EC_SHARED_JWT_SECRET = env("EC_SHARED_JWT_SECRET")
 
-def issue_internal_token(request):
+def issue_internal_token(request, entity_schema:Optional[str]):
     claims = request.state.claims
-    print(claims.get("entity_schema"))
+
+    if claims.get("entity_schema") is not None:
+        v_entity_schema = claims.get("entity_schema")
+    else:
+        v_entity_schema = entity_schema
+
     now = datetime.now(timezone.utc)
     return jwt.encode(
         {
@@ -16,7 +22,7 @@ def issue_internal_token(request):
             "iat": now,
             "exp": now + timedelta(minutes=5),
             "scope": "internal",
-            "entity_schema": claims.get("entity_schema"),
+            "entity_schema": v_entity_schema,
             "permissions": claims.get("permissions", []),
         },
         EC_SHARED_JWT_SECRET,
