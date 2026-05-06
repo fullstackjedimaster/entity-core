@@ -23,7 +23,7 @@ export default function EntityIndexPage() {
         let cancelled = false;
 
         async function load() {
-            if (authLoading) return;
+            if (loading) return;
 
             if (!disableAuth && !isAuthenticated) {
                 await login();
@@ -57,7 +57,7 @@ export default function EntityIndexPage() {
         return () => {
             cancelled = true;
         };
-    }, [api, authLoading, isAuthenticated, disableAuth, login]);
+    }, [api, loading, isAuthenticated, disableAuth, login]);
 
     return (
         <main className="p-6 max-w-3xl mx-auto space-y-6">
