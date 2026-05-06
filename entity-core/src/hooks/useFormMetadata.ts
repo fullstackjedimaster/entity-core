@@ -37,7 +37,7 @@ export function useFormMetadata(entityName?: string) {
     };
 
     const { data, error, isLoading, mutate } = useSWR<FormMetadata>(
-        shouldFetch ? `/entity/${entityName}/form_metadata` : null,
+        shouldFetch ? `/entities/${entityName}/form_metadata` : null,
         fetcher
     );
 
