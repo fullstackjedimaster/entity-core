@@ -6,13 +6,7 @@ from typing import Optional
 
 EC_SHARED_JWT_SECRET = env("EC_SHARED_JWT_SECRET")
 
-def issue_internal_token(request, entity_schema:Optional[str] = None):
-
-
-    if claims.get("entity_schema") is not None:
-        v_entity_schema = claims.get("entity_schema")
-    else:
-        v_entity_schema = entity_schema
+def issue_internal_token(request):
 
     now = datetime.now(timezone.utc)
     return jwt.encode(
@@ -22,8 +16,6 @@ def issue_internal_token(request, entity_schema:Optional[str] = None):
             "iat": now,
             "exp": now + timedelta(minutes=5),
             "scope": "internal",
-            "entity_schema": v_entity_schema,
-            "permissions": claims.get("permissions", []),
         },
         EC_SHARED_JWT_SECRET,
         algorithm="HS256",
