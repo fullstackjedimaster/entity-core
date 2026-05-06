@@ -2,6 +2,7 @@
 
 import useSWR from 'swr';
 import { useEntityApi } from '@/lib/apiEntity';
+import { useAuth } from '@/contexts/AuthContext';
 
 export type FieldMeta = {
     name: string;
@@ -24,7 +25,12 @@ type FormMetadataResponse =
     | {
           formMetadata?: FormMetadata;
           metadata?: FormMetadata;
-          result?: FormMetadata | { formMetadata?: FormMetadata; metadata?: FormMetadata };
+          result?:
+              | FormMetadata
+              | {
+                    formMetadata?: FormMetadata;
+                    metadata?: FormMetadata;
+                };
       };
 
 function normalizeFormMetadata(payload: FormMetadataResponse): FormMetadata {
@@ -41,9 +47,15 @@ function normalizeFormMetadata(payload: FormMetadataResponse): FormMetadata {
 }
 
 export function useFormMetadata(entityName: string) {
+    const { isAuthenticated, loading: authLoading, disableAuth } = useAuth();
     const api = useEntityApi();
 
-    const key = entityName ? ['form-metadata', entityName] : null;
+    const canFetch =
+        !!entityName &&
+        !authLoading &&
+        (disableAuth || isAuthenticated);
+
+    const key = canFetch ? ['form-metadata', entityName] : null;
 
     const {
         data,
@@ -52,7 +64,8 @@ export function useFormMetadata(entityName: string) {
         mutate,
     } = useSWR<FormMetadataResponse>(
         key,
-        async () => api.getFormMetadata(entityName) as Promise<FormMetadataResponse>,
+        async () =>
+            api.getFormMetadata(entityName) as Promise<FormMetadataResponse>,
         {
             revalidateOnFocus: false,
             revalidateOnReconnect: false,
@@ -64,8 +77,8 @@ export function useFormMetadata(entityName: string) {
     return {
         formMetadata,
         metadata: formMetadata,
-        isLoading,
-        loading: isLoading,
+        isLoading: authLoading || isLoading,
+        loading: authLoading || isLoading,
         error,
         mutate,
     };
