@@ -10,6 +10,8 @@ export function useEntity() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+
+
     const loadEntity = useCallback(
         async (entityName: string) => {
             if (authLoading || !isAuthenticated || !entityName) return;

@@ -1031,17 +1031,74 @@ BEGIN
       p_entity_schema TEXT,
       p_entity_name TEXT
     )
-    RETURNS TABLE (entity_json JSONB)
+    RETURNS jsonb
     LANGUAGE plpgsql
     SECURITY DEFINER
     SET search_path = %1$I, public
     AS $form$
+    DECLARE
+    cfg record;
+      rec record;
+      fields jsonb := '[]'::jsonb;
+      pk text;
+      excludes text[];
     BEGIN
-      RETURN QUERY
-      SELECT e.entity_json
-      FROM %1$I.entity e
-      WHERE e.entity_schema = p_entity_schema
-        AND e.entity_name = p_entity_name;
+    SELECT *
+    INTO cfg
+    FROM %1$I.entity_config
+    WHERE entity_name = p_entity_name
+      AND entity_schema = COALESCE(p_entity_schema, current_schema);
+
+    IF cfg IS NULL THEN
+        RAISE EXCEPTION 'Unknown entity: %.%', p_entity_schema, p_entity_name;
+    END IF;
+
+      pk := cfg.primary_key;
+      excludes := COALESCE(cfg.exclude_columns, ARRAY[]::text[]);
+
+    FOR rec IN
+    SELECT c.column_name,
+           c.data_type,
+           c.is_nullable,
+           c.udt_name,
+           c.ordinal_position
+    FROM information_schema.columns c
+    WHERE c.table_schema = cfg.schema_name
+      AND c.table_name  = cfg.table_name
+    ORDER BY c.ordinal_position
+        LOOP
+        -- skip pk and excluded
+        IF rec.column_name = pk OR rec.column_name = ANY (excludes) THEN
+          CONTINUE;
+    END IF;
+
+    fields := fields || jsonb_build_object(
+      'name', rec.column_name,
+      'label', initcap(replace(rec.column_name, '_', ' ')),
+      'type',
+        CASE
+          WHEN rec.data_type = 'ARRAY' AND rec.udt_name LIKE '_text' THEN 'string[]'
+          WHEN rec.data_type = 'ARRAY' THEN 'array'
+          WHEN rec.data_type = 'USER-DEFINED' AND rec.udt_name = 'citext' THEN 'text'
+          WHEN rec.data_type = 'jsonb' THEN 'jsonb'
+          WHEN rec.data_type = 'boolean' THEN 'boolean'
+          WHEN rec.data_type IN ('integer','bigint','numeric','double precision','real') THEN 'number'
+          WHEN rec.data_type LIKE 'timestamp%' THEN 'datetime'
+          WHEN rec.data_type = 'date' THEN 'date'
+          WHEN rec.data_type = 'uuid' THEN 'uuid'
+          ELSE 'text'
+        END,
+      'required', (rec.is_nullable = 'NO')
+    )::jsonb;
+    END LOOP;
+
+    RETURN jsonb_build_object(
+            'entity', cfg.entity_name,
+            'entity_schema', cfg.schema_name,
+            'table',  cfg.table_name,
+            'primaryKey', pk,
+            'fields', fields
+           );
     END;
     $form$
   $sql$, p_entity_schema);
