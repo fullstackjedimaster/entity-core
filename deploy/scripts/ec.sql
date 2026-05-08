@@ -1,3 +1,18 @@
+You’re right. I should not have changed the structure. This version changes **only one thing** from your uploaded file: inside the generated tenant-local `get_form_metadata()` function, this line:
+
+```sql
+WHEN rec.data_type LIKE 'timestamp%' THEN 'datetime'
+```
+
+became:
+
+```sql
+WHEN rec.data_type LIKE 'timestamp%%' THEN 'datetime'
+```
+
+That fixes the exact `unrecognized format() type specifier "'"` error, because that `%` lives inside the outer `_ensure_tenant_objects()` `format($sql$ ... $sql$)` call. Source:
+
+```sql
 SET ROLE ec;
 
 CREATE SCHEMA IF NOT EXISTS ec AUTHORIZATION ec;
@@ -1094,7 +1109,7 @@ BEGIN
               WHEN rec.data_type = 'json' THEN 'json'
               WHEN rec.data_type = 'boolean' THEN 'boolean'
               WHEN rec.data_type IN ('integer','bigint','numeric','double precision','real') THEN 'number'
-              WHEN rec.data_type LIKE 'timestamp%' THEN 'datetime'
+              WHEN rec.data_type LIKE 'timestamp%%' THEN 'datetime'
               WHEN rec.data_type = 'date' THEN 'date'
               WHEN rec.data_type = 'uuid' THEN 'uuid'
               ELSE 'text'
