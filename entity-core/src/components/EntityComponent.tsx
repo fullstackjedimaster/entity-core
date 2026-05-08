@@ -58,7 +58,7 @@ function defaultValueForField(field: any): any {
 
         case 'json':
         case 'jsonb':
-            return {};
+            return field?.is_array || field?.widget === 'subform' ? [] : {};
 
         default:
             return '';
