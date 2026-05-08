@@ -46,7 +46,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_name_idx
 
 CREATE OR REPLACE FUNCTION ec._upsert_entity(
   p_entity_schema TEXT,
-  p_entity_name
+  p_entity_name TEXT,
   p_entity_json JSONB
 )
 RETURNS VOID
