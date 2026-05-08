@@ -28,15 +28,38 @@ function cloneValue<T>(value: T): T {
     return JSON.parse(JSON.stringify(value));
 }
 
-function defaultValueForType(type?: string): any {
-    switch ((type ?? '').toLowerCase()) {
+function defaultValueForField(field: any): any {
+    const type = String(field?.type ?? '').toLowerCase();
+
+    const template =
+        field?.template ??
+        field?.defaultValue ??
+        field?.default_value ??
+        field?.sample ??
+        field?.shape ??
+        field?.schema;
+
+    if (template !== undefined && template !== null) {
+        return cloneValue(template);
+    }
+
+    switch (type) {
         case 'boolean':
+        case 'bool':
             return false;
+
         case 'number':
         case 'integer':
+        case 'int':
         case 'float':
         case 'decimal':
+        case 'numeric':
             return 0;
+
+        case 'json':
+        case 'jsonb':
+            return {};
+
         default:
             return '';
     }
@@ -46,12 +69,11 @@ function buildEntityFromMetadata(metadata: any): Entity {
     const entity: Entity = {};
 
     for (const field of metadata?.fields ?? []) {
-        entity[field.name] = defaultValueForType(field.type);
+        entity[field.name] = defaultValueForField(field);
     }
 
     return entity;
 }
-
 function normalizeLoadedEntity(payload: any): Entity {
     if (!payload) return {};
 
