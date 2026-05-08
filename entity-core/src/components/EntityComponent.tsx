@@ -31,42 +31,29 @@ function cloneValue<T>(value: T): T {
 function normalizeLoadedEntity(payload: any): Entity {
     if (!payload) return {};
 
-    if (payload.entity && typeof payload.entity === 'object') {
-        return cloneValue(payload.entity);
-    }
-
-    if (payload.result?.entity && typeof payload.result.entity === 'object') {
-        return cloneValue(payload.result.entity);
-    }
-
-    if (payload.result?.data && typeof payload.result.data === 'object') {
-        return cloneValue(payload.result.data);
-    }
-
-    if (payload.data && typeof payload.data === 'object') {
-        return cloneValue(payload.data);
-    }
-
-    if (typeof payload === 'object') {
-        return cloneValue(payload);
-    }
+    if (payload.entity && typeof payload.entity === 'object') return cloneValue(payload.entity);
+    if (payload.result?.entity && typeof payload.result.entity === 'object') return cloneValue(payload.result.entity);
+    if (payload.result?.data && typeof payload.result.data === 'object') return cloneValue(payload.result.data);
+    if (payload.data && typeof payload.data === 'object') return cloneValue(payload.data);
+    if (payload.result && typeof payload.result === 'object') return cloneValue(payload.result);
+    if (typeof payload === 'object') return cloneValue(payload);
 
     return {};
 }
 
-function extractEntityJson(metadata: any, entityName: string): Entity | null {
+function extractEntityJsonFromDefinition(definition: any, entityName: string): Entity | null {
     const raw =
-        metadata?.entity_json ??
-        metadata?.entityJson ??
-        metadata?.result?.entity_json ??
-        metadata?.result?.entityJson ??
-        metadata?.data?.entity_json ??
-        metadata?.data?.entityJson ??
+        definition?.entity_json ??
+        definition?.entityJson ??
+        definition?.entity?.entity_json ??
+        definition?.entity?.entityJson ??
+        definition?.data?.entity_json ??
+        definition?.data?.entityJson ??
+        definition?.result?.entity_json ??
+        definition?.result?.entityJson ??
         null;
 
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-        return null;
-    }
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
 
     const entityJson =
         raw[entityName] && typeof raw[entityName] === 'object'
@@ -77,9 +64,7 @@ function extractEntityJson(metadata: any, entityName: string): Entity | null {
 }
 
 function defaultValueFromShape(value: any): any {
-    if (Array.isArray(value)) {
-        return [];
-    }
+    if (Array.isArray(value)) return [];
 
     if (value !== null && typeof value === 'object') {
         const result: Entity = {};
@@ -95,22 +80,6 @@ function defaultValueFromShape(value: any): any {
     if (typeof value === 'number') return 0;
 
     return '';
-}
-
-function buildEntityFromEntityJson(metadata: any, entityName: string): Entity {
-    const entityJson = extractEntityJson(metadata, entityName);
-
-    if (!entityJson) {
-        return {};
-    }
-
-    const entity: Entity = {};
-
-    for (const [key, value] of Object.entries(entityJson)) {
-        entity[key] = defaultValueFromShape(value);
-    }
-
-    return entity;
 }
 
 function defaultValueForMetadataField(field: any): any {
@@ -148,14 +117,18 @@ function buildEntityFromMetadata(metadata: any): Entity {
     return entity;
 }
 
-function buildNewEntity(metadata: any, entityName: string): Entity {
-    const fromEntityJson = buildEntityFromEntityJson(metadata, entityName);
-
-    if (Object.keys(fromEntityJson).length > 0) {
-        return fromEntityJson;
+function buildEntityFromShape(shape: Entity | null, metadata: any): Entity {
+    if (!shape || Object.keys(shape).length === 0) {
+        return buildEntityFromMetadata(metadata);
     }
 
-    return buildEntityFromMetadata(metadata);
+    const entity: Entity = {};
+
+    for (const [key, value] of Object.entries(shape)) {
+        entity[key] = defaultValueFromShape(value);
+    }
+
+    return entity;
 }
 
 function mergeEntityValuesIntoShape(shape: any, values: any): any {
@@ -165,18 +138,10 @@ function mergeEntityValuesIntoShape(shape: any, values: any): any {
                 ? shape[0]
                 : {};
 
-        if (!Array.isArray(values)) {
-            return [];
-        }
+        if (!Array.isArray(values)) return [];
 
         return values.map((row) => {
-            if (
-                row &&
-                typeof row === 'object' &&
-                !Array.isArray(row) &&
-                templateRow &&
-                typeof templateRow === 'object'
-            ) {
+            if (row && typeof row === 'object' && !Array.isArray(row)) {
                 return mergeEntityValuesIntoShape(templateRow, row);
             }
 
@@ -209,26 +174,13 @@ function mergeEntityValuesIntoShape(shape: any, values: any): any {
     return values;
 }
 
-function buildRenderShape(metadata: any, entityName: string): Entity {
-    const entityJson = extractEntityJson(metadata, entityName);
-
-    if (entityJson && Object.keys(entityJson).length > 0) {
-        return entityJson;
-    }
-
-    return buildEntityFromMetadata(metadata);
-}
-
 function normalizeEntityForSave(entityValue: Entity, metadata: any): Entity {
     const normalized = cloneValue(entityValue) || {};
 
     for (const field of metadata?.fields ?? []) {
         const type = String(field?.type ?? '').toLowerCase();
 
-        if (
-            (type === 'json' || type === 'jsonb') &&
-            normalized[field.name] === ''
-        ) {
+        if ((type === 'json' || type === 'jsonb') && normalized[field.name] === '') {
             normalized[field.name] = {};
         }
     }
@@ -249,6 +201,8 @@ export default function EntityComponent({
     const { metadata, isLoading: metadataLoading } = useFormMetadata(entityName);
 
     const [entity, setEntity] = useState<Entity>({});
+    const [entityDefinition, setEntityDefinition] = useState<Entity | null>(null);
+    const [formShape, setFormShape] = useState<Entity>({});
     const [entityLoading, setEntityLoading] = useState(true);
     const [entityError, setEntityError] = useState<string | null>(null);
     const [addButtonEnabled, setAddButtonEnabled] = useState<Record<string, boolean>>({});
@@ -268,10 +222,58 @@ export default function EntityComponent({
 
     const hier = useHierarchicalOptions(entityName, hierarchyFields, 'id', 'name');
 
-    const renderShape = useMemo(() => {
-        if (!metadata) return {};
-        return buildRenderShape(metadata, entityName);
-    }, [metadata, entityName]);
+    const loadEntityDefinition = useCallback(async (): Promise<Entity | null> => {
+        const response = await fetch('/api/manage', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                operation: 'execute',
+                target: 'ec.get_entity',
+                args: {
+                    entity_name: entityName,
+                },
+                meta: {
+                    source: 'EntityComponent.loadEntityDefinition',
+                },
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(
+                `Entity definition load failed: ${response.status} ${response.statusText}`
+            );
+        }
+
+        const payload = await response.json();
+        return normalizeLoadedEntity(payload);
+    }, [entityName]);
+
+    const loadEntityData = useCallback(async (): Promise<Entity> => {
+        const response = await fetch('/api/manage', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                operation: 'read',
+                target: entityName,
+                id: itemId,
+                args: {},
+                meta: {
+                    source: 'EntityComponent.loadEntityData',
+                },
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Entity data load failed: ${response.status} ${response.statusText}`);
+        }
+
+        const payload = await response.json();
+        return normalizeLoadedEntity(payload);
+    }, [entityName, itemId]);
 
     const loadEntity = useCallback(async () => {
         if (!metadata) return;
@@ -280,60 +282,53 @@ export default function EntityComponent({
         setEntityError(null);
 
         try {
+            const definition = await loadEntityDefinition();
+            const shape = extractEntityJsonFromDefinition(definition, entityName);
+
+            setEntityDefinition(definition);
+            setFormShape(shape && Object.keys(shape).length > 0 ? shape : buildEntityFromMetadata(metadata));
+
             if (initialValues) {
                 setEntity(
-                    mergeEntityValuesIntoShape(
-                        buildRenderShape(metadata, entityName),
-                        initialValues
-                    )
+                    shape
+                        ? mergeEntityValuesIntoShape(shape, initialValues)
+                        : cloneValue(initialValues)
                 );
                 return;
             }
 
             if (isNewEntity) {
-                setEntity(buildNewEntity(metadata, entityName));
+                setEntity(buildEntityFromShape(shape, metadata));
                 return;
             }
 
-            const response = await fetch('/api/manage', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    operation: 'read',
-                    target: entityName,
-                    id: itemId,
-                    args: {},
-                    meta: {
-                        source: 'EntityComponent.loadEntity',
-                    },
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`Load failed: ${response.status} ${response.statusText}`);
-            }
-
-            const payload = await response.json();
-            const loadedEntity = normalizeLoadedEntity(payload);
+            const loadedEntity = await loadEntityData();
 
             setEntity(
                 Object.keys(loadedEntity).length > 0
-                    ? mergeEntityValuesIntoShape(
-                          buildRenderShape(metadata, entityName),
-                          loadedEntity
-                      )
-                    : buildNewEntity(metadata, entityName)
+                    ? shape
+                        ? mergeEntityValuesIntoShape(shape, loadedEntity)
+                        : loadedEntity
+                    : buildEntityFromShape(shape, metadata)
             );
         } catch (err) {
             console.error(`Error loading ${entityName}:`, err);
             setEntityError(err instanceof Error ? err.message : 'Unable to load entity');
-            setEntity(buildNewEntity(metadata, entityName));
+
+            const fallbackShape = buildEntityFromMetadata(metadata);
+            setFormShape(fallbackShape);
+            setEntity(fallbackShape);
         } finally {
             setEntityLoading(false);
         }
-    }, [entityName, itemId, initialValues, isNewEntity, metadata]);
+    }, [
+        entityName,
+        initialValues,
+        isNewEntity,
+        loadEntityData,
+        loadEntityDefinition,
+        metadata,
+    ]);
 
     useEffect(() => {
         void loadEntity();
@@ -387,6 +382,7 @@ export default function EntityComponent({
         const rows = Array.isArray(current) ? current : [];
 
         setEntityPath(path, [...rows, defaultValueFromShape(templateRow)]);
+
         setAddButtonEnabled((prev) => ({
             ...prev,
             [path.join('.')]: false,
@@ -652,7 +648,7 @@ export default function EntityComponent({
                 )}
             </div>
 
-            {Object.entries(renderShape).map(([key, value]) => {
+            {Object.entries(formShape).map(([key, value]) => {
                 if (key === 'entity_json') return null;
                 return renderField(key, value);
             })}
