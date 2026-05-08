@@ -94,6 +94,7 @@ BEGIN
     EXECUTE format(
       'CREATE TABLE %I.%I (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        created_at timestamptz DEFAULT now(),
         updated_at timestamptz DEFAULT now()
       )',
       entity_schema,
