@@ -258,7 +258,10 @@ export default function EntityComponent({
 
     const hier = useHierarchicalOptions(entityName, hierarchyFields, 'id', 'name');
 
-    const loadEntity = useCallback(async () => {
+    useEffect(() => {
+    let cancelled = false;
+
+    async function runLoadEntity() {
         if (!metadata || !entityName) return;
 
         setEntityLoading(true);
@@ -266,6 +269,9 @@ export default function EntityComponent({
 
         try {
             const definitionPayload = await loadEntityDefinition(entityName);
+
+            if (cancelled) return;
+
             const definition = normalizeLoadedEntity(definitionPayload);
             const shape = extractEntityJsonFromDefinition(definition, entityName);
 
@@ -291,6 +297,9 @@ export default function EntityComponent({
             }
 
             const dataPayload = await loadEntityData(itemId, entityName);
+
+            if (cancelled) return;
+
             const loadedEntity = normalizeLoadedEntity(dataPayload);
 
             setEntity(
@@ -301,6 +310,8 @@ export default function EntityComponent({
                     : buildEntityFromShape(shape, metadata)
             );
         } catch (err) {
+            if (cancelled) return;
+
             console.error(`Error loading ${entityName}:`, err);
 
             const message =
@@ -312,21 +323,25 @@ export default function EntityComponent({
             setFormShape(fallbackShape);
             setEntity(fallbackShape);
         } finally {
-            setEntityLoading(false);
+            if (!cancelled) {
+                setEntityLoading(false);
+            }
         }
-    }, [
-        entityName,
-        initialValues,
-        isNewEntity,
-        itemId,
-        loadEntityData,
-        loadEntityDefinition,
-        metadata,
-    ]);
+    }
 
-    useEffect(() => {
-        void loadEntity();
-    }, [loadEntity]);
+    void runLoadEntity();
+
+    return () => {
+        cancelled = true;
+    };
+    }, [
+        metadata,
+        entityName,
+        itemId,
+        isNewEntity,
+        initialValues,
+    ]);
+        
 
     const setEntityPath = (path: string[], value: any) => {
         setEntity((prev) => {
