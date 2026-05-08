@@ -4,8 +4,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Toaster } from 'sonner';
 
 import { useFormMetadata } from '@/hooks/useFormMetadata';
-import { useSaveEntity } from '@/hooks/useSaveEntity';
 import { useHierarchicalOptions } from '@/hooks/useHierarchicalOptions';
+import { useEntity } from '@/hooks/useEntity';
+import { useEntityData } from '@/hooks/useEntityData';
+import { ZERO_UUID } from '@/lib/apiCrud';
 
 type Entity = Record<string, any>;
 
@@ -16,8 +18,6 @@ type EntityComponentProps = {
     onSavedAction?: (savedEntity: Entity) => Promise<void> | void;
     onCancelAction?: () => void;
 };
-
-const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
 
 function labelize(value: string): string {
     return value.replace(/_/g, ' ');
@@ -31,12 +31,33 @@ function cloneValue<T>(value: T): T {
 function normalizeLoadedEntity(payload: any): Entity {
     if (!payload) return {};
 
-    if (payload.entity && typeof payload.entity === 'object') return cloneValue(payload.entity);
-    if (payload.result?.entity && typeof payload.result.entity === 'object') return cloneValue(payload.result.entity);
-    if (payload.result?.data && typeof payload.result.data === 'object') return cloneValue(payload.result.data);
-    if (payload.data && typeof payload.data === 'object') return cloneValue(payload.data);
-    if (payload.result && typeof payload.result === 'object') return cloneValue(payload.result);
-    if (typeof payload === 'object') return cloneValue(payload);
+    if (payload.entity && typeof payload.entity === 'object') {
+        return cloneValue(payload.entity);
+    }
+
+    if (payload.result?.entity && typeof payload.result.entity === 'object') {
+        return cloneValue(payload.result.entity);
+    }
+
+    if (payload.result?.data && typeof payload.result.data === 'object') {
+        return cloneValue(payload.result.data);
+    }
+
+    if (payload.data && typeof payload.data === 'object') {
+        return cloneValue(payload.data);
+    }
+
+    if (payload.items && typeof payload.items === 'object') {
+        return cloneValue(payload.items);
+    }
+
+    if (payload.result && typeof payload.result === 'object') {
+        return cloneValue(payload.result);
+    }
+
+    if (typeof payload === 'object') {
+        return cloneValue(payload);
+    }
 
     return {};
 }
@@ -51,9 +72,13 @@ function extractEntityJsonFromDefinition(definition: any, entityName: string): E
         definition?.data?.entityJson ??
         definition?.result?.entity_json ??
         definition?.result?.entityJson ??
+        definition?.items?.entity_json ??
+        definition?.items?.entityJson ??
         null;
 
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return null;
+    }
 
     const entityJson =
         raw[entityName] && typeof raw[entityName] === 'object'
@@ -64,7 +89,9 @@ function extractEntityJsonFromDefinition(definition: any, entityName: string): E
 }
 
 function defaultValueFromShape(value: any): any {
-    if (Array.isArray(value)) return [];
+    if (Array.isArray(value)) {
+        return [];
+    }
 
     if (value !== null && typeof value === 'object') {
         const result: Entity = {};
@@ -138,7 +165,9 @@ function mergeEntityValuesIntoShape(shape: any, values: any): any {
                 ? shape[0]
                 : {};
 
-        if (!Array.isArray(values)) return [];
+        if (!Array.isArray(values)) {
+            return [];
+        }
 
         return values.map((row) => {
             if (row && typeof row === 'object' && !Array.isArray(row)) {
@@ -200,17 +229,24 @@ export default function EntityComponent({
 
     const { metadata, isLoading: metadataLoading } = useFormMetadata(entityName);
 
+    const {
+        loadEntity: loadEntityDefinition,
+        isLoading: entityDefinitionLoading,
+        error: entityDefinitionError,
+    } = useEntity();
+
+    const {
+        loadEntityData,
+        saveEntityData,
+        isLoading: entityDataLoading,
+        error: entityDataError,
+    } = useEntityData();
+
     const [entity, setEntity] = useState<Entity>({});
-    const [entityDefinition, setEntityDefinition] = useState<Entity | null>(null);
     const [formShape, setFormShape] = useState<Entity>({});
     const [entityLoading, setEntityLoading] = useState(true);
     const [entityError, setEntityError] = useState<string | null>(null);
     const [addButtonEnabled, setAddButtonEnabled] = useState<Record<string, boolean>>({});
-
-    const { save, loading: saving } = useSaveEntity({
-        entityName,
-        primaryKey: metadata?.primaryKey ?? 'id',
-    });
 
     const hierarchyFields = useMemo(() => {
         return (
@@ -222,71 +258,23 @@ export default function EntityComponent({
 
     const hier = useHierarchicalOptions(entityName, hierarchyFields, 'id', 'name');
 
-    const loadEntityDefinition = useCallback(async (): Promise<Entity | null> => {
-        const response = await fetch('/api/manage', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                operation: 'execute',
-                target: 'ec.get_entity',
-                args: {
-                    entity_name: entityName,
-                },
-                meta: {
-                    source: 'EntityComponent.loadEntityDefinition',
-                },
-            }),
-        });
-
-        if (!response.ok) {
-            throw new Error(
-                `Entity definition load failed: ${response.status} ${response.statusText}`
-            );
-        }
-
-        const payload = await response.json();
-        return normalizeLoadedEntity(payload);
-    }, [entityName]);
-
-    const loadEntityData = useCallback(async (): Promise<Entity> => {
-        const response = await fetch('/api/manage', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                operation: 'read',
-                target: entityName,
-                id: itemId,
-                args: {},
-                meta: {
-                    source: 'EntityComponent.loadEntityData',
-                },
-            }),
-        });
-
-        if (!response.ok) {
-            throw new Error(`Entity data load failed: ${response.status} ${response.statusText}`);
-        }
-
-        const payload = await response.json();
-        return normalizeLoadedEntity(payload);
-    }, [entityName, itemId]);
-
     const loadEntity = useCallback(async () => {
-        if (!metadata) return;
+        if (!metadata || !entityName) return;
 
         setEntityLoading(true);
         setEntityError(null);
 
         try {
-            const definition = await loadEntityDefinition();
+            const definitionPayload = await loadEntityDefinition(entityName);
+            const definition = normalizeLoadedEntity(definitionPayload);
             const shape = extractEntityJsonFromDefinition(definition, entityName);
 
-            setEntityDefinition(definition);
-            setFormShape(shape && Object.keys(shape).length > 0 ? shape : buildEntityFromMetadata(metadata));
+            const resolvedShape =
+                shape && Object.keys(shape).length > 0
+                    ? shape
+                    : buildEntityFromMetadata(metadata);
+
+            setFormShape(resolvedShape);
 
             if (initialValues) {
                 setEntity(
@@ -302,7 +290,8 @@ export default function EntityComponent({
                 return;
             }
 
-            const loadedEntity = await loadEntityData();
+            const dataPayload = await loadEntityData(itemId, entityName);
+            const loadedEntity = normalizeLoadedEntity(dataPayload);
 
             setEntity(
                 Object.keys(loadedEntity).length > 0
@@ -313,7 +302,11 @@ export default function EntityComponent({
             );
         } catch (err) {
             console.error(`Error loading ${entityName}:`, err);
-            setEntityError(err instanceof Error ? err.message : 'Unable to load entity');
+
+            const message =
+                err instanceof Error ? err.message : 'Unable to load entity';
+
+            setEntityError(message);
 
             const fallbackShape = buildEntityFromMetadata(metadata);
             setFormShape(fallbackShape);
@@ -325,6 +318,7 @@ export default function EntityComponent({
         entityName,
         initialValues,
         isNewEntity,
+        itemId,
         loadEntityData,
         loadEntityDefinition,
         metadata,
@@ -415,7 +409,10 @@ export default function EntityComponent({
     const renderField = (key: string, shapeValue: any, path: string[] = []) => {
         const fullPath = [...path, key];
         const fieldName = fullPath.join('.');
-        const disabled = saving || entityLoading;
+        const disabled =
+            entityLoading ||
+            entityDefinitionLoading ||
+            entityDataLoading;
 
         if (Array.isArray(shapeValue)) {
             const templateRow =
@@ -621,8 +618,13 @@ export default function EntityComponent({
             return;
         }
 
-        await save(savePayload);
+        await saveEntityData(isNewEntity ? null : itemId, entityName, savePayload);
     }
+
+    const displayedError =
+        entityError ||
+        entityDefinitionError ||
+        entityDataError;
 
     if (metadataLoading || entityLoading) {
         return <div>Loading {entityName}...</div>;
@@ -641,9 +643,9 @@ export default function EntityComponent({
                     {isNewEntity ? 'Create' : 'Edit'} {entityName}
                 </h2>
 
-                {entityError && (
+                {displayedError && (
                     <p className="text-sm text-red-600 mt-1">
-                        {entityError}
+                        {displayedError}
                     </p>
                 )}
             </div>
@@ -657,13 +659,13 @@ export default function EntityComponent({
                 <button
                     type="submit"
                     className={`mt-4 px-4 py-2 rounded text-white ${
-                        saving
+                        entityDataLoading
                             ? 'bg-gray-400 cursor-wait'
                             : 'bg-blue-600 hover:bg-blue-700'
                     }`}
-                    disabled={saving}
+                    disabled={entityDataLoading}
                 >
-                    {saving
+                    {entityDataLoading
                         ? 'Saving...'
                         : isNewEntity
                           ? `Create ${entityName}`
@@ -675,7 +677,7 @@ export default function EntityComponent({
                         type="button"
                         onClick={onCancelAction}
                         className="mt-4 px-4 py-2 rounded border"
-                        disabled={saving}
+                        disabled={entityDataLoading}
                     >
                         Cancel
                     </button>
@@ -683,4 +685,4 @@ export default function EntityComponent({
             </div>
         </form>
     );
-}
+};
