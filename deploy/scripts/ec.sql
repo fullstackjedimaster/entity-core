@@ -46,7 +46,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS entity_schema_entity_name_idx
 
 CREATE OR REPLACE FUNCTION ec._upsert_entity(
   p_entity_schema TEXT,
-  p_entity_name TEXT,
+  p_entity_name
   p_entity_json JSONB
 )
 RETURNS VOID
@@ -94,7 +94,6 @@ BEGIN
     EXECUTE format(
       'CREATE TABLE %I.%I (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        created_at timestamptz DEFAULT now(),
         updated_at timestamptz DEFAULT now()
       )',
       entity_schema,
@@ -102,6 +101,11 @@ BEGIN
     );
   END IF;
 
+  EXECUTE format(
+    'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO ec_app',
+    entity_schema,
+    entity_name
+  );
 
   FOR k, v IN
     SELECT key, value FROM jsonb_each(entity_json)
@@ -424,45 +428,48 @@ ALTER FUNCTION ec.get_column_options(TEXT, TEXT, TEXT, TEXT) OWNER TO ec;
 GRANT EXECUTE ON FUNCTION ec.get_column_options(TEXT, TEXT, TEXT, TEXT) TO ec_app;
 
 CREATE OR REPLACE FUNCTION ec.get_form_metadata(
-  p_entity_schema text,
-  p_entity_name text
-) RETURNS jsonb
-LANGUAGE plpgsql AS $form$
+  p_entity_schema TEXT,
+  p_entity_name TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ec, public
+AS $form$
 DECLARE
-cfg record;
-  rec record;
-  fields jsonb := '[]'::jsonb;
-  pk text;
-  excludes text[];
+  rec RECORD;
+  fields JSONB := '[]'::JSONB;
+  pk TEXT := 'id';
+  excludes TEXT[] := ARRAY['created_at', 'updated_at', 'last_updated_at', 'last_updated_by']::TEXT[];
+  has_entity BOOLEAN;
 BEGIN
-SELECT *
-INTO cfg
-FROM ec.entity
-WHERE entity_name = p_entity_name
-  AND entity_schema = p_entity_schema;
+  SELECT EXISTS (
+    SELECT 1
+    FROM ec.entity
+    WHERE entity_schema = p_entity_schema
+      AND entity_name = p_entity_name
+  )
+  INTO has_entity;
 
-IF cfg IS NULL THEN
+  IF NOT has_entity THEN
     RAISE EXCEPTION 'Unknown entity: %.%', p_entity_schema, p_entity_name;
-END IF;
+  END IF;
 
-  pk := cfg.primary_key;
-  excludes := COALESCE(cfg.excludes, ARRAY[]::text[]);
-
-FOR rec IN
-SELECT c.column_name,
-       c.data_type,
-       c.is_nullable,
-       c.udt_name,
-       c.ordinal_position
-FROM information_schema.columns c
-WHERE c.table_schema = cfg.schema_name
-  AND c.table_name  = cfg.table_name
-ORDER BY c.ordinal_position
-    LOOP
-    -- skip pk and excluded
-    IF rec.column_name = pk OR rec.column_name = ANY (excludes) THEN
+  FOR rec IN
+    SELECT
+      c.column_name,
+      c.data_type,
+      c.is_nullable,
+      c.udt_name,
+      c.ordinal_position
+    FROM information_schema.columns c
+    WHERE c.table_schema = p_entity_schema
+      AND c.table_name = p_entity_name
+    ORDER BY c.ordinal_position
+  LOOP
+    IF rec.column_name = pk OR rec.column_name = ANY(excludes) THEN
       CONTINUE;
-END IF;
+    END IF;
 
     fields := fields || jsonb_build_object(
       'name', rec.column_name,
@@ -473,6 +480,7 @@ END IF;
           WHEN rec.data_type = 'ARRAY' THEN 'array'
           WHEN rec.data_type = 'USER-DEFINED' AND rec.udt_name = 'citext' THEN 'text'
           WHEN rec.data_type = 'jsonb' THEN 'jsonb'
+          WHEN rec.data_type = 'json' THEN 'json'
           WHEN rec.data_type = 'boolean' THEN 'boolean'
           WHEN rec.data_type IN ('integer','bigint','numeric','double precision','real') THEN 'number'
           WHEN rec.data_type LIKE 'timestamp%' THEN 'datetime'
@@ -481,16 +489,18 @@ END IF;
           ELSE 'text'
         END,
       'required', (rec.is_nullable = 'NO')
-    )::jsonb;
-END LOOP;
+    )::JSONB;
+  END LOOP;
 
-RETURN jsonb_build_object(
-        'entity', cfg.entity_name,
-        'entity_schema', cfg.schema_name,
-        'table',  cfg.table_name,
-        'primaryKey', pk,
-        'fields', fields
-       );
+  RETURN jsonb_build_object(
+    'entityName', p_entity_name,
+    'entity', p_entity_name,
+    'entity_schema', p_entity_schema,
+    'schema', p_entity_schema,
+    'table', p_entity_name,
+    'primaryKey', pk,
+    'fields', fields
+  );
 END;
 $form$;
 
@@ -691,7 +701,7 @@ BEGIN
       END IF;
 
       EXECUTE format(
-        'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO ec_app',
+        'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %%I.%%I TO ec_app',
         entity_schema,
         entity_name
       );
@@ -1031,74 +1041,76 @@ BEGIN
       p_entity_schema TEXT,
       p_entity_name TEXT
     )
-    RETURNS jsonb
+    RETURNS JSONB
     LANGUAGE plpgsql
     SECURITY DEFINER
     SET search_path = %1$I, public
     AS $form$
     DECLARE
-    cfg record;
-      rec record;
-      fields jsonb := '[]'::jsonb;
-      pk text;
-      excludes text[];
+      rec RECORD;
+      fields JSONB := '[]'::JSONB;
+      pk TEXT := 'id';
+      excludes TEXT[] := ARRAY['created_at', 'updated_at', 'last_updated_at', 'last_updated_by']::TEXT[];
+      has_entity BOOLEAN;
     BEGIN
-    SELECT *
-    INTO cfg
-    FROM %1$I.entity_config
-    WHERE entity_name = p_entity_name
-      AND entity_schema = COALESCE(p_entity_schema, current_schema);
+      SELECT EXISTS (
+        SELECT 1
+        FROM %1$I.entity
+        WHERE entity_schema = p_entity_schema
+          AND entity_name = p_entity_name
+      )
+      INTO has_entity;
 
-    IF cfg IS NULL THEN
+      IF NOT has_entity THEN
         RAISE EXCEPTION 'Unknown entity: %.%', p_entity_schema, p_entity_name;
-    END IF;
+      END IF;
 
-      pk := cfg.primary_key;
-      excludes := COALESCE(cfg.exclude_columns, ARRAY[]::text[]);
-
-    FOR rec IN
-    SELECT c.column_name,
-           c.data_type,
-           c.is_nullable,
-           c.udt_name,
-           c.ordinal_position
-    FROM information_schema.columns c
-    WHERE c.table_schema = cfg.schema_name
-      AND c.table_name  = cfg.table_name
-    ORDER BY c.ordinal_position
-        LOOP
-        -- skip pk and excluded
-        IF rec.column_name = pk OR rec.column_name = ANY (excludes) THEN
+      FOR rec IN
+        SELECT
+          c.column_name,
+          c.data_type,
+          c.is_nullable,
+          c.udt_name,
+          c.ordinal_position
+        FROM information_schema.columns c
+        WHERE c.table_schema = p_entity_schema
+          AND c.table_name = p_entity_name
+        ORDER BY c.ordinal_position
+      LOOP
+        IF rec.column_name = pk OR rec.column_name = ANY(excludes) THEN
           CONTINUE;
-    END IF;
+        END IF;
 
-    fields := fields || jsonb_build_object(
-      'name', rec.column_name,
-      'label', initcap(replace(rec.column_name, '_', ' ')),
-      'type',
-        CASE
-          WHEN rec.data_type = 'ARRAY' AND rec.udt_name LIKE '_text' THEN 'string[]'
-          WHEN rec.data_type = 'ARRAY' THEN 'array'
-          WHEN rec.data_type = 'USER-DEFINED' AND rec.udt_name = 'citext' THEN 'text'
-          WHEN rec.data_type = 'jsonb' THEN 'jsonb'
-          WHEN rec.data_type = 'boolean' THEN 'boolean'
-          WHEN rec.data_type IN ('integer','bigint','numeric','double precision','real') THEN 'number'
-          WHEN rec.data_type LIKE 'timestamp%' THEN 'datetime'
-          WHEN rec.data_type = 'date' THEN 'date'
-          WHEN rec.data_type = 'uuid' THEN 'uuid'
-          ELSE 'text'
-        END,
-      'required', (rec.is_nullable = 'NO')
-    )::jsonb;
-    END LOOP;
+        fields := fields || jsonb_build_object(
+          'name', rec.column_name,
+          'label', initcap(replace(rec.column_name, '_', ' ')),
+          'type',
+            CASE
+              WHEN rec.data_type = 'ARRAY' AND rec.udt_name LIKE '_text' THEN 'string[]'
+              WHEN rec.data_type = 'ARRAY' THEN 'array'
+              WHEN rec.data_type = 'USER-DEFINED' AND rec.udt_name = 'citext' THEN 'text'
+              WHEN rec.data_type = 'jsonb' THEN 'jsonb'
+              WHEN rec.data_type = 'json' THEN 'json'
+              WHEN rec.data_type = 'boolean' THEN 'boolean'
+              WHEN rec.data_type IN ('integer','bigint','numeric','double precision','real') THEN 'number'
+              WHEN rec.data_type LIKE 'timestamp%' THEN 'datetime'
+              WHEN rec.data_type = 'date' THEN 'date'
+              WHEN rec.data_type = 'uuid' THEN 'uuid'
+              ELSE 'text'
+            END,
+          'required', (rec.is_nullable = 'NO')
+        )::JSONB;
+      END LOOP;
 
-    RETURN jsonb_build_object(
-            'entity', cfg.entity_name,
-            'entity_schema', cfg.schema_name,
-            'table',  cfg.table_name,
-            'primaryKey', pk,
-            'fields', fields
-           );
+      RETURN jsonb_build_object(
+        'entityName', p_entity_name,
+        'entity', p_entity_name,
+        'entity_schema', p_entity_schema,
+        'schema', p_entity_schema,
+        'table', p_entity_name,
+        'primaryKey', pk,
+        'fields', fields
+      );
     END;
     $form$
   $sql$, p_entity_schema);
@@ -1477,14 +1489,14 @@ BEGIN
 
   v_memberships := v_user->'memberships';
 
-  --PERFORM ec._upsert_tenant(
-  --  p_sub,
-  --  p_entity_schema,
-   -- v_org_id,
-  --  p_roles,
-  --  p_permissions,
-  --  v_memberships
-  --);
+  PERFORM ec._upsert_tenant(
+    p_sub,
+    p_entity_schema,
+    v_org_id,
+    p_roles,
+    p_permissions,
+    v_memberships
+  );
 
   v_app_metadata := jsonb_build_object(
     'sub', p_sub,
@@ -1527,6 +1539,8 @@ GRANT EXECUTE ON FUNCTION ec.create_entity(TEXT, TEXT, JSONB) TO ec_app;
 GRANT EXECUTE ON FUNCTION ec.list_entities(TEXT) TO ec_app;
 GRANT EXECUTE ON FUNCTION ec.get_entity(TEXT, TEXT) TO ec_app;
 GRANT EXECUTE ON FUNCTION ec.manage_entity(TEXT, TEXT, TEXT, UUID, JSONB) TO ec_app;
+GRANT EXECUTE ON FUNCTION ec.get_column_options(TEXT, TEXT, TEXT, TEXT) TO ec_app;
+GRANT EXECUTE ON FUNCTION ec.get_form_metadata(TEXT, TEXT) TO ec_app;
 
 GRANT EXECUTE ON FUNCTION ec._ensure_tenant_objects(TEXT) TO ec_app;
 GRANT EXECUTE ON FUNCTION ec._seed_roles_and_permissions(TEXT) TO ec_app;
