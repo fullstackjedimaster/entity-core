@@ -28,52 +28,6 @@ function cloneValue<T>(value: T): T {
     return JSON.parse(JSON.stringify(value));
 }
 
-function defaultValueForField(field: any): any {
-    const type = String(field?.type ?? '').toLowerCase();
-
-    const template =
-        field?.template ??
-        field?.defaultValue ??
-        field?.default_value ??
-        field?.sample ??
-        field?.shape ??
-        field?.schema;
-
-    if (template !== undefined && template !== null) {
-        return cloneValue(template);
-    }
-
-    switch (type) {
-        case 'boolean':
-        case 'bool':
-            return false;
-
-        case 'number':
-        case 'integer':
-        case 'int':
-        case 'float':
-        case 'decimal':
-        case 'numeric':
-            return 0;
-
-        case 'json':
-        case 'jsonb':
-            return field?.is_array || field?.widget === 'subform' ? [] : {};
-
-        default:
-            return '';
-    }
-}
-
-function buildEntityFromMetadata(metadata: any): Entity {
-    const entity: Entity = {};
-
-    for (const field of metadata?.fields ?? []) {
-        entity[field.name] = defaultValueForField(field);
-    }
-
-    return entity;
-}
 function normalizeLoadedEntity(payload: any): Entity {
     if (!payload) return {};
 
@@ -100,6 +54,188 @@ function normalizeLoadedEntity(payload: any): Entity {
     return {};
 }
 
+function extractEntityJson(metadata: any, entityName: string): Entity | null {
+    const raw =
+        metadata?.entity_json ??
+        metadata?.entityJson ??
+        metadata?.result?.entity_json ??
+        metadata?.result?.entityJson ??
+        metadata?.data?.entity_json ??
+        metadata?.data?.entityJson ??
+        null;
+
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return null;
+    }
+
+    const entityJson =
+        raw[entityName] && typeof raw[entityName] === 'object'
+            ? raw[entityName]
+            : raw;
+
+    return cloneValue(entityJson);
+}
+
+function defaultValueFromShape(value: any): any {
+    if (Array.isArray(value)) {
+        return [];
+    }
+
+    if (value !== null && typeof value === 'object') {
+        const result: Entity = {};
+
+        for (const [key, childValue] of Object.entries(value)) {
+            result[key] = defaultValueFromShape(childValue);
+        }
+
+        return result;
+    }
+
+    if (typeof value === 'boolean') return false;
+    if (typeof value === 'number') return 0;
+
+    return '';
+}
+
+function buildEntityFromEntityJson(metadata: any, entityName: string): Entity {
+    const entityJson = extractEntityJson(metadata, entityName);
+
+    if (!entityJson) {
+        return {};
+    }
+
+    const entity: Entity = {};
+
+    for (const [key, value] of Object.entries(entityJson)) {
+        entity[key] = defaultValueFromShape(value);
+    }
+
+    return entity;
+}
+
+function defaultValueForMetadataField(field: any): any {
+    const type = String(field?.type ?? '').toLowerCase();
+
+    switch (type) {
+        case 'boolean':
+        case 'bool':
+            return false;
+
+        case 'number':
+        case 'integer':
+        case 'int':
+        case 'float':
+        case 'decimal':
+        case 'numeric':
+            return 0;
+
+        case 'json':
+        case 'jsonb':
+            return {};
+
+        default:
+            return '';
+    }
+}
+
+function buildEntityFromMetadata(metadata: any): Entity {
+    const entity: Entity = {};
+
+    for (const field of metadata?.fields ?? []) {
+        entity[field.name] = defaultValueForMetadataField(field);
+    }
+
+    return entity;
+}
+
+function buildNewEntity(metadata: any, entityName: string): Entity {
+    const fromEntityJson = buildEntityFromEntityJson(metadata, entityName);
+
+    if (Object.keys(fromEntityJson).length > 0) {
+        return fromEntityJson;
+    }
+
+    return buildEntityFromMetadata(metadata);
+}
+
+function mergeEntityValuesIntoShape(shape: any, values: any): any {
+    if (Array.isArray(shape)) {
+        const templateRow =
+            shape.length > 0 && typeof shape[0] === 'object' && shape[0] !== null
+                ? shape[0]
+                : {};
+
+        if (!Array.isArray(values)) {
+            return [];
+        }
+
+        return values.map((row) => {
+            if (
+                row &&
+                typeof row === 'object' &&
+                !Array.isArray(row) &&
+                templateRow &&
+                typeof templateRow === 'object'
+            ) {
+                return mergeEntityValuesIntoShape(templateRow, row);
+            }
+
+            return row;
+        });
+    }
+
+    if (shape !== null && typeof shape === 'object') {
+        const merged: Entity = {};
+
+        for (const [key, childShape] of Object.entries(shape)) {
+            const childValue =
+                values && typeof values === 'object' && key in values
+                    ? values[key]
+                    : undefined;
+
+            merged[key] =
+                childValue === undefined
+                    ? defaultValueFromShape(childShape)
+                    : mergeEntityValuesIntoShape(childShape, childValue);
+        }
+
+        return merged;
+    }
+
+    if (values === undefined || values === null) {
+        return defaultValueFromShape(shape);
+    }
+
+    return values;
+}
+
+function buildRenderShape(metadata: any, entityName: string): Entity {
+    const entityJson = extractEntityJson(metadata, entityName);
+
+    if (entityJson && Object.keys(entityJson).length > 0) {
+        return entityJson;
+    }
+
+    return buildEntityFromMetadata(metadata);
+}
+
+function normalizeEntityForSave(entityValue: Entity, metadata: any): Entity {
+    const normalized = cloneValue(entityValue) || {};
+
+    for (const field of metadata?.fields ?? []) {
+        const type = String(field?.type ?? '').toLowerCase();
+
+        if (
+            (type === 'json' || type === 'jsonb') &&
+            normalized[field.name] === ''
+        ) {
+            normalized[field.name] = {};
+        }
+    }
+
+    return normalized;
+}
+
 export default function EntityComponent({
     entityName,
     id,
@@ -115,7 +251,6 @@ export default function EntityComponent({
     const [entity, setEntity] = useState<Entity>({});
     const [entityLoading, setEntityLoading] = useState(true);
     const [entityError, setEntityError] = useState<string | null>(null);
-
     const [addButtonEnabled, setAddButtonEnabled] = useState<Record<string, boolean>>({});
 
     const { save, loading: saving } = useSaveEntity({
@@ -133,6 +268,11 @@ export default function EntityComponent({
 
     const hier = useHierarchicalOptions(entityName, hierarchyFields, 'id', 'name');
 
+    const renderShape = useMemo(() => {
+        if (!metadata) return {};
+        return buildRenderShape(metadata, entityName);
+    }, [metadata, entityName]);
+
     const loadEntity = useCallback(async () => {
         if (!metadata) return;
 
@@ -141,12 +281,17 @@ export default function EntityComponent({
 
         try {
             if (initialValues) {
-                setEntity(cloneValue(initialValues));
+                setEntity(
+                    mergeEntityValuesIntoShape(
+                        buildRenderShape(metadata, entityName),
+                        initialValues
+                    )
+                );
                 return;
             }
 
             if (isNewEntity) {
-                setEntity(buildEntityFromMetadata(metadata));
+                setEntity(buildNewEntity(metadata, entityName));
                 return;
             }
 
@@ -175,13 +320,16 @@ export default function EntityComponent({
 
             setEntity(
                 Object.keys(loadedEntity).length > 0
-                    ? loadedEntity
-                    : buildEntityFromMetadata(metadata)
+                    ? mergeEntityValuesIntoShape(
+                          buildRenderShape(metadata, entityName),
+                          loadedEntity
+                      )
+                    : buildNewEntity(metadata, entityName)
             );
         } catch (err) {
             console.error(`Error loading ${entityName}:`, err);
             setEntityError(err instanceof Error ? err.message : 'Unable to load entity');
-            setEntity(buildEntityFromMetadata(metadata));
+            setEntity(buildNewEntity(metadata, entityName));
         } finally {
             setEntityLoading(false);
         }
@@ -238,7 +386,7 @@ export default function EntityComponent({
         const current = readEntityPath(path);
         const rows = Array.isArray(current) ? current : [];
 
-        setEntityPath(path, [...rows, cloneValue(templateRow)]);
+        setEntityPath(path, [...rows, defaultValueFromShape(templateRow)]);
         setAddButtonEnabled((prev) => ({
             ...prev,
             [path.join('.')]: false,
@@ -268,20 +416,21 @@ export default function EntityComponent({
         }));
     };
 
-    const renderField = (key: string, value: any, path: string[] = []) => {
+    const renderField = (key: string, shapeValue: any, path: string[] = []) => {
         const fullPath = [...path, key];
         const fieldName = fullPath.join('.');
         const disabled = saving || entityLoading;
 
-        if (Array.isArray(value)) {
+        if (Array.isArray(shapeValue)) {
             const templateRow =
-                value.length > 0 && typeof value[0] === 'object'
-                    ? value[0]
+                shapeValue.length > 0 &&
+                typeof shapeValue[0] === 'object' &&
+                shapeValue[0] !== null
+                    ? shapeValue[0]
                     : {};
 
             const currentRows = readEntityPath(fullPath);
             const rows = Array.isArray(currentRows) ? currentRows : [];
-
             const columns = Object.keys(templateRow);
 
             return (
@@ -359,7 +508,7 @@ export default function EntityComponent({
             );
         }
 
-        if (typeof value === 'object' && value !== null) {
+        if (typeof shapeValue === 'object' && shapeValue !== null) {
             return (
                 <fieldset
                     key={fieldName}
@@ -367,14 +516,14 @@ export default function EntityComponent({
                 >
                     <legend className="text-sm font-medium">{labelize(key)}</legend>
 
-                    {Object.entries(value).map(([childKey, childValue]) =>
+                    {Object.entries(shapeValue).map(([childKey, childValue]) =>
                         renderField(childKey, childValue, fullPath)
                     )}
                 </fieldset>
             );
         }
 
-        if (typeof value === 'boolean') {
+        if (typeof shapeValue === 'boolean') {
             return (
                 <label key={fieldName} className="flex items-center gap-2">
                     <input
@@ -393,7 +542,7 @@ export default function EntityComponent({
         if (
             lowerKey.includes('date') ||
             lowerKey.includes('dob') ||
-            (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value))
+            (typeof shapeValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(shapeValue))
         ) {
             return (
                 <label key={fieldName} className="block">
@@ -409,7 +558,7 @@ export default function EntityComponent({
             );
         }
 
-        if (typeof value === 'number') {
+        if (typeof shapeValue === 'number') {
             return (
                 <label key={fieldName} className="block">
                     <span className="font-medium">{labelize(key)}</span>
@@ -469,12 +618,14 @@ export default function EntityComponent({
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
 
+        const savePayload = normalizeEntityForSave(entity, metadata);
+
         if (onSavedAction) {
-            await onSavedAction(entity);
+            await onSavedAction(savePayload);
             return;
         }
 
-        await save(entity);
+        await save(savePayload);
     }
 
     if (metadataLoading || entityLoading) {
@@ -484,16 +635,6 @@ export default function EntityComponent({
     if (!metadata) {
         return <div>No metadata found for {entityName}.</div>;
     }
-
-    const renderSource =
-        entity && Object.keys(entity).length > 0
-            ? entity
-            : buildEntityFromMetadata(metadata);
-
-    const template =
-        renderSource?._template && typeof renderSource._template === 'object'
-            ? renderSource._template
-            : null;
 
     return (
         <form onSubmit={handleSubmit} className="grid gap-4">
@@ -511,14 +652,10 @@ export default function EntityComponent({
                 )}
             </div>
 
-            {template
-                ? Object.entries(template).map(([key, value]) =>
-                      renderField(key, value)
-                  )
-                : Object.entries(renderSource).map(([key, value]) => {
-                      if (key === '_template') return null;
-                      return renderField(key, value);
-                  })}
+            {Object.entries(renderShape).map(([key, value]) => {
+                if (key === 'entity_json') return null;
+                return renderField(key, value);
+            })}
 
             <div className="flex gap-3">
                 <button
@@ -530,7 +667,11 @@ export default function EntityComponent({
                     }`}
                     disabled={saving}
                 >
-                    {saving ? 'Saving...' : isNewEntity ? `Create ${entityName}` : `Save ${entityName}`}
+                    {saving
+                        ? 'Saving...'
+                        : isNewEntity
+                          ? `Create ${entityName}`
+                          : `Save ${entityName}`}
                 </button>
 
                 {onCancelAction && (
