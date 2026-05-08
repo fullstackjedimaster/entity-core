@@ -1063,7 +1063,7 @@ BEGIN
       INTO has_entity;
 
       IF NOT has_entity THEN
-        RAISE EXCEPTION 'Unknown entity: %.%', p_entity_schema, p_entity_name;
+        RAISE EXCEPTION 'Unknown entity:%%.%%', p_entity_schema, p_entity_name;
       END IF;
 
       FOR rec IN
