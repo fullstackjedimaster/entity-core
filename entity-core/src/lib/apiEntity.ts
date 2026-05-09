@@ -16,11 +16,9 @@ export type OptionItem = {
     label: string;
 };
 
-export type GetOptionsParams = {
+export type ForeignKeyOptionsParams = {
     parentField?: string;
     parentValue?: string | number | null;
-    filter?: string;
-    mode?: 'auto' | 'foreign_key' | 'column';
 };
 
 async function handle<T>(resp: Response): Promise<T> {
@@ -69,18 +67,32 @@ export function useEntityApi() {
                 return handle<unknown>(resp);
             },
 
-            getOptions: async (
+            getColumnOptions: async (
                 entityName: string,
                 column: string,
-                params: GetOptionsParams = {}
+                filter?: string
             ) => {
                 const qs = new URLSearchParams();
 
-                qs.set('mode', params.mode ?? 'auto');
-
-                if (params.filter) {
-                    qs.set('filter', params.filter);
+                if (filter) {
+                    qs.set('filter', filter);
                 }
+
+                const suffix = qs.toString() ? `?${qs.toString()}` : '';
+
+                const resp = await authedFetch(
+                    `/entities/${entityName}/options/${column}${suffix}`
+                );
+
+                return handle<OptionItem[]>(resp);
+            },
+
+            getForeignKeyOptions: async (
+                entityName: string,
+                column: string,
+                params: ForeignKeyOptionsParams = {}
+            ) => {
+                const qs = new URLSearchParams();
 
                 if (params.parentField) {
                     qs.set('parentField', params.parentField);
@@ -97,22 +109,7 @@ export function useEntityApi() {
                 const suffix = qs.toString() ? `?${qs.toString()}` : '';
 
                 const resp = await authedFetch(
-                    `/entities/${entityName}/options/${column}${suffix}`
-                );
-
-                return handle<OptionItem[]>(resp);
-            },
-
-            getColumnOptions: async (
-                entityName: string,
-                column: string,
-                filter?: string
-            ) => {
-                const resp = await authedFetch(
-                    `/entities/${entityName}/options/${column}?${new URLSearchParams({
-                        mode: 'column',
-                        ...(filter ? { filter } : {}),
-                    }).toString()}`
+                    `/entities/${entityName}/foreign-key-options/${column}${suffix}`
                 );
 
                 return handle<OptionItem[]>(resp);
