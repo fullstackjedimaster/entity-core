@@ -1,62 +1,191 @@
 // src/hooks/useHierarchicalOptions.ts
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useOptions } from "./useOptions";
+import { useCallback, useMemo, useState } from 'react';
+import useSWR from 'swr';
+import {
+    buildOptionsUrl,
+    fetchOptions,
+    type OptionItem,
+    type OptionFilter,
+} from './useOptions';
 
-/**
- * Automatically manages chained selects like:
- *   org_hier1 → site_hier2 → panel_hier3
- * The naming convention is important:
- *   - Each level's name must end with _hierN
- *   - The next level's filter will include { [prevField]: selectedValue }
- */
+type OptionsByField = Record<string, OptionItem[]>;
+type LoadingByField = Record<string, boolean>;
+type ErrorByField = Record<string, Error | undefined>;
+
+function hierarchyLevel(field: string): number {
+    const match = field.match(/_hier(\d+)$/);
+    return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+}
+
+function sortHierarchyFields(fields: string[]): string[] {
+    return [...fields].sort((a, b) => hierarchyLevel(a) - hierarchyLevel(b));
+}
+
 export function useHierarchicalOptions(
     baseEntityName: string,
     hierarchyFields: string[],
-    valueCol = "id",
-    labelCol = "name"
+    valueCol = 'id',
+    labelCol = 'name',
+    limit = 100
 ) {
+    const sortedFields = useMemo(
+        () => sortHierarchyFields(hierarchyFields),
+        [hierarchyFields]
+    );
+
     const [selectedValues, setSelectedValues] = useState<Record<string, string | null>>({});
 
-    const hooks = hierarchyFields.map((field, index) => {
-        // Build filter based on the previous field's selection
-        const filter: Record<string, string | number | null> = {};
-
-        if (index > 0) {
-            const prevField = hierarchyFields[index - 1];
-            const prevValue = selectedValues[prevField];
-            if (prevValue != null) {
-                filter[prevField] = prevValue;
-            }
+    const requestPlan = useMemo(() => {
+        if (!baseEntityName || sortedFields.length === 0) {
+            return [];
         }
 
-        const { options, isLoading, error } = useOptions(
-            baseEntityName,
-            valueCol,
-            labelCol,
-            filter
-        );
+        return sortedFields.map((field, index) => {
+            const filter: OptionFilter = {};
+            let enabled = true;
 
-        return {
-            field,
-            options,
-            isLoading,
-            error,
-        };
-    });
+            if (index > 0) {
+                const previousField = sortedFields[index - 1];
+                const previousValue = selectedValues[previousField];
 
-    function onChange(field: string, value: string | null) {
-        setSelectedValues((prev) => {
-            const next: Record<string, string | null> = { ...prev, [field]: value };
-            // clear downstream selections
-            const idx = hierarchyFields.indexOf(field);
-            for (let i = idx + 1; i < hierarchyFields.length; i++) {
-                next[hierarchyFields[i]] = null;
+                if (!previousValue) {
+                    enabled = false;
+                } else {
+                    filter[previousField] = previousValue;
+                }
             }
-            return next;
-        });
-    }
 
-    return { hooks, selectedValues, onChange };
+            return {
+                field,
+                enabled,
+                url: enabled
+                    ? buildOptionsUrl(baseEntityName, valueCol, labelCol, filter, limit)
+                    : null,
+            };
+        });
+    }, [baseEntityName, sortedFields, selectedValues, valueCol, labelCol, limit]);
+
+    const swrKey = useMemo(() => {
+        if (requestPlan.length === 0) return null;
+
+        return JSON.stringify(
+            requestPlan.map((item) => ({
+                field: item.field,
+                url: item.url,
+                enabled: item.enabled,
+            }))
+        );
+    }, [requestPlan]);
+
+    const { data, error, isLoading, mutate } = useSWR<OptionsByField>(
+        swrKey,
+        async () => {
+            const result: OptionsByField = {};
+
+            await Promise.all(
+                requestPlan.map(async (item) => {
+                    if (!item.enabled || !item.url) {
+                        result[item.field] = [];
+                        return;
+                    }
+
+                    result[item.field] = await fetchOptions(item.url);
+                })
+            );
+
+            return result;
+        }
+    );
+
+    const loadingByField = useMemo<LoadingByField>(() => {
+        const result: LoadingByField = {};
+
+        for (const item of requestPlan) {
+            result[item.field] = item.enabled && isLoading;
+        }
+
+        return result;
+    }, [requestPlan, isLoading]);
+
+    const errorByField = useMemo<ErrorByField>(() => {
+        const result: ErrorByField = {};
+
+        for (const item of requestPlan) {
+            result[item.field] = item.enabled ? error : undefined;
+        }
+
+        return result;
+    }, [requestPlan, error]);
+
+    const onChange = useCallback(
+        (field: string, value: string | null) => {
+            setSelectedValues((prev) => {
+                const next: Record<string, string | null> = {
+                    ...prev,
+                    [field]: value,
+                };
+
+                const index = sortedFields.indexOf(field);
+
+                for (let i = index + 1; i < sortedFields.length; i++) {
+                    next[sortedFields[i]] = null;
+                }
+
+                return next;
+            });
+        },
+        [sortedFields]
+    );
+
+    const setSelectionsFromEntity = useCallback(
+        (entity: Record<string, any>) => {
+            setSelectedValues(() => {
+                const next: Record<string, string | null> = {};
+
+                for (const field of sortedFields) {
+                    const value = entity?.[field];
+                    next[field] =
+                        value === undefined || value === null || value === ''
+                            ? null
+                            : String(value);
+                }
+
+                return next;
+            });
+        },
+        [sortedFields]
+    );
+
+    const clear = useCallback(() => {
+        setSelectedValues({});
+    }, []);
+
+    const isFieldEnabled = useCallback(
+        (field: string) => {
+            const index = sortedFields.indexOf(field);
+
+            if (index <= 0) return true;
+
+            const previousField = sortedFields[index - 1];
+            return Boolean(selectedValues[previousField]);
+        },
+        [sortedFields, selectedValues]
+    );
+
+    return {
+        fields: sortedFields,
+        selectedValues,
+        optionsByField: data ?? {},
+        loadingByField,
+        errorByField,
+        isLoading,
+        error,
+        refresh: mutate,
+        onChange,
+        setSelectionsFromEntity,
+        clear,
+        isFieldEnabled,
+    };
 }

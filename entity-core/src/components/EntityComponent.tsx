@@ -28,36 +28,21 @@ function cloneValue<T>(value: T): T {
     return JSON.parse(JSON.stringify(value));
 }
 
+function hierarchyLevel(field: string): number {
+    const match = field.match(/_hier(\d+)$/);
+    return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+}
+
 function normalizeLoadedEntity(payload: any): Entity {
     if (!payload) return {};
 
-    if (payload.entity && typeof payload.entity === 'object') {
-        return cloneValue(payload.entity);
-    }
-
-    if (payload.result?.entity && typeof payload.result.entity === 'object') {
-        return cloneValue(payload.result.entity);
-    }
-
-    if (payload.result?.data && typeof payload.result.data === 'object') {
-        return cloneValue(payload.result.data);
-    }
-
-    if (payload.data && typeof payload.data === 'object') {
-        return cloneValue(payload.data);
-    }
-
-    if (payload.items && typeof payload.items === 'object') {
-        return cloneValue(payload.items);
-    }
-
-    if (payload.result && typeof payload.result === 'object') {
-        return cloneValue(payload.result);
-    }
-
-    if (typeof payload === 'object') {
-        return cloneValue(payload);
-    }
+    if (payload.entity && typeof payload.entity === 'object') return cloneValue(payload.entity);
+    if (payload.result?.entity && typeof payload.result.entity === 'object') return cloneValue(payload.result.entity);
+    if (payload.result?.data && typeof payload.result.data === 'object') return cloneValue(payload.result.data);
+    if (payload.data && typeof payload.data === 'object') return cloneValue(payload.data);
+    if (payload.items && typeof payload.items === 'object') return cloneValue(payload.items);
+    if (payload.result && typeof payload.result === 'object') return cloneValue(payload.result);
+    if (typeof payload === 'object') return cloneValue(payload);
 
     return {};
 }
@@ -76,30 +61,23 @@ function extractEntityJsonFromDefinition(definition: any, entityName: string): E
         definition?.items?.entityJson ??
         null;
 
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-        return null;
-    }
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
 
-    const entityJson =
+    return cloneValue(
         raw[entityName] && typeof raw[entityName] === 'object'
             ? raw[entityName]
-            : raw;
-
-    return cloneValue(entityJson);
+            : raw
+    );
 }
 
 function defaultValueFromShape(value: any): any {
-    if (Array.isArray(value)) {
-        return [];
-    }
+    if (Array.isArray(value)) return [];
 
     if (value !== null && typeof value === 'object') {
         const result: Entity = {};
-
         for (const [key, childValue] of Object.entries(value)) {
             result[key] = defaultValueFromShape(childValue);
         }
-
         return result;
     }
 
@@ -116,7 +94,6 @@ function defaultValueForMetadataField(field: any): any {
         case 'boolean':
         case 'bool':
             return false;
-
         case 'number':
         case 'integer':
         case 'int':
@@ -124,11 +101,9 @@ function defaultValueForMetadataField(field: any): any {
         case 'decimal':
         case 'numeric':
             return 0;
-
         case 'json':
         case 'jsonb':
             return {};
-
         default:
             return '';
     }
@@ -165,9 +140,7 @@ function mergeEntityValuesIntoShape(shape: any, values: any): any {
                 ? shape[0]
                 : {};
 
-        if (!Array.isArray(values)) {
-            return [];
-        }
+        if (!Array.isArray(values)) return [];
 
         return values.map((row) => {
             if (row && typeof row === 'object' && !Array.isArray(row)) {
@@ -252,98 +225,98 @@ export default function EntityComponent({
         return (
             metadata?.fields
                 ?.map((field: any) => field.name)
-                .filter((name: string) => /_hier\d+$/.test(name)) ?? []
+                .filter((name: string) => /_hier\d+$/.test(name))
+                .sort((a: string, b: string) => hierarchyLevel(a) - hierarchyLevel(b)) ?? []
         );
     }, [metadata]);
 
     const hier = useHierarchicalOptions(entityName, hierarchyFields, 'id', 'name');
 
     useEffect(() => {
-    let cancelled = false;
+        let cancelled = false;
 
-    async function runLoadEntity() {
-        if (!metadata || !entityName) return;
+        async function runLoadEntity() {
+            if (!metadata || !entityName) return;
 
-        setEntityLoading(true);
-        setEntityError(null);
+            setEntityLoading(true);
+            setEntityError(null);
 
-        try {
-            const definitionPayload = await loadEntityDefinition(entityName);
+            try {
+                const definitionPayload = await loadEntityDefinition(entityName);
+                if (cancelled) return;
 
-            if (cancelled) return;
+                const definition = normalizeLoadedEntity(definitionPayload);
+                const shape = extractEntityJsonFromDefinition(definition, entityName);
 
-            const definition = normalizeLoadedEntity(definitionPayload);
-            const shape = extractEntityJsonFromDefinition(definition, entityName);
+                const resolvedShape =
+                    shape && Object.keys(shape).length > 0
+                        ? shape
+                        : buildEntityFromMetadata(metadata);
 
-            const resolvedShape =
-                shape && Object.keys(shape).length > 0
-                    ? shape
-                    : buildEntityFromMetadata(metadata);
+                setFormShape(resolvedShape);
 
-            setFormShape(resolvedShape);
+                let resolvedEntity: Entity;
 
-            if (initialValues) {
-                setEntity(
-                    shape
+                if (initialValues) {
+                    resolvedEntity = shape
                         ? mergeEntityValuesIntoShape(shape, initialValues)
-                        : cloneValue(initialValues)
-                );
-                return;
-            }
+                        : cloneValue(initialValues);
+                } else if (isNewEntity) {
+                    resolvedEntity = buildEntityFromShape(shape, metadata);
+                } else {
+                    const dataPayload = await loadEntityData(itemId, entityName);
+                    if (cancelled) return;
 
-            if (isNewEntity) {
-                setEntity(buildEntityFromShape(shape, metadata));
-                return;
-            }
+                    const loadedEntity = normalizeLoadedEntity(dataPayload);
 
-            const dataPayload = await loadEntityData(itemId, entityName);
+                    resolvedEntity =
+                        Object.keys(loadedEntity).length > 0
+                            ? shape
+                                ? mergeEntityValuesIntoShape(shape, loadedEntity)
+                                : loadedEntity
+                            : buildEntityFromShape(shape, metadata);
+                }
 
-            if (cancelled) return;
+                setEntity(resolvedEntity);
+                hier.setSelectionsFromEntity(resolvedEntity);
+            } catch (err) {
+                if (cancelled) return;
 
-            const loadedEntity = normalizeLoadedEntity(dataPayload);
+                console.error(`Error loading ${entityName}:`, err);
 
-            setEntity(
-                Object.keys(loadedEntity).length > 0
-                    ? shape
-                        ? mergeEntityValuesIntoShape(shape, loadedEntity)
-                        : loadedEntity
-                    : buildEntityFromShape(shape, metadata)
-            );
-        } catch (err) {
-            if (cancelled) return;
+                const message =
+                    err instanceof Error ? err.message : 'Unable to load entity';
 
-            console.error(`Error loading ${entityName}:`, err);
+                setEntityError(message);
 
-            const message =
-                err instanceof Error ? err.message : 'Unable to load entity';
-
-            setEntityError(message);
-
-            const fallbackShape = buildEntityFromMetadata(metadata);
-            setFormShape(fallbackShape);
-            setEntity(fallbackShape);
-        } finally {
-            if (!cancelled) {
-                setEntityLoading(false);
+                const fallbackShape = buildEntityFromMetadata(metadata);
+                setFormShape(fallbackShape);
+                setEntity(fallbackShape);
+                hier.setSelectionsFromEntity(fallbackShape);
+            } finally {
+                if (!cancelled) {
+                    setEntityLoading(false);
+                }
             }
         }
-    }
 
-    void runLoadEntity();
+        void runLoadEntity();
 
-    return () => {
-        cancelled = true;
-    };
+        return () => {
+            cancelled = true;
+        };
     }, [
         metadata,
         entityName,
         itemId,
         isNewEntity,
         initialValues,
+        loadEntityDefinition,
+        loadEntityData,
+        hier.setSelectionsFromEntity,
     ]);
-        
 
-    const setEntityPath = (path: string[], value: any) => {
+    const setEntityPath = useCallback((path: string[], value: any) => {
         setEntity((prev) => {
             const updated = cloneValue(prev) || {};
             let ref = updated;
@@ -363,14 +336,17 @@ export default function EntityComponent({
             ref[path[path.length - 1]] = value;
             return updated;
         });
-    };
+    }, []);
 
-    const readEntityPath = (path: string[]) => {
-        return path.reduce<any>((acc, key) => {
-            if (acc === undefined || acc === null) return '';
-            return acc[key] !== undefined ? acc[key] : '';
-        }, entity);
-    };
+    const readEntityPath = useCallback(
+        (path: string[]) => {
+            return path.reduce<any>((acc, key) => {
+                if (acc === undefined || acc === null) return '';
+                return acc[key] !== undefined ? acc[key] : '';
+            }, entity);
+        },
+        [entity]
+    );
 
     const handleInputChange = (
         path: string[],
@@ -384,6 +360,32 @@ export default function EntityComponent({
                 : target.value;
 
         setEntityPath(path, value);
+    };
+
+    const handleHierarchyChange = (path: string[], key: string, value: string | null) => {
+        hier.onChange(key, value);
+
+        setEntity((prev) => {
+            const updated = cloneValue(prev) || {};
+            let ref = updated;
+
+            for (let i = 0; i < path.length - 1; i++) {
+                const pathKey = path[i];
+                if (ref[pathKey] === undefined || ref[pathKey] === null) {
+                    ref[pathKey] = {};
+                }
+                ref = ref[pathKey];
+            }
+
+            ref[path[path.length - 1]] = value ?? '';
+
+            const index = hierarchyFields.indexOf(key);
+            for (let i = index + 1; i < hierarchyFields.length; i++) {
+                updated[hierarchyFields[i]] = '';
+            }
+
+            return updated;
+        });
     };
 
     const handleAddRow = (path: string[], templateRow: Entity) => {
@@ -582,7 +584,10 @@ export default function EntityComponent({
         }
 
         if (hierarchyFields.includes(key)) {
-            const h = hier.hooks.find((hook: any) => hook.field === key);
+            const options = hier.optionsByField[key] ?? [];
+            const hierarchyLoading = hier.loadingByField[key] ?? false;
+            const hierarchyEnabled = hier.isFieldEnabled(key);
+            const hierarchyError = hier.errorByField[key];
 
             return (
                 <label key={fieldName} className="block">
@@ -592,19 +597,27 @@ export default function EntityComponent({
                         value={String(readEntityPath(fullPath) ?? '')}
                         onChange={(e) => {
                             const selectedValue = e.target.value || null;
-                            hier.onChange(key, selectedValue);
-                            setEntityPath(fullPath, selectedValue);
+                            handleHierarchyChange(fullPath, key, selectedValue);
                         }}
                         className="w-full border rounded p-1 mt-1"
-                        disabled={h?.isLoading || disabled}
+                        disabled={disabled || hierarchyLoading || !hierarchyEnabled}
                     >
-                        <option value="">Select...</option>
-                        {h?.options?.map((opt: any) => (
-                            <option key={opt.value} value={opt.value}>
+                        <option value="">
+                            {hierarchyEnabled ? 'Select...' : 'Select previous level first...'}
+                        </option>
+
+                        {options.map((opt) => (
+                            <option key={String(opt.value)} value={String(opt.value)}>
                                 {opt.label}
                             </option>
                         ))}
                     </select>
+
+                    {hierarchyError && (
+                        <p className="text-xs text-red-600 mt-1">
+                            Failed to load options.
+                        </p>
+                    )}
                 </label>
             );
         }
@@ -700,4 +713,4 @@ export default function EntityComponent({
             </div>
         </form>
     );
-};
+}

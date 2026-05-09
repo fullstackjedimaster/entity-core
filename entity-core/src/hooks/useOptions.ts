@@ -1,49 +1,93 @@
 // src/hooks/useOptions.ts
-"use client";
-import useSWR from "swr";
+'use client';
 
-export type OptionItem = { value: string | number; label: string };
+import useSWR from 'swr';
 
-const fetcher = async (url: string): Promise<OptionItem[]> => {
-    const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("access_token") || ""}` },
-    });
-    if (!res.ok) throw new Error(`Failed to load options: ${res.statusText}`);
-    return res.json();
+export type OptionItem = {
+    value: string | number;
+    label: string;
 };
 
-/**
- * useOptions(entity, valueCol, labelCol, filter)
- * Example:
- *   useOptions("organization", "id", "name", { parent_id: selectedParent });
- */
-export function useOptions(
-    entity?: string,
-    valueCol?: string,
-    labelCol?: string,
-    filter: Record<string, any> = {},
-    limit = 100
-) {
-    if (!entity || !valueCol || !labelCol) {
-        return { options: [], isLoading: false, error: null, refresh: () => {} };
-    }
+export type OptionFilter = Record<string, string | number | boolean | null | undefined>;
 
+export function buildOptionsUrl(
+    entity: string,
+    valueCol: string,
+    labelCol: string,
+    filter: OptionFilter = {},
+    limit = 100
+): string {
     const params = new URLSearchParams({
         entity,
         value: valueCol,
         label: labelCol,
-        limit: limit.toString(),
+        limit: String(limit),
     });
 
-    for (const [k, v] of Object.entries(filter)) {
-        if (v !== undefined && v !== null) params.append(k, String(v));
+    for (const [key, value] of Object.entries(filter)) {
+        if (value !== undefined && value !== null && value !== '') {
+            params.append(key, String(value));
+        }
     }
 
-    const url = `/api/options?${params.toString()}`;
-    const { data, error, isLoading, mutate } = useSWR<OptionItem[]>(url, fetcher);
+    return `/api/options?${params.toString()}`;
+}
+
+export async function fetchOptions(url: string): Promise<OptionItem[]> {
+    const token =
+        typeof window !== 'undefined'
+            ? localStorage.getItem('access_token') || ''
+            : '';
+
+    const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
+    if (!res.ok) {
+        throw new Error(`Failed to load options: ${res.status} ${res.statusText}`);
+    }
+
+    const payload = await res.json();
+
+    if (Array.isArray(payload)) {
+        return payload;
+    }
+
+    if (Array.isArray(payload?.options)) {
+        return payload.options;
+    }
+
+    if (Array.isArray(payload?.result)) {
+        return payload.result;
+    }
+
+    if (Array.isArray(payload?.result?.options)) {
+        return payload.result.options;
+    }
+
+    return [];
+}
+
+export function useOptions(
+    entity?: string,
+    valueCol?: string,
+    labelCol?: string,
+    filter: OptionFilter = {},
+    limit = 100
+) {
+    const enabled = Boolean(entity && valueCol && labelCol);
+
+    const url = enabled
+        ? buildOptionsUrl(entity!, valueCol!, labelCol!, filter, limit)
+        : null;
+
+    const { data, error, isLoading, mutate } = useSWR<OptionItem[]>(
+        url,
+        fetchOptions
+    );
 
     return {
-        options: data || [],
+        options: data ?? [],
         isLoading,
         error,
         refresh: mutate,

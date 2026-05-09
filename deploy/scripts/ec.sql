@@ -428,9 +428,127 @@ $opt$;
 ALTER FUNCTION ec.get_column_options(TEXT, TEXT, TEXT, TEXT) OWNER TO ec;
 GRANT EXECUTE ON FUNCTION ec.get_column_options(TEXT, TEXT, TEXT, TEXT) TO ec_app;
 
+CREATE OR REPLACE FUNCTION ec.get_form_metadata(
+  p_entity_schema TEXT,
+  p_entity_name TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ec, public
+AS $form$
+DECLARE
+  rec RECORD;
+  fields JSONB := '[]'::JSONB;
+  pk TEXT := 'id';
+  excludes TEXT[] := ARRAY['created_at', 'updated_at', 'last_updated_at', 'last_updated_by']::TEXT[];
+  has_entity BOOLEAN;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1
+    FROM ec.entity
+    WHERE entity_schema = p_entity_schema
+      AND entity_name = p_entity_name
+  )
+  INTO has_entity;
+
+  IF NOT has_entity THEN
+    RAISE EXCEPTION 'Unknown entity: %.%', p_entity_schema, p_entity_name;
+  END IF;
+
+  FOR rec IN
+    SELECT
+      c.column_name,
+      c.data_type,
+      c.is_nullable,
+      c.udt_name,
+      c.ordinal_position
+    FROM information_schema.columns c
+    WHERE c.table_schema = p_entity_schema
+      AND c.table_name = p_entity_name
+    ORDER BY c.ordinal_position
+  LOOP
+    IF rec.column_name = pk OR rec.column_name = ANY(excludes) THEN
+      CONTINUE;
+    END IF;
+
+    fields := fields || jsonb_build_object(
+      'name', rec.column_name,
+      'label', initcap(replace(rec.column_name, '_', ' ')),
+      'type',
+        CASE
+          WHEN rec.data_type = 'ARRAY' AND rec.udt_name LIKE '_text' THEN 'string[]'
+          WHEN rec.data_type = 'ARRAY' THEN 'array'
+          WHEN rec.data_type = 'USER-DEFINED' AND rec.udt_name = 'citext' THEN 'text'
+          WHEN rec.data_type = 'jsonb' THEN 'jsonb'
+          WHEN rec.data_type = 'json' THEN 'json'
+          WHEN rec.data_type = 'boolean' THEN 'boolean'
+          WHEN rec.data_type IN ('integer','bigint','numeric','double precision','real') THEN 'number'
+          WHEN rec.data_type LIKE 'timestamp%' THEN 'datetime'
+          WHEN rec.data_type = 'date' THEN 'date'
+          WHEN rec.data_type = 'uuid' THEN 'uuid'
+          ELSE 'text'
+        END,
+      'required', (rec.is_nullable = 'NO')
+    )::JSONB;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'entityName', p_entity_name,
+    'entity', p_entity_name,
+    'entity_schema', p_entity_schema,
+    'schema', p_entity_schema,
+    'table', p_entity_name,
+    'primaryKey', pk,
+    'fields', fields
+  );
+END;
+$form$;
 
 ALTER FUNCTION ec.get_form_metadata(TEXT, TEXT) OWNER TO ec;
 GRANT EXECUTE ON FUNCTION ec.get_form_metadata(TEXT, TEXT) TO ec_app;
+
+CREATE OR REPLACE FUNCTION ec.get_foreign_key_options(entity_schema TEXT, entity_name TEXT)
+RETURNS JSONB LANGUAGE plpgsql AS $$
+DECLARE
+    cfg RECORD;
+    fk RECORD;
+    result JSONB := '{}';
+    lookup JSONB;
+BEGIN
+    SELECT * INTO cfg
+    FROM ec.entity_json ej
+    WHERE ej.entity_name = entity_name
+    AND ej.entity_schema = entity_schema;
+
+    FOR fk IN
+        SELECT
+            kcu.column_name,
+            ccu.table_name AS foreign_table,
+            ccu.column_name AS foreign_column
+        FROM information_schema.table_constraints AS tc
+        JOIN information_schema.key_column_usage AS kcu
+            ON tc.constraint_name = kcu.constraint_name
+        JOIN information_schema.constraint_column_usage AS ccu
+            ON ccu.constraint_name = tc.constraint_name
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+          AND tc.table_schema = cfg.entity_schema
+          AND tc.table_name = cfg.entity_name
+    LOOP
+        EXECUTE format(
+            'SELECT json_agg(json_build_object(''id'', %I, ''name'', %I)) FROM %I.%I',
+            fk.foreign_column, fk.foreign_column, cfg.entity_schema, fk.foreign_table
+        ) INTO lookup;
+
+        result := jsonb_set(result, ARRAY[fk.column_name], lookup);
+    END LOOP;
+
+    RETURN result;
+END;
+$$;
+
+ALTER FUNCTION ec.get_foreign_key_options(TEXT, TEXT) OWNER TO ec;
+GRANT EXECUTE ON FUNCTION ec.get_foreign_key_options(TEXT, TEXT) TO ec_app;
 -- =========================================================
 -- TENANT BOOTSTRAP
 -- =========================================================
@@ -961,6 +1079,7 @@ BEGIN
   EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_column_options(TEXT, TEXT, TEXT, TEXT) TO ec_app', p_entity_schema);
   EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_column_options(TEXT, TEXT, TEXT, TEXT) TO %1$I', p_entity_schema);
 
+
   EXECUTE format($sql$
     CREATE OR REPLACE FUNCTION %1$I.get_form_metadata(
       p_entity_schema TEXT,
@@ -1044,6 +1163,54 @@ BEGIN
   EXECUTE format('REVOKE ALL ON FUNCTION %1$I.get_form_metadata(TEXT, TEXT) FROM PUBLIC', p_entity_schema);
   EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_form_metadata(TEXT, TEXT) TO ec_app', p_entity_schema);
   EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_form_metadata(TEXT, TEXT) TO %1$I', p_entity_schema);
+
+  EXECUTE format($sql$
+      CREATE OR REPLACE FUNCTION %1$I.get_foreign_key_options(entity_schema TEXT, entity_name TEXT)
+        RETURNS JSONB LANGUAGE plpgsql AS $fk$
+        DECLARE
+            cfg RECORD;
+            fk RECORD;
+            result JSONB := '{}';
+            lookup JSONB;
+        BEGIN
+            SELECT * INTO cfg
+            FROM %1$I.entity_json ej
+            WHERE ej.entity_name = entity_name
+            AND ej.entity_schema = entity_schema;
+
+            FOR fk IN
+                SELECT
+                    kcu.column_name,
+                    ccu.table_name AS foreign_table,
+                    ccu.column_name AS foreign_column
+                FROM information_schema.table_constraints AS tc
+                JOIN information_schema.key_column_usage AS kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                JOIN information_schema.constraint_column_usage AS ccu
+                    ON ccu.constraint_name = tc.constraint_name
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_schema = cfg.entity_schema
+                  AND tc.table_name = cfg.entity_name
+            LOOP
+                EXECUTE format(
+                    'SELECT json_agg(json_build_object(''id'', %%I, ''name'', %%I)) FROM %%I.%%I',
+                    fk.foreign_column, fk.foreign_column, cfg.entity_schema, fk.foreign_table
+                ) INTO lookup;
+
+                result := jsonb_set(result, ARRAY[fk.column_name], lookup);
+            END LOOP;
+
+            RETURN result;
+        END;
+        $fk$;
+    , p_entity_schema);
+
+
+  EXECUTE format('ALTER FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT) OWNER TO %1$I', p_entity_schema);
+  EXECUTE format('REVOKE ALL ON FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT) FROM PUBLIC', p_entity_schema);
+  EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT) TO ec_app', p_entity_schema);
+  EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT) TO %1$I', p_entity_schema);
+
 
   EXECUTE format('ALTER SCHEMA %1$I OWNER TO %1$I', p_entity_schema);
   EXECUTE format('GRANT USAGE ON SCHEMA %1$I TO ec_app', p_entity_schema);
