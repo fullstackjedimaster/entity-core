@@ -230,7 +230,7 @@ export default function EntityComponent({
         );
     }, [metadata]);
 
-    const hier = useHierarchicalOptions(entityName, hierarchyFields, 'id', 'name');
+    const hier = useHierarchicalOptions(entityName, hierarchyFields);
 
     useEffect(() => {
         let cancelled = false;
