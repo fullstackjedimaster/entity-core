@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useMemo } from 'react';
 import { useAuthedFetch } from '@/hooks/useAuthedFetch';
 
 export const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
@@ -32,17 +33,20 @@ async function handle<T>(resp: Response): Promise<T> {
 export function useCrudApi() {
     const authedFetch = useAuthedFetch();
 
-    const postEnvelope = async <T>(entityName: string, envelope: RequestEnvelope) => {
-        const resp = await authedFetch(`/crud/${entityName}`, {
-            method: 'POST',
-            body: JSON.stringify(envelope),
-        });
+    const postEnvelope = useCallback(
+        async <T,>(entityName: string, envelope: RequestEnvelope): Promise<T> => {
+            const resp = await authedFetch(`/crud/${entityName}`, {
+                method: 'POST',
+                body: JSON.stringify(envelope),
+            });
 
-        return handle<T>(resp);
-    };
+            return handle<T>(resp);
+        },
+        [authedFetch]
+    );
 
-    return {
-        list: async (entityName: string) => {
+    const list = useCallback(
+        async (entityName: string) => {
             return postEnvelope<{ items: EntityDataItemInfo[] }>(entityName, {
                 operation: 'list',
                 target: entityName,
@@ -54,8 +58,11 @@ export function useCrudApi() {
                 },
             });
         },
+        [postEnvelope]
+    );
 
-        get: async (entityName: string, id: string) => {
+    const get = useCallback(
+        async (entityName: string, id: string) => {
             return postEnvelope<{ items: unknown }>(entityName, {
                 operation: 'read',
                 target: entityName,
@@ -67,11 +74,11 @@ export function useCrudApi() {
                 },
             });
         },
+        [postEnvelope]
+    );
 
-        create: async (
-            entityName: string,
-            data: Record<string, unknown>
-        ) => {
+    const create = useCallback(
+        async (entityName: string, data: Record<string, unknown>) => {
             return postEnvelope<{ items: unknown }>(entityName, {
                 operation: 'create',
                 target: entityName,
@@ -83,8 +90,11 @@ export function useCrudApi() {
                 },
             });
         },
+        [postEnvelope]
+    );
 
-        update: async (
+    const update = useCallback(
+        async (
             entityName: string,
             id: string,
             data: Record<string, unknown>
@@ -100,8 +110,11 @@ export function useCrudApi() {
                 },
             });
         },
+        [postEnvelope]
+    );
 
-        delete: async (entityName: string, id: string) => {
+    const deleteEntity = useCallback(
+        async (entityName: string, id: string) => {
             return postEnvelope<{ items: unknown }>(entityName, {
                 operation: 'delete',
                 target: entityName,
@@ -113,5 +126,17 @@ export function useCrudApi() {
                 },
             });
         },
-    };
+        [postEnvelope]
+    );
+
+    return useMemo(
+        () => ({
+            list,
+            get,
+            create,
+            update,
+            delete: deleteEntity,
+        }),
+        [list, get, create, update, deleteEntity]
+    );
 }

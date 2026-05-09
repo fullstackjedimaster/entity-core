@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Toaster } from 'sonner';
 
 import { useFormMetadata } from '@/hooks/useFormMetadata';
@@ -232,6 +232,26 @@ export default function EntityComponent({
 
     const hier = useHierarchicalOptions(entityName, hierarchyFields);
 
+    const loadEntityDefinitionRef = useRef(loadEntityDefinition);
+    const loadEntityDataRef = useRef(loadEntityData);
+    const setSelectionsFromEntityRef = useRef(hier.setSelectionsFromEntity);
+
+    useEffect(() => {
+        loadEntityDefinitionRef.current = loadEntityDefinition;
+    }, [loadEntityDefinition]);
+
+    useEffect(() => {
+        loadEntityDataRef.current = loadEntityData;
+    }, [loadEntityData]);
+
+    useEffect(() => {
+        setSelectionsFromEntityRef.current = hier.setSelectionsFromEntity;
+    }, [hier.setSelectionsFromEntity]);
+
+    const initialValuesKey = useMemo(() => {
+        return initialValues ? JSON.stringify(initialValues) : '';
+    }, [initialValues]);
+
     useEffect(() => {
         let cancelled = false;
 
@@ -242,7 +262,7 @@ export default function EntityComponent({
             setEntityError(null);
 
             try {
-                const definitionPayload = await loadEntityDefinition(entityName);
+                const definitionPayload = await loadEntityDefinitionRef.current(entityName);
                 if (cancelled) return;
 
                 const definition = normalizeLoadedEntity(definitionPayload);
@@ -264,7 +284,7 @@ export default function EntityComponent({
                 } else if (isNewEntity) {
                     resolvedEntity = buildEntityFromShape(shape, metadata);
                 } else {
-                    const dataPayload = await loadEntityData(itemId, entityName);
+                    const dataPayload = await loadEntityDataRef.current(itemId, entityName);
                     if (cancelled) return;
 
                     const loadedEntity = normalizeLoadedEntity(dataPayload);
@@ -278,7 +298,7 @@ export default function EntityComponent({
                 }
 
                 setEntity(resolvedEntity);
-                hier.setSelectionsFromEntity(resolvedEntity);
+                setSelectionsFromEntityRef.current(resolvedEntity);
             } catch (err) {
                 if (cancelled) return;
 
@@ -292,7 +312,7 @@ export default function EntityComponent({
                 const fallbackShape = buildEntityFromMetadata(metadata);
                 setFormShape(fallbackShape);
                 setEntity(fallbackShape);
-                hier.setSelectionsFromEntity(fallbackShape);
+                setSelectionsFromEntityRef.current(fallbackShape);
             } finally {
                 if (!cancelled) {
                     setEntityLoading(false);
@@ -310,10 +330,7 @@ export default function EntityComponent({
         entityName,
         itemId,
         isNewEntity,
-        initialValues,
-        loadEntityDefinition,
-        loadEntityData,
-        hier.setSelectionsFromEntity,
+        initialValuesKey,
     ]);
 
     const setEntityPath = useCallback((path: string[], value: any) => {
