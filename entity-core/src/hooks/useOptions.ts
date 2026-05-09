@@ -1,95 +1,121 @@
-// src/hooks/useOptions.ts
 'use client';
 
-import useSWR from 'swr';
+import { useCallback, useEffect, useState } from 'react';
+import { useEntityApi, type OptionItem } from '@/lib/apiEntity';
 
-export type OptionItem = {
-    value: string | number;
-    label: string;
+export type { OptionItem };
+
+export type UseOptionsParams = {
+    entityName?: string;
+    column?: string;
+    parentField?: string;
+    parentValue?: string | number | null;
+    filter?: string;
+    mode?: 'auto' | 'foreign_key' | 'column';
 };
 
-export type OptionFilter = Record<string, string | number | boolean | null | undefined>;
+export function useOptions({
+    entityName,
+    column,
+    parentField,
+    parentValue,
+    filter,
+    mode = 'auto',
+}: UseOptionsParams) {
+    const api = useEntityApi();
 
-export function buildOptionsUrl(
-    entity: string,
-    valueCol: string,
-    labelCol: string,
-    filter: OptionFilter = {},
-    limit = 100
-): string {
-    const params = new URLSearchParams({
-        entity,
-        value: valueCol,
-        label: labelCol,
-        limit: String(limit),
-    });
+    const [options, setOptions] = useState<OptionItem[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
 
-    for (const [key, value] of Object.entries(filter)) {
-        if (value !== undefined && value !== null && value !== '') {
-            params.append(key, String(value));
+    const loadOptions = useCallback(async () => {
+        if (!entityName || !column) {
+            setOptions([]);
+            setIsLoading(false);
+            setError(null);
+            return;
         }
-    }
 
-    return `/api/options?${params.toString()}`;
-}
+        setIsLoading(true);
+        setError(null);
 
-export async function fetchOptions(url: string): Promise<OptionItem[]> {
-    const token =
-        typeof window !== 'undefined'
-            ? localStorage.getItem('access_token') || ''
-            : '';
+        try {
+            const loaded = await api.getOptions(entityName, column, {
+                parentField,
+                parentValue,
+                filter,
+                mode,
+            });
 
-    const res = await fetch(url, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+            setOptions(loaded);
+        } catch (err) {
+            const normalized =
+                err instanceof Error
+                    ? err
+                    : new Error('Failed to load options');
 
-    if (!res.ok) {
-        throw new Error(`Failed to load options: ${res.status} ${res.statusText}`);
-    }
+            setError(normalized);
+            setOptions([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [api, entityName, column, parentField, parentValue, filter, mode]);
 
-    const payload = await res.json();
+    useEffect(() => {
+        let cancelled = false;
 
-    if (Array.isArray(payload)) {
-        return payload;
-    }
+        async function run() {
+            if (!entityName || !column) {
+                if (!cancelled) {
+                    setOptions([]);
+                    setIsLoading(false);
+                    setError(null);
+                }
+                return;
+            }
 
-    if (Array.isArray(payload?.options)) {
-        return payload.options;
-    }
+            setIsLoading(true);
+            setError(null);
 
-    if (Array.isArray(payload?.result)) {
-        return payload.result;
-    }
+            try {
+                const loaded = await api.getOptions(entityName, column, {
+                    parentField,
+                    parentValue,
+                    filter,
+                    mode,
+                });
 
-    if (Array.isArray(payload?.result?.options)) {
-        return payload.result.options;
-    }
+                if (!cancelled) {
+                    setOptions(loaded);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    const normalized =
+                        err instanceof Error
+                            ? err
+                            : new Error('Failed to load options');
 
-    return [];
-}
+                    setError(normalized);
+                    setOptions([]);
+                }
+            } finally {
+                if (!cancelled) {
+                    setIsLoading(false);
+                }
+            }
+        }
 
-export function useOptions(
-    entity?: string,
-    valueCol?: string,
-    labelCol?: string,
-    filter: OptionFilter = {},
-    limit = 100
-) {
-    const enabled = Boolean(entity && valueCol && labelCol);
+        void run();
 
-    const url = enabled
-        ? buildOptionsUrl(entity!, valueCol!, labelCol!, filter, limit)
-        : null;
-
-    const { data, error, isLoading, mutate } = useSWR<OptionItem[]>(
-        url,
-        fetchOptions
-    );
+        return () => {
+            cancelled = true;
+        };
+    }, [api, entityName, column, parentField, parentValue, filter, mode]);
 
     return {
-        options: data ?? [],
+        options,
         isLoading,
         error,
-        refresh: mutate,
+        refresh: loadOptions,
     };
 }

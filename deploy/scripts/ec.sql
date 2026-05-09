@@ -507,6 +507,7 @@ $form$;
 
 ALTER FUNCTION ec.get_form_metadata(TEXT, TEXT) OWNER TO ec;
 GRANT EXECUTE ON FUNCTION ec.get_form_metadata(TEXT, TEXT) TO ec_app;
+
 CREATE OR REPLACE FUNCTION ec.get_foreign_key_options(
     p_entity_schema TEXT,
     p_entity_name TEXT,

@@ -171,24 +171,57 @@ async def get_column_options(
             "filter": filter,
         },
         meta={
-            "source": "entity-core-api:/api/entities/{entity_name}/options/{column}:GET"
+            "source": "entity-core-api:/api/entities/{entity_name}/options/{column}:GET",
         },
     )
 
     data = await call_model_manage(envelope, token=internal_token)
-    result = _unwrap_result(data, "entity-server failed column_options")
+    result = _unwrap_result(data, "entity-server failed get_column_options")
 
-    values: List[Any] = []
+    if not isinstance(result, list):
+        raise HTTPException(
+            status_code=500,
+            detail="Expected get_column_options to return a list",
+        )
 
-    if isinstance(result, list):
-        for item in result:
-            values.append(item.get("value") if isinstance(item, dict) else item)
-        return values
+    return result
 
-    if isinstance(result, dict) and "rows" in result:
-        for row in result["rows"]:
-            if isinstance(row, dict):
-                values.append(row.get("value"))
-        return values
+@router.get("/{entity_name}/foreign-key-options/{column}")
+async def get_foreign_key_options(
+    request: Request,
+    entity_name: str,
+    column: str,
+    parentField: Optional[str] = None,
+    parentValue: Optional[str] = None,
+    token_payload: dict = Depends(require_jwt()),
+):
+    entity_schema = get_entity_schema_from_claims(token_payload)
+    internal_token = issue_internal_token(request, token_payload)
 
-    raise HTTPException(status_code=500, detail="Unexpected result format")
+    envelope = RequestEnvelope(
+        operation="execute",
+        target="get_foreign_key_options",
+        id=None,
+        data={},
+        args={
+            "entity_schema": entity_schema,
+            "entity_name": entity_name,
+            "column_name": column,
+            "parent_field": parentField,
+            "parent_value": parentValue,
+        },
+        meta={
+            "source": "entity-core-api:/api/entities/{entity_name}/foreign-key-options/{column}:GET",
+        },
+    )
+
+    data = await call_model_manage(envelope, token=internal_token)
+    result = _unwrap_result(data, "entity-server failed get_foreign_key_options")
+
+    if not isinstance(result, dict):
+        raise HTTPException(
+            status_code=500,
+            detail="Expected get_foreign_key_options to return a JSON object",
+        )
+
+    return result.get(column, [])

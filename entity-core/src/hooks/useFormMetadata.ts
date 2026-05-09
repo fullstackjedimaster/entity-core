@@ -1,6 +1,6 @@
 'use client';
 
-import useSWR from 'swr';
+import { useCallback, useEffect, useState } from 'react';
 import { useEntityApi } from '@/lib/apiEntity';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -50,29 +50,88 @@ export function useFormMetadata(entityName: string) {
     const { isAuthenticated, loading: authLoading, disableAuth } = useAuth();
     const api = useEntityApi();
 
+    const [formMetadata, setFormMetadata] = useState<FormMetadata | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
+
     const canFetch =
         !!entityName &&
         !authLoading &&
         (disableAuth || isAuthenticated);
 
-    const key = canFetch ? ['form-metadata', entityName] : null;
-
-    const {
-        data,
-        error,
-        isLoading,
-        mutate,
-    } = useSWR<FormMetadataResponse>(
-        key,
-        async () =>
-            api.getFormMetadata(entityName) as Promise<FormMetadataResponse>,
-        {
-            revalidateOnFocus: false,
-            revalidateOnReconnect: false,
+    const loadFormMetadata = useCallback(async () => {
+        if (!canFetch) {
+            setFormMetadata(null);
+            setIsLoading(false);
+            setError(null);
+            return;
         }
-    );
 
-    const formMetadata = data ? normalizeFormMetadata(data) : null;
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const payload =
+                (await api.getFormMetadata(entityName)) as FormMetadataResponse;
+
+            setFormMetadata(normalizeFormMetadata(payload));
+        } catch (err) {
+            setFormMetadata(null);
+            setError(
+                err instanceof Error
+                    ? err
+                    : new Error('Failed to load form metadata')
+            );
+        } finally {
+            setIsLoading(false);
+        }
+    }, [api, canFetch, entityName]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function run() {
+            if (!canFetch) {
+                if (!cancelled) {
+                    setFormMetadata(null);
+                    setIsLoading(false);
+                    setError(null);
+                }
+                return;
+            }
+
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                const payload =
+                    (await api.getFormMetadata(entityName)) as FormMetadataResponse;
+
+                if (!cancelled) {
+                    setFormMetadata(normalizeFormMetadata(payload));
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setFormMetadata(null);
+                    setError(
+                        err instanceof Error
+                            ? err
+                            : new Error('Failed to load form metadata')
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setIsLoading(false);
+                }
+            }
+        }
+
+        void run();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [api, canFetch, entityName]);
 
     return {
         formMetadata,
@@ -80,6 +139,7 @@ export function useFormMetadata(entityName: string) {
         isLoading: authLoading || isLoading,
         loading: authLoading || isLoading,
         error,
-        mutate,
+        mutate: loadFormMetadata,
+        refresh: loadFormMetadata,
     };
 }

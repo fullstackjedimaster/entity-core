@@ -653,18 +653,22 @@ export default function EntityComponent({
         );
     };
 
-    async function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
+   const handleSubmit = async (e: any) => {
+    e.preventDefault();
 
-        const savePayload = normalizeEntityForSave(entity, metadata);
+    const savePayload = normalizeEntityForSave(entity, metadata);
 
-        if (onSavedAction) {
-            await onSavedAction(savePayload);
-            return;
-        }
-
-        await saveEntityData(isNewEntity ? null : itemId, entityName, savePayload);
+    if (onSavedAction) {
+        await onSavedAction(savePayload);
+        return;
     }
+
+    await saveEntityData(
+        isNewEntity ? null : itemId,
+        entityName,
+        savePayload
+    );
+};
 
     const displayedError =
         entityError ||
