@@ -1202,8 +1202,8 @@ BEGIN
 
             RETURN result;
         END;
-        $fk$;
-    , p_entity_schema);
+        $fk$
+       $sql$ , p_entity_schema);
 
 
   EXECUTE format('ALTER FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT) OWNER TO %1$I', p_entity_schema);
