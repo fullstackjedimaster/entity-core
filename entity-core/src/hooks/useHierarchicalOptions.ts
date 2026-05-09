@@ -1,18 +1,23 @@
-// src/hooks/useHierarchicalOptions.ts
+// entity-core/src/hooks/useHierarchicalOptions.ts
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
 import useSWR from 'swr';
-import {
-    buildOptionsUrl,
-    fetchOptions,
-    type OptionItem,
-    type OptionFilter,
-} from './useOptions';
+
+export type OptionItem = {
+    value: string | number;
+    label: string;
+};
 
 type OptionsByField = Record<string, OptionItem[]>;
 type LoadingByField = Record<string, boolean>;
 type ErrorByField = Record<string, Error | undefined>;
+
+type RequestPlanItem = {
+    field: string;
+    enabled: boolean;
+    url: string | null;
+};
 
 function hierarchyLevel(field: string): number {
     const match = field.match(/_hier(\d+)$/);
@@ -23,12 +28,74 @@ function sortHierarchyFields(fields: string[]): string[] {
     return [...fields].sort((a, b) => hierarchyLevel(a) - hierarchyLevel(b));
 }
 
+function normalizeOptionsPayload(payload: unknown): OptionsByField {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return {};
+    }
+
+    const result: OptionsByField = {};
+
+    for (const [field, rawOptions] of Object.entries(payload)) {
+        if (!Array.isArray(rawOptions)) {
+            result[field] = [];
+            continue;
+        }
+
+        result[field] = rawOptions.map((item: any) => ({
+            value: item.value ?? item.id ?? item.uuid ?? item.key ?? '',
+            label: item.label ?? item.name ?? item.title ?? item.value ?? item.id ?? '',
+        }));
+    }
+
+    return result;
+}
+
+async function fetchForeignKeyOptions(url: string): Promise<OptionsByField> {
+    const token =
+        typeof window !== 'undefined'
+            ? localStorage.getItem('access_token') || ''
+            : '';
+
+    const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+            Accept: 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+    });
+
+    if (!res.ok) {
+        throw new Error(
+            `Failed to load foreign key options: ${res.status} ${res.statusText}`
+        );
+    }
+
+    const payload = await res.json();
+    return normalizeOptionsPayload(payload);
+}
+
+function buildForeignKeyOptionsUrl(
+    entityName: string,
+    field: string,
+    parentField?: string,
+    parentValue?: string | null
+): string {
+    const params = new URLSearchParams({
+        entity: entityName,
+        field,
+    });
+
+    if (parentField && parentValue) {
+        params.set('parentField', parentField);
+        params.set('parentValue', parentValue);
+    }
+
+    return `/api/foreign-key-options?${params.toString()}`;
+}
+
 export function useHierarchicalOptions(
     baseEntityName: string,
-    hierarchyFields: string[],
-    valueCol = 'id',
-    labelCol = 'name',
-    limit = 100
+    hierarchyFields: string[]
 ) {
     const sortedFields = useMemo(
         () => sortHierarchyFields(hierarchyFields),
@@ -37,35 +104,43 @@ export function useHierarchicalOptions(
 
     const [selectedValues, setSelectedValues] = useState<Record<string, string | null>>({});
 
-    const requestPlan = useMemo(() => {
+    const requestPlan = useMemo<RequestPlanItem[]>(() => {
         if (!baseEntityName || sortedFields.length === 0) {
             return [];
         }
 
         return sortedFields.map((field, index) => {
-            const filter: OptionFilter = {};
-            let enabled = true;
+            if (index === 0) {
+                return {
+                    field,
+                    enabled: true,
+                    url: buildForeignKeyOptionsUrl(baseEntityName, field),
+                };
+            }
 
-            if (index > 0) {
-                const previousField = sortedFields[index - 1];
-                const previousValue = selectedValues[previousField];
+            const parentField = sortedFields[index - 1];
+            const parentValue = selectedValues[parentField];
 
-                if (!previousValue) {
-                    enabled = false;
-                } else {
-                    filter[previousField] = previousValue;
-                }
+            if (!parentValue) {
+                return {
+                    field,
+                    enabled: false,
+                    url: null,
+                };
             }
 
             return {
                 field,
-                enabled,
-                url: enabled
-                    ? buildOptionsUrl(baseEntityName, valueCol, labelCol, filter, limit)
-                    : null,
+                enabled: true,
+                url: buildForeignKeyOptionsUrl(
+                    baseEntityName,
+                    field,
+                    parentField,
+                    parentValue
+                ),
             };
         });
-    }, [baseEntityName, sortedFields, selectedValues, valueCol, labelCol, limit]);
+    }, [baseEntityName, sortedFields, selectedValues]);
 
     const swrKey = useMemo(() => {
         if (requestPlan.length === 0) return null;
@@ -73,31 +148,44 @@ export function useHierarchicalOptions(
         return JSON.stringify(
             requestPlan.map((item) => ({
                 field: item.field,
-                url: item.url,
                 enabled: item.enabled,
+                url: item.url,
             }))
         );
     }, [requestPlan]);
 
-    const { data, error, isLoading, mutate } = useSWR<OptionsByField>(
-        swrKey,
-        async () => {
-            const result: OptionsByField = {};
+    const {
+        data,
+        error,
+        isLoading,
+        mutate,
+    } = useSWR<OptionsByField>(swrKey, async () => {
+        const result: OptionsByField = {};
 
-            await Promise.all(
-                requestPlan.map(async (item) => {
-                    if (!item.enabled || !item.url) {
-                        result[item.field] = [];
-                        return;
-                    }
+        await Promise.all(
+            requestPlan.map(async (item) => {
+                if (!item.enabled || !item.url) {
+                    result[item.field] = [];
+                    return;
+                }
 
-                    result[item.field] = await fetchOptions(item.url);
-                })
-            );
+                const payload = await fetchForeignKeyOptions(item.url);
+                result[item.field] = payload[item.field] ?? [];
+            })
+        );
 
-            return result;
+        return result;
+    });
+
+    const optionsByField = useMemo<OptionsByField>(() => {
+        const result: OptionsByField = {};
+
+        for (const field of sortedFields) {
+            result[field] = data?.[field] ?? [];
         }
-    );
+
+        return result;
+    }, [data, sortedFields]);
 
     const loadingByField = useMemo<LoadingByField>(() => {
         const result: LoadingByField = {};
@@ -146,6 +234,7 @@ export function useHierarchicalOptions(
 
                 for (const field of sortedFields) {
                     const value = entity?.[field];
+
                     next[field] =
                         value === undefined || value === null || value === ''
                             ? null
@@ -177,7 +266,7 @@ export function useHierarchicalOptions(
     return {
         fields: sortedFields,
         selectedValues,
-        optionsByField: data ?? {},
+        optionsByField,
         loadingByField,
         errorByField,
         isLoading,

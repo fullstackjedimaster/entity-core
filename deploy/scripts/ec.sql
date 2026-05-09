@@ -507,48 +507,190 @@ $form$;
 
 ALTER FUNCTION ec.get_form_metadata(TEXT, TEXT) OWNER TO ec;
 GRANT EXECUTE ON FUNCTION ec.get_form_metadata(TEXT, TEXT) TO ec_app;
-
-CREATE OR REPLACE FUNCTION ec.get_foreign_key_options(entity_schema TEXT, entity_name TEXT)
-RETURNS JSONB LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION ec.get_foreign_key_options(
+    p_entity_schema TEXT,
+    p_entity_name TEXT,
+    p_column_name TEXT DEFAULT NULL,
+    p_parent_field TEXT DEFAULT NULL,
+    p_parent_value TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+AS $$
 DECLARE
-    cfg RECORD;
     fk RECORD;
+    parent_fk RECORD;
+    child_parent_fk RECORD;
     result JSONB := '{}';
     lookup JSONB;
+    label_column TEXT;
+    where_sql TEXT;
 BEGIN
-    SELECT * INTO cfg
-    FROM ec.entity_json ej
-    WHERE ej.entity_name = entity_name
-    AND ej.entity_schema = entity_schema;
-
     FOR fk IN
         SELECT
             kcu.column_name,
+            ccu.table_schema AS foreign_schema,
             ccu.table_name AS foreign_table,
             ccu.column_name AS foreign_column
         FROM information_schema.table_constraints AS tc
         JOIN information_schema.key_column_usage AS kcu
             ON tc.constraint_name = kcu.constraint_name
+           AND tc.constraint_schema = kcu.constraint_schema
         JOIN information_schema.constraint_column_usage AS ccu
             ON ccu.constraint_name = tc.constraint_name
+           AND ccu.constraint_schema = tc.constraint_schema
         WHERE tc.constraint_type = 'FOREIGN KEY'
-          AND tc.table_schema = cfg.entity_schema
-          AND tc.table_name = cfg.entity_name
+          AND tc.table_schema = p_entity_schema
+          AND tc.table_name = p_entity_name
+          AND (
+                p_column_name IS NULL
+                OR kcu.column_name = p_column_name
+          )
+        ORDER BY kcu.column_name
     LOOP
-        EXECUTE format(
-            'SELECT json_agg(json_build_object(''id'', %I, ''name'', %I)) FROM %I.%I',
-            fk.foreign_column, fk.foreign_column, cfg.entity_schema, fk.foreign_table
-        ) INTO lookup;
+        SELECT c.column_name
+        INTO label_column
+        FROM information_schema.columns c
+        WHERE c.table_schema = fk.foreign_schema
+          AND c.table_name = fk.foreign_table
+          AND c.column_name IN ('name', 'label', 'title')
+        ORDER BY CASE c.column_name
+            WHEN 'name' THEN 1
+            WHEN 'label' THEN 2
+            WHEN 'title' THEN 3
+            ELSE 4
+        END
+        LIMIT 1;
 
-        result := jsonb_set(result, ARRAY[fk.column_name], lookup);
+        IF label_column IS NULL THEN
+            label_column := fk.foreign_column;
+        END IF;
+
+        where_sql := '';
+
+        IF p_parent_field IS NOT NULL
+           AND p_parent_value IS NOT NULL
+           AND p_parent_value <> ''
+        THEN
+            SELECT
+                kcu.column_name,
+                ccu.table_schema AS foreign_schema,
+                ccu.table_name AS foreign_table,
+                ccu.column_name AS foreign_column
+            INTO parent_fk
+            FROM information_schema.table_constraints AS tc
+            JOIN information_schema.key_column_usage AS kcu
+                ON tc.constraint_name = kcu.constraint_name
+               AND tc.constraint_schema = kcu.constraint_schema
+            JOIN information_schema.constraint_column_usage AS ccu
+                ON ccu.constraint_name = tc.constraint_name
+               AND ccu.constraint_schema = tc.constraint_schema
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+              AND tc.table_schema = p_entity_schema
+              AND tc.table_name = p_entity_name
+              AND kcu.column_name = p_parent_field
+            LIMIT 1;
+
+            IF parent_fk.column_name IS NOT NULL THEN
+                SELECT
+                    kcu.column_name,
+                    ccu.table_schema AS parent_schema,
+                    ccu.table_name AS parent_table,
+                    ccu.column_name AS parent_column
+                INTO child_parent_fk
+                FROM information_schema.table_constraints AS tc
+                JOIN information_schema.key_column_usage AS kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                   AND tc.constraint_schema = kcu.constraint_schema
+                JOIN information_schema.constraint_column_usage AS ccu
+                    ON ccu.constraint_name = tc.constraint_name
+                   AND ccu.constraint_schema = tc.constraint_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_schema = fk.foreign_schema
+                  AND tc.table_name = fk.foreign_table
+                  AND ccu.table_schema = parent_fk.foreign_schema
+                  AND ccu.table_name = parent_fk.foreign_table
+                  AND ccu.column_name = parent_fk.foreign_column
+                LIMIT 1;
+
+                IF child_parent_fk.column_name IS NOT NULL THEN
+                    where_sql := format(
+                        'WHERE %I::text = $1',
+                        child_parent_fk.column_name
+                    );
+                ELSE
+                    lookup := '[]'::jsonb;
+
+                    result := jsonb_set(
+                        result,
+                        ARRAY[fk.column_name],
+                        lookup,
+                        true
+                    );
+
+                    CONTINUE;
+                END IF;
+            END IF;
+        END IF;
+
+        IF where_sql <> '' THEN
+            EXECUTE format(
+                'SELECT COALESCE(
+                    jsonb_agg(
+                        jsonb_build_object(
+                            ''value'', %1$I::text,
+                            ''label'', COALESCE(%2$I::text, %1$I::text)
+                        )
+                        ORDER BY COALESCE(%2$I::text, %1$I::text)
+                    ),
+                    ''[]''::jsonb
+                )
+                FROM %3$I.%4$I
+                %5$s',
+                fk.foreign_column,
+                label_column,
+                fk.foreign_schema,
+                fk.foreign_table,
+                where_sql
+            )
+            INTO lookup
+            USING p_parent_value;
+        ELSE
+            EXECUTE format(
+                'SELECT COALESCE(
+                    jsonb_agg(
+                        jsonb_build_object(
+                            ''value'', %1$I::text,
+                            ''label'', COALESCE(%2$I::text, %1$I::text)
+                        )
+                        ORDER BY COALESCE(%2$I::text, %1$I::text)
+                    ),
+                    ''[]''::jsonb
+                )
+                FROM %3$I.%4$I',
+                fk.foreign_column,
+                label_column,
+                fk.foreign_schema,
+                fk.foreign_table
+            )
+            INTO lookup;
+        END IF;
+
+        result := jsonb_set(
+            result,
+            ARRAY[fk.column_name],
+            lookup,
+            true
+        );
     END LOOP;
 
     RETURN result;
 END;
 $$;
 
-ALTER FUNCTION ec.get_foreign_key_options(TEXT, TEXT) OWNER TO ec;
-GRANT EXECUTE ON FUNCTION ec.get_foreign_key_options(TEXT, TEXT) TO ec_app;
+ALTER FUNCTION ec.get_foreign_key_options(TEXT, TEXT, TEXT, TEXT, TEXT) OWNER TO ec;
+GRANT EXECUTE ON FUNCTION ec.get_foreign_key_options(TEXT, TEXT, TEXT, TEXT, TEXT) TO ec_app;
+
 -- =========================================================
 -- TENANT BOOTSTRAP
 -- =========================================================
@@ -1165,45 +1307,188 @@ BEGIN
   EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_form_metadata(TEXT, TEXT) TO %1$I', p_entity_schema);
 
   EXECUTE format($sql$
-      CREATE OR REPLACE FUNCTION %1$I.get_foreign_key_options(entity_schema TEXT, entity_name TEXT)
-        RETURNS JSONB LANGUAGE plpgsql AS $fk$
-        DECLARE
-            cfg RECORD;
-            fk RECORD;
-            result JSONB := '{}';
-            lookup JSONB;
-        BEGIN
-            SELECT * INTO cfg
-            FROM %1$I.entity_json ej
-            WHERE ej.entity_name = entity_name
-            AND ej.entity_schema = entity_schema;
+    CREATE OR REPLACE FUNCTION  %1$I.get_foreign_key_options(
+        p_entity_schema TEXT,
+        p_entity_name TEXT,
+        p_column_name TEXT DEFAULT NULL,
+        p_parent_field TEXT DEFAULT NULL,
+        p_parent_value TEXT DEFAULT NULL
+    )
+    RETURNS JSONB
+    LANGUAGE plpgsql
+    AS $fk$
+    DECLARE
+        fk RECORD;
+        parent_fk RECORD;
+        child_parent_fk RECORD;
+        result JSONB := '{}';
+        lookup JSONB;
+        label_column TEXT;
+        where_sql TEXT;
+    BEGIN
+        FOR fk IN
+            SELECT
+                kcu.column_name,
+                ccu.table_schema AS foreign_schema,
+                ccu.table_name AS foreign_table,
+                ccu.column_name AS foreign_column
+            FROM information_schema.table_constraints AS tc
+            JOIN information_schema.key_column_usage AS kcu
+                ON tc.constraint_name = kcu.constraint_name
+               AND tc.constraint_schema = kcu.constraint_schema
+            JOIN information_schema.constraint_column_usage AS ccu
+                ON ccu.constraint_name = tc.constraint_name
+               AND ccu.constraint_schema = tc.constraint_schema
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+              AND tc.table_schema = p_entity_schema
+              AND tc.table_name = p_entity_name
+              AND (
+                    p_column_name IS NULL
+                    OR kcu.column_name = p_column_name
+              )
+            ORDER BY kcu.column_name
+        LOOP
+            SELECT c.column_name
+            INTO label_column
+            FROM information_schema.columns c
+            WHERE c.table_schema = fk.foreign_schema
+              AND c.table_name = fk.foreign_table
+              AND c.column_name IN ('name', 'label', 'title')
+            ORDER BY CASE c.column_name
+                WHEN 'name' THEN 1
+                WHEN 'label' THEN 2
+                WHEN 'title' THEN 3
+                ELSE 4
+            END
+            LIMIT 1;
 
-            FOR fk IN
+            IF label_column IS NULL THEN
+                label_column := fk.foreign_column;
+            END IF;
+
+            where_sql := '';
+
+            IF p_parent_field IS NOT NULL
+               AND p_parent_value IS NOT NULL
+               AND p_parent_value <> ''
+            THEN
                 SELECT
                     kcu.column_name,
+                    ccu.table_schema AS foreign_schema,
                     ccu.table_name AS foreign_table,
                     ccu.column_name AS foreign_column
+                INTO parent_fk
                 FROM information_schema.table_constraints AS tc
                 JOIN information_schema.key_column_usage AS kcu
                     ON tc.constraint_name = kcu.constraint_name
+                   AND tc.constraint_schema = kcu.constraint_schema
                 JOIN information_schema.constraint_column_usage AS ccu
                     ON ccu.constraint_name = tc.constraint_name
+                   AND ccu.constraint_schema = tc.constraint_schema
                 WHERE tc.constraint_type = 'FOREIGN KEY'
-                  AND tc.table_schema = cfg.entity_schema
-                  AND tc.table_name = cfg.entity_name
-            LOOP
+                  AND tc.table_schema = p_entity_schema
+                  AND tc.table_name = p_entity_name
+                  AND kcu.column_name = p_parent_field
+                LIMIT 1;
+
+                IF parent_fk.column_name IS NOT NULL THEN
+                    SELECT
+                        kcu.column_name,
+                        ccu.table_schema AS parent_schema,
+                        ccu.table_name AS parent_table,
+                        ccu.column_name AS parent_column
+                    INTO child_parent_fk
+                    FROM information_schema.table_constraints AS tc
+                    JOIN information_schema.key_column_usage AS kcu
+                        ON tc.constraint_name = kcu.constraint_name
+                       AND tc.constraint_schema = kcu.constraint_schema
+                    JOIN information_schema.constraint_column_usage AS ccu
+                        ON ccu.constraint_name = tc.constraint_name
+                       AND ccu.constraint_schema = tc.constraint_schema
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                      AND tc.table_schema = fk.foreign_schema
+                      AND tc.table_name = fk.foreign_table
+                      AND ccu.table_schema = parent_fk.foreign_schema
+                      AND ccu.table_name = parent_fk.foreign_table
+                      AND ccu.column_name = parent_fk.foreign_column
+                    LIMIT 1;
+
+                    IF child_parent_fk.column_name IS NOT NULL THEN
+                        where_sql := format(
+                            'WHERE %%I::text = $1',
+                            child_parent_fk.column_name
+                        );
+                    ELSE
+                        lookup := '[]'::jsonb;
+
+                        result := jsonb_set(
+                            result,
+                            ARRAY[fk.column_name],
+                            lookup,
+                            true
+                        );
+
+                        CONTINUE;
+                    END IF;
+                END IF;
+            END IF;
+
+            IF where_sql <> '' THEN
                 EXECUTE format(
-                    'SELECT json_agg(json_build_object(''id'', %%I, ''name'', %%I)) FROM %%I.%%I',
-                    fk.foreign_column, fk.foreign_column, cfg.entity_schema, fk.foreign_table
-                ) INTO lookup;
+                    'SELECT COALESCE(
+                        jsonb_agg(
+                            jsonb_build_object(
+                                ''value'', %%1$I::text,
+                                ''label'', COALESCE(%%2$I::text, %%1$I::text)
+                            )
+                            ORDER BY COALESCE(%%2$I::text, %%1$I::text)
+                        ),
+                        ''[]''::jsonb
+                    )
+                    FROM %%3$I.%%4$I
+                    %%5$s',
+                    fk.foreign_column,
+                    label_column,
+                    fk.foreign_schema,
+                    fk.foreign_table,
+                    where_sql
+                )
+                INTO lookup
+                USING p_parent_value;
+            ELSE
+                EXECUTE format(
+                    'SELECT COALESCE(
+                        jsonb_agg(
+                            jsonb_build_object(
+                                ''value'', %%1$I::text,
+                                ''label'', COALESCE(%%2$I::text, %%1$I::text)
+                            )
+                            ORDER BY COALESCE(%%2$I::text, %%1$I::text)
+                        ),
+                        ''[]''::jsonb
+                    )
+                    FROM %%3$I.%%4$I',
+                    fk.foreign_column,
+                    label_column,
+                    fk.foreign_schema,
+                    fk.foreign_table
+                )
+                INTO lookup;
+            END IF;
 
-                result := jsonb_set(result, ARRAY[fk.column_name], lookup);
-            END LOOP;
+            result := jsonb_set(
+                result,
+                ARRAY[fk.column_name],
+                lookup,
+                true
+            );
+        END LOOP;
 
-            RETURN result;
-        END;
-        $fk$
-       $sql$ , p_entity_schema);
+        RETURN result;
+    END;
+    $fk$
+    $sql$ , p_entity_schema);
+
 
 
   EXECUTE format('ALTER FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT) OWNER TO %1$I', p_entity_schema);
