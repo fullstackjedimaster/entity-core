@@ -1491,10 +1491,10 @@ BEGIN
 
 
 
-  EXECUTE format('ALTER FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT) OWNER TO %1$I', p_entity_schema);
-  EXECUTE format('REVOKE ALL ON FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT) FROM PUBLIC', p_entity_schema);
-  EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT) TO ec_app', p_entity_schema);
-  EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT) TO %1$I', p_entity_schema);
+  EXECUTE format('ALTER FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT, TEXT, TEXT, TEXT) OWNER TO %1$I', p_entity_schema);
+  EXECUTE format('REVOKE ALL ON FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC', p_entity_schema);
+  EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT, TEXT, TEXT, TEXT) TO ec_app', p_entity_schema);
+  EXECUTE format('GRANT EXECUTE ON FUNCTION %1$I.get_foreign_key_options(TEXT, TEXT, TEXT, TEXT, TEXT) TO %1$I', p_entity_schema);
 
 
   EXECUTE format('ALTER SCHEMA %1$I OWNER TO %1$I', p_entity_schema);
