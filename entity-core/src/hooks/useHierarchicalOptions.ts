@@ -93,11 +93,10 @@ export function useHierarchicalOptions(
                 }
 
                 try {
-                    nextOptions[item.field] = await api.getOptions(
+                    nextOptions[item.field] = await api.getForeignKeyOptions(
                         baseEntityName,
                         item.field,
                         {
-                            mode: 'foreign_key',
                             parentField: item.parentField,
                             parentValue: item.parentValue,
                         }
@@ -175,11 +174,10 @@ export function useHierarchicalOptions(
                     }
 
                     try {
-                        nextOptions[item.field] = await api.getOptions(
+                        nextOptions[item.field] = await api.getForeignKeyOptions(
                             baseEntityName,
                             item.field,
                             {
-                                mode: 'foreign_key',
                                 parentField: item.parentField,
                                 parentValue: item.parentValue,
                             }
