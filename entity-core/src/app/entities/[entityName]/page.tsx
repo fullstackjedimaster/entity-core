@@ -85,7 +85,7 @@ function EntityInner() {
 
             await saveEntity(cleanEntityName, parsed);
 
-            router.push('/entity');
+            router.push('/entities');
         } catch (err) {
             console.error('Save failed:', err);
             alert(
@@ -149,7 +149,7 @@ function EntityInner() {
 
                 <button
                     type="button"
-                    onClick={() => router.push('/entity')}
+                    onClick={() => router.push('/entities')}
                     className="px-4 py-2 border rounded-md"
                 >
                     Cancel

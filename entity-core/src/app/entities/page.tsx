@@ -79,7 +79,7 @@ export default function EntityIndexPage() {
                 </div>
 
                 <Link
-                    href="/entity/new"
+                    href="/entities/new"
                     className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
                     Create New Entity
@@ -107,7 +107,7 @@ export default function EntityIndexPage() {
 
                             <div className="flex gap-4 text-sm">
                                 <Link
-                                    href={`/entity/${ent.entity_name}`}
+                                    href={`/entities/${ent.entity_name}`}
                                     className="text-blue-600 hover:underline"
                                 >
                                     Edit definition
