@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import EntityTemplateBuilder from '@/components/EntityTemplateBuilder';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntity } from '@/hooks/useEntity';
 
@@ -73,10 +72,6 @@ function EntityInner() {
         }
     }, [entity, isNew]);
 
-    function handleBuilderChange(template: Record<string, unknown>) {
-        setJsonStr(JSON.stringify(template, null, 2));
-    }
-
     const onSave = async () => {
         try {
             const cleanEntityName = entityName.trim();
@@ -90,7 +85,7 @@ function EntityInner() {
 
             await saveEntity(cleanEntityName, parsed);
 
-            router.push('/entities');
+            router.push('/entity');
         } catch (err) {
             console.error('Save failed:', err);
             alert(
@@ -110,7 +105,7 @@ function EntityInner() {
     }
 
     return (
-        <main className="p-6 max-w-5xl mx-auto space-y-6">
+        <main className="p-6 max-w-3xl mx-auto space-y-4">
             <div>
                 <h1 className="text-2xl font-semibold">
                     {isNew ? 'Create Entity' : 'Edit Entity'}
@@ -128,18 +123,10 @@ function EntityInner() {
                     disabled={!isNew}
                     onChange={(e) => setEntityName(e.target.value)}
                     className="border px-3 py-2 rounded w-full disabled:bg-gray-100"
-                    placeholder="employee"
                 />
             </div>
 
             {error && <div className="text-red-600 text-sm">{error}</div>}
-
-            {isNew && (
-                <EntityTemplateBuilder
-                    entityName={entityName}
-                    onChange={handleBuilderChange}
-                />
-            )}
 
             <div>
                 <label className="block font-medium mb-2">Entity JSON</label>
@@ -153,7 +140,6 @@ function EntityInner() {
 
             <div className="flex gap-3">
                 <button
-                    type="button"
                     onClick={onSave}
                     disabled={isLoading}
                     className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-60"
@@ -163,7 +149,7 @@ function EntityInner() {
 
                 <button
                     type="button"
-                    onClick={() => router.push('/entities')}
+                    onClick={() => router.push('/entity')}
                     className="px-4 py-2 border rounded-md"
                 >
                     Cancel
