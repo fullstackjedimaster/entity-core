@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Roboto } from 'next/font/google';
 import AuthWrapper from '@/components/AuthWrapper';
+import './globals.css';
 
 const roboto = Roboto({
     weight: ['400', '500', '700'],
