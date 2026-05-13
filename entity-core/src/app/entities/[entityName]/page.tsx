@@ -90,7 +90,7 @@ function EntityInner() {
 
             await saveEntity(cleanEntityName, parsed);
 
-            router.push('/entity');
+            router.push('/entities');
         } catch (err) {
             console.error('Save failed:', err);
             alert(
