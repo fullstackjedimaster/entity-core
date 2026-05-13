@@ -222,9 +222,7 @@ export default function EntityIndexPage() {
                                                     {entity.entity_name}
                                                 </h3>
 
-                                                <p className="text-gray-400 mt-1">
-                                                    Dynamic entity definition and CRUD management.
-                                                </p>
+
                                             </div>
                                         </div>
 
@@ -250,7 +248,7 @@ export default function EntityIndexPage() {
                                             </Link>
 
                                             <Link
-                                                href={`/${entity.entity_name}`}
+                                                href={`/crud/${entity.entity_name}`}
                                                 className="
                                                     inline-flex items-center justify-center gap-3
                                                     rounded-2xl
