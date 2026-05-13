@@ -29,7 +29,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
         // For now just land cleanly
         window.history.replaceState({}, document.title, '/');
 
-        window.location.replace('/entity');
+        window.location.replace('/entities');
     };
     return (
         <Auth0Provider

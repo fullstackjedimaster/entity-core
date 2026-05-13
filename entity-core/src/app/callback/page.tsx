@@ -10,7 +10,7 @@ export default function CallbackPage() {
 
     useEffect(() => {
         if (!loading && isAuthenticated) {
-            router.replace('/entity');
+            router.replace('/entities');
         }
     }, [loading, isAuthenticated]);
 

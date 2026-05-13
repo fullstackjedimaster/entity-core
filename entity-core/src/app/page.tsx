@@ -16,7 +16,7 @@ export default function HomePage() {
             return;
         }
         // ✅ Redirect authenticated users to default entity list
-        router.push("/entity");
+        router.push("/entities");
     }, [loading, isAuthenticated, router]);
 
     return (
