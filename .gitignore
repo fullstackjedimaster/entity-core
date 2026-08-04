@@ -17,6 +17,8 @@ Thumbs.db
 
 .idea/
 
+*.env
+
 
 # ---- deploy runtime secrets (never commit) ----
 
