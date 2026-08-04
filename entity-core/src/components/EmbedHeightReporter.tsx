@@ -2,72 +2,154 @@
 
 import { useEffect } from "react";
 
-type Beacon = {
-    type: "EMBED_HEIGHT";
-    frameId?: string;
-    height: number;
+const DEFAULT_CONTENT_ROOT_ID = "entity-core-embed-content";
+const MAX_HEIGHT = 5000;
+const CHANGE_THRESHOLD = 2;
+const SETTLE_DELAYS_MS = [0, 50, 150, 350, 750];
+
+export type EmbedHeightReporterProps = {
+    contentRootId?: string;
 };
 
-export default function EmbedHeightReporter() {
+function getFrameId(): string {
+    return new URLSearchParams(window.location.search).get("frameId") || "";
+}
+
+function measureContentHeight(root: HTMLElement): number {
+    const rect = root.getBoundingClientRect();
+
+    return Math.min(
+        MAX_HEIGHT,
+        Math.max(
+            1,
+            Math.ceil(
+                Math.max(
+                    rect.height,
+                    root.offsetHeight,
+                    root.scrollHeight,
+                ),
+            ),
+        ),
+    );
+}
+
+export default function EmbedHeightReporter({
+    contentRootId = DEFAULT_CONTENT_ROOT_ID,
+}: EmbedHeightReporterProps) {
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const frameId = params.get("frameId") || undefined;
+        const root = document.getElementById(contentRootId);
 
-        let raf = 0;
-        let last = 0;
-
-        const post = (h: number) => {
-            const now = Date.now();
-            // throttle to ~15fps
-            if (now - last < 66) return;
-            last = now;
-
-            const msg: Beacon = { type: "EMBED_HEIGHT", frameId, height: h };
-            if (window.parent && window.parent !== window) {
-                try {
-                    window.parent.postMessage(msg, "*");
-                } catch {
-                    // noop
-                }
-            }
-        };
-
-        const measure = () => {
-            const body = document.body;
-            const html = document.documentElement;
-            const h = Math.max(
-                body.scrollHeight,
-                html.scrollHeight,
-                body.offsetHeight,
-                html.offsetHeight,
-                body.clientHeight,
-                html.clientHeight
+        if (!(root instanceof HTMLElement)) {
+            console.warn(
+                `[EmbedHeightReporter] Missing #${contentRootId}; height reporting disabled.`,
             );
-            post(h);
-        };
+            return;
+        }
 
-        const ro = new ResizeObserver(() => {
-            cancelAnimationFrame(raf);
-            raf = requestAnimationFrame(measure);
+        const rootElement: HTMLElement = root;
+        const frameId = getFrameId();
+
+        let animationFrameId = 0;
+        let lastHeight = 0;
+        let disposed = false;
+
+        const settleTimers = new Set<number>();
+
+        function postMeasuredHeight(): void {
+            if (disposed) return;
+
+            window.cancelAnimationFrame(animationFrameId);
+
+            animationFrameId = window.requestAnimationFrame(() => {
+                if (disposed) return;
+
+                const height = measureContentHeight(rootElement);
+
+                if (
+                    lastHeight > 0 &&
+                    Math.abs(height - lastHeight) < CHANGE_THRESHOLD
+                ) {
+                    return;
+                }
+
+                lastHeight = height;
+
+                window.parent.postMessage(
+                    {
+                        type: "EMBED_HEIGHT",
+                        frameId,
+                        height,
+                    },
+                    "*",
+                );
+            });
+        }
+
+        function scheduleSettledMeasurements(): void {
+            for (const delay of SETTLE_DELAYS_MS) {
+                const timerId = window.setTimeout(() => {
+                    settleTimers.delete(timerId);
+                    postMeasuredHeight();
+                }, delay);
+
+                settleTimers.add(timerId);
+            }
+        }
+
+        document.documentElement.style.overflowX = "hidden";
+        document.body.style.overflowX = "hidden";
+
+        scheduleSettledMeasurements();
+
+        const resizeObserver = new ResizeObserver(
+            scheduleSettledMeasurements,
+        );
+        resizeObserver.observe(rootElement);
+
+        const mutationObserver = new MutationObserver(
+            scheduleSettledMeasurements,
+        );
+        mutationObserver.observe(rootElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            characterData: true,
         });
 
-        ro.observe(document.documentElement);
-        ro.observe(document.body);
+        const onResize = () => scheduleSettledMeasurements();
+        const onLayoutEnd = () => scheduleSettledMeasurements();
 
-        // initial + safety pings
-        measure();
-        const onLoad = () => measure();
-        const onOrient = () => measure();
-        window.addEventListener("load", onLoad);
-        window.addEventListener("orientationchange", onOrient);
+        window.addEventListener("load", onResize);
+        window.addEventListener("resize", onResize);
+        document.addEventListener("transitionend", onLayoutEnd, true);
+        document.addEventListener("animationend", onLayoutEnd, true);
 
         return () => {
-            window.removeEventListener("load", onLoad);
-            window.removeEventListener("orientationchange", onOrient);
-            ro.disconnect();
-            cancelAnimationFrame(raf);
+            disposed = true;
+            window.cancelAnimationFrame(animationFrameId);
+
+            for (const timerId of settleTimers) {
+                window.clearTimeout(timerId);
+            }
+
+            settleTimers.clear();
+            resizeObserver.disconnect();
+            mutationObserver.disconnect();
+
+            window.removeEventListener("load", onResize);
+            window.removeEventListener("resize", onResize);
+            document.removeEventListener(
+                "transitionend",
+                onLayoutEnd,
+                true,
+            );
+            document.removeEventListener(
+                "animationend",
+                onLayoutEnd,
+                true,
+            );
         };
-    }, []);
+    }, [contentRootId]);
 
     return null;
 }
