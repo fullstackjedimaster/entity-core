@@ -4,65 +4,106 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.init import preload_jwks
-from app.core.settings import env
 from app.core.error_handlers import install_global_error_handlers
-
-# Routers: only the ones that actually exist in ec-control.
+from app.core.init import preload_jwks
+from app.core.settings import CORS_ORIGINS, env
 from app.routers import (
+    crud as crud_router,
     entities as entities_router,
     internal as internal_router,
     login as login_router,
     onboarding as onboarding_router,
-    crud as crud_router
 )
 
+
+def parse_cors_origins(raw: str) -> list[str]:
+    """
+    Parse a comma-separated CORS_ORIGINS environment value.
+
+    Empty entries are ignored and duplicates are removed while preserving
+    their original order.
+    """
+    origins: list[str] = []
+
+    for value in raw.split(","):
+        origin = value.strip().rstrip("/")
+
+        if origin and origin not in origins:
+            origins.append(origin)
+
+    return origins
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    ec-control lifespan:
-    - Preload JWKS / auth metadata for validating external JWTs.
-    - NO database pools or adapter setup. All data access is via ec-model.
+    Entity Core control-service lifespan.
+
+    Entity Core validates Auth0 JWTs and delegates data operations to
+    Entity Server. It does not maintain a local database connection pool.
     """
     await preload_jwks(app)
     yield
-    # Nothing to tear down; no DB pools.
 
-
-# ---------------------------------------------------------------------------
-#  Application
-# ---------------------------------------------------------------------------
 
 app_name = env("EC_CONTROL_APP_NAME") or "Entity Core Control"
+
 app = FastAPI(
     title=app_name,
     version="0.1.0",
     lifespan=lifespan,
 )
 
-# Global error handlers (non-DB) shared across routes.
+cors_origins = parse_cors_origins(CORS_ORIGINS)
+
+if cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=[
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "OPTIONS",
+        ],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "Accept",
+            "Origin",
+            "X-Onboarding-Token",
+            "X-Embed-Token",
+        ],
+        expose_headers=[
+            "Content-Disposition",
+        ],
+        max_age=86400,
+    )
+
 install_global_error_handlers(app)
 
-# ---------------------------------------------------------------------------
-#  Router registration
-# ---------------------------------------------------------------------------
-
-# All of these routers should be implemented in terms of:
-#   - ec-control's own auth (Auth0, etc.) to validate user JWTs
-#   - app.core.model_client.call_model_manage(...) to talk to ec-model
-# ec-control itself never touches a database.
 app.include_router(login_router.router)
 app.include_router(onboarding_router.router)
 app.include_router(entities_router.router)
 app.include_router(internal_router.router)
 app.include_router(crud_router.router)
 
-# Optional root endpoint for quick diagnostics
+
 @app.get("/")
 async def root():
+    return {
+        "service": "ec-control",
+        "status": "ok",
+    }
+
+
+@app.get("/health")
+async def health():
     return {
         "service": "ec-control",
         "status": "ok",
