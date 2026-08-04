@@ -5,50 +5,6 @@ networks:
     external: true
 
 services:
-  entity-core-postgres:
-    image: postgres:16
-    container_name: entity-core-postgres
-    tmpfs:
-      - /var/lib/postgresql/data
-    env_file:
-      - ./env/postgres.env
-    ports:
-     - "127.0.0.1:5432:5432"
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""
-        ]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    networks:
-      - shared-net
-
-  bootstrap:
-    build:
-      context: ..
-      dockerfile: deploy/docker/bootstrap/Dockerfile
-    image: entity-core-api/bootstrap:local
-    env_file:
-      - ./env/postgres.env
-    depends_on:
-      entity-core-postgres:
-        condition: service_healthy
-    command:
-      - bash
-      - -lc
-      - |
-        /scripts/bootstrap.sh
-        /scripts/init-postgres.sh
-    restart: no
-    networks:
-      - shared-net
-
   entity-core-api:
     build:
       context: ..
@@ -78,7 +34,6 @@ services:
     image: entity-core:local
     env_file:
       - ./env/entity-core.env
-
     restart: unless-stopped
     ports:
       - "127.0.0.1:3006:3006"
