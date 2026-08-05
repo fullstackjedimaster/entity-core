@@ -1,27 +1,28 @@
 // src/app/page.tsx
-"use client";
+'use client';
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function HomePage() {
     const router = useRouter();
     const { isAuthenticated, loading } = useAuth();
 
     useEffect(() => {
-        if (loading) return; // wait for Auth0 to initialize
+        if (loading) return;
+
         if (!isAuthenticated) {
-            router.push("/login");
+            router.push('/login');
             return;
         }
-        // ✅ Redirect authenticated users to default entity list
-        router.push("/entities");
+
+        router.push('/entities');
     }, [loading, isAuthenticated, router]);
 
     return (
         <main className="min-h-screen flex items-center justify-center text-gray-600 dark:text-gray-300">
-            <p>Redirecting to entities...…</p>
+            <p>Redirecting to entities...</p>
         </main>
     );
 }

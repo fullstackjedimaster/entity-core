@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntity } from '@/hooks/useEntity';
 
@@ -26,11 +28,25 @@ function EntityInner() {
     const entityNameParam = String(params?.entityName ?? '');
     const isNew = entityNameParam === 'new';
 
-    const [entityName, setEntityName] = useState(isNew ? '' : entityNameParam);
+    const [entityName, setEntityName] = useState(
+        isNew ? '' : entityNameParam
+    );
     const [jsonStr, setJsonStr] = useState('{}');
 
-    const { isAuthenticated, loading: authLoading, login, disableAuth } = useAuth();
-    const { entity, loadEntity, saveEntity, isLoading, error } = useEntity();
+    const {
+        isAuthenticated,
+        loading: authLoading,
+        login,
+        disableAuth,
+    } = useAuth();
+
+    const {
+        entity,
+        loadEntity,
+        saveEntity,
+        isLoading,
+        error,
+    } = useEntity();
 
     useEffect(() => {
         if (authLoading) return;
@@ -88,6 +104,7 @@ function EntityInner() {
             router.push('/entities');
         } catch (err) {
             console.error('Save failed:', err);
+
             alert(
                 err instanceof Error
                     ? err.message
@@ -101,38 +118,68 @@ function EntityInner() {
     }
 
     if (!disableAuth && !isAuthenticated) {
-        return <p className="p-6 text-gray-600">Redirecting to login...</p>;
+        return (
+            <p className="p-6 text-gray-600">
+                Redirecting to login...
+            </p>
+        );
     }
 
     return (
         <main className="p-6 max-w-3xl mx-auto space-y-4">
+            <Link
+                href="/entities"
+                className="inline-flex items-center text-sm text-blue-600 hover:underline"
+            >
+                ← Back to Dashboard
+            </Link>
+
             <div>
                 <h1 className="text-2xl font-semibold">
                     {isNew ? 'Create Entity' : 'Edit Entity'}
                 </h1>
+
                 <p className="text-sm text-gray-600">
                     Define the JSON template for this entity.
                 </p>
             </div>
 
             <div>
-                <label className="block font-medium mb-2">Entity Name</label>
+                <label
+                    htmlFor="entity-name"
+                    className="block font-medium mb-2"
+                >
+                    Entity Name
+                </label>
+
                 <input
+                    id="entity-name"
                     type="text"
                     value={entityName}
                     disabled={!isNew}
-                    onChange={(e) => setEntityName(e.target.value)}
+                    onChange={(event) => setEntityName(event.target.value)}
                     className="border px-3 py-2 rounded w-full disabled:bg-gray-100"
                 />
             </div>
 
-            {error && <div className="text-red-600 text-sm">{error}</div>}
+            {error && (
+                <div className="text-red-600 text-sm">
+                    {error}
+                </div>
+            )}
 
             <div>
-                <label className="block font-medium mb-2">Entity JSON</label>
+                <label
+                    htmlFor="entity-json"
+                    className="block font-medium mb-2"
+                >
+                    Entity JSON
+                </label>
+
                 <textarea
+                    id="entity-json"
                     value={jsonStr}
-                    onChange={(e) => setJsonStr(e.target.value)}
+                    onChange={(event) => setJsonStr(event.target.value)}
                     rows={20}
                     className="w-full font-mono text-sm border rounded-lg p-3"
                 />
@@ -140,6 +187,7 @@ function EntityInner() {
 
             <div className="flex gap-3">
                 <button
+                    type="button"
                     onClick={onSave}
                     disabled={isLoading}
                     className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-60"
@@ -150,7 +198,7 @@ function EntityInner() {
                 <button
                     type="button"
                     onClick={() => router.push('/entities')}
-                    className="px-4 py-2 border rounded-md"
+                    className="px-4 py-2 border rounded-md hover:bg-gray-100"
                 >
                     Cancel
                 </button>

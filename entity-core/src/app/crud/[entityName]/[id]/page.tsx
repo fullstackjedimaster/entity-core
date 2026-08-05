@@ -1,6 +1,13 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import {
+    Suspense,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 import EntityComponent from '@/components/EntityComponent';
@@ -11,7 +18,7 @@ import { ZERO_UUID } from '@/lib/apiCrud';
 function normalizeDateValue(value: unknown): unknown {
     if (typeof value !== 'string') return value;
 
-    // Converts "2026-05-06T19:20:00.655174+00:00" -> "2026-05-06"
+    // Converts "2026-05-06T19:20:00.655174+00:00" to "2026-05-06".
     if (/^\d{4}-\d{2}-\d{2}T/.test(value)) {
         return value.slice(0, 10);
     }
@@ -19,18 +26,29 @@ function normalizeDateValue(value: unknown): unknown {
     return value;
 }
 
-function normalizeInitialValues(raw: Record<string, unknown>): Record<string, unknown> {
+function normalizeInitialValues(
+    raw: Record<string, unknown>
+): Record<string, unknown> {
     const normalized: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(raw)) {
         if (Array.isArray(value)) {
             normalized[key] = value.map((item) =>
-                item && typeof item === 'object' && !Array.isArray(item)
-                    ? normalizeInitialValues(item as Record<string, unknown>)
+                item &&
+                typeof item === 'object' &&
+                !Array.isArray(item)
+                    ? normalizeInitialValues(
+                          item as Record<string, unknown>
+                      )
                     : normalizeDateValue(item)
             );
-        } else if (value && typeof value === 'object') {
-            normalized[key] = normalizeInitialValues(value as Record<string, unknown>);
+        } else if (
+            value &&
+            typeof value === 'object'
+        ) {
+            normalized[key] = normalizeInitialValues(
+                value as Record<string, unknown>
+            );
         } else {
             normalized[key] = normalizeDateValue(value);
         }
@@ -44,7 +62,9 @@ export default function EntityDataItemDetailPage() {
         <Suspense
             fallback={
                 <main className="p-6 max-w-3xl mx-auto">
-                    <p className="text-gray-600">Loading record...</p>
+                    <p className="text-gray-600">
+                        Loading record...
+                    </p>
                 </main>
             }
         >
@@ -61,7 +81,12 @@ function EntityDataItemDetailInner() {
     const id = String(params?.id ?? ZERO_UUID);
     const isNew = id === ZERO_UUID;
 
-    const { isAuthenticated, loading: authLoading, login, disableAuth } = useAuth();
+    const {
+        isAuthenticated,
+        loading: authLoading,
+        login,
+        disableAuth,
+    } = useAuth();
 
     const {
         entityData,
@@ -85,6 +110,7 @@ function EntityDataItemDetailInner() {
                 loginStartedRef.current = true;
                 login();
             }
+
             return;
         }
 
@@ -109,6 +135,8 @@ function EntityDataItemDetailInner() {
         entityName,
         id,
         isNew,
+        login,
+        loadEntityData,
     ]);
 
     useEffect(() => {
@@ -120,8 +148,16 @@ function EntityDataItemDetailInner() {
             entityData?.result ??
             entityData;
 
-        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-            setInitialValues(normalizeInitialValues(raw as Record<string, unknown>));
+        if (
+            raw &&
+            typeof raw === 'object' &&
+            !Array.isArray(raw)
+        ) {
+            setInitialValues(
+                normalizeInitialValues(
+                    raw as Record<string, unknown>
+                )
+            );
         }
     }, [entityData, isNew]);
 
@@ -134,7 +170,9 @@ function EntityDataItemDetailInner() {
     if (authLoading) {
         return (
             <main className="p-6 max-w-3xl mx-auto">
-                <p className="text-gray-600">Checking authentication...</p>
+                <p className="text-gray-600">
+                    Checking authentication...
+                </p>
             </main>
         );
     }
@@ -142,7 +180,9 @@ function EntityDataItemDetailInner() {
     if (!disableAuth && !isAuthenticated) {
         return (
             <main className="p-6 max-w-3xl mx-auto">
-                <p className="text-gray-600">Redirecting to login...</p>
+                <p className="text-gray-600">
+                    Redirecting to login...
+                </p>
             </main>
         );
     }
@@ -150,32 +190,54 @@ function EntityDataItemDetailInner() {
     if (!entityName) {
         return (
             <main className="p-6 max-w-3xl mx-auto">
-                <p className="text-red-600">Missing entity name.</p>
+                <p className="text-red-600">
+                    Missing entity name.
+                </p>
             </main>
         );
     }
 
     return (
         <main className="p-6 max-w-3xl mx-auto space-y-4">
+            <Link
+                href={`/crud/${entityName}`}
+                className="inline-flex items-center text-sm text-blue-600 hover:underline"
+            >
+                ← Back to Records
+            </Link>
+
             <div>
-                <h1 className="text-2xl font-semibold">{title}</h1>
+                <h1 className="text-2xl font-semibold">
+                    {title}
+                </h1>
+
                 <p className="text-sm text-gray-600">
-                    {isNew ? 'New record' : `Record ID: ${id}`}
+                    {isNew
+                        ? 'New record'
+                        : `Record ID: ${id}`}
                 </p>
             </div>
 
             {isLoading && !isNew && (
-                <p className="text-gray-600">Loading existing record...</p>
+                <p className="text-gray-600">
+                    Loading existing record...
+                </p>
             )}
 
-            {error && <p className="text-red-600">Error: {error}</p>}
+            {error && (
+                <p className="text-red-600">
+                    Error: {error}
+                </p>
+            )}
 
             {(!isLoading || isNew) && (
                 <EntityComponent
                     entityName={entityName}
                     id={id}
                     initialValues={initialValues}
-                    onSavedAction={async (savedValues: Record<string, unknown>) => {
+                    onSavedAction={async (
+                        savedValues: Record<string, unknown>
+                    ) => {
                         await saveEntityData(
                             isNew ? null : id,
                             entityName,
@@ -184,7 +246,9 @@ function EntityDataItemDetailInner() {
 
                         router.push(`/crud/${entityName}`);
                     }}
-                    onCancelAction={() => router.push(`/crud/${entityName}`)}
+                    onCancelAction={() =>
+                        router.push(`/crud/${entityName}`)
+                    }
                 />
             )}
         </main>

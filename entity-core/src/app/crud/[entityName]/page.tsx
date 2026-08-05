@@ -3,12 +3,23 @@
 import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+
 import { useAuth } from '@/contexts/AuthContext';
-import { useCrudApi, ZERO_UUID, type EntityDataItemInfo } from '@/lib/apiCrud';
+import {
+    useCrudApi,
+    ZERO_UUID,
+    type EntityDataItemInfo,
+} from '@/lib/apiCrud';
 
 export default function EntityDataItemIndexPage() {
     return (
-        <Suspense fallback={<main className="p-6">Loading entity data...</main>}>
+        <Suspense
+            fallback={
+                <main className="p-6">
+                    Loading entity data...
+                </main>
+            }
+        >
             <EntityDataItemIndexInner />
         </Suspense>
     );
@@ -19,7 +30,13 @@ function EntityDataItemIndexInner() {
     const entityName = String(params?.entityName ?? '');
 
     const api = useCrudApi();
-    const { isAuthenticated, login, loading: authLoading, disableAuth } = useAuth();
+
+    const {
+        isAuthenticated,
+        login,
+        loading: authLoading,
+        disableAuth,
+    } = useAuth();
 
     const [items, setItems] = useState<EntityDataItemInfo[]>([]);
     const [loading, setLoading] = useState(true);
@@ -52,7 +69,9 @@ function EntityDataItemIndexInner() {
                 console.error(err);
 
                 if (!cancelled) {
-                    setError(err?.message ?? 'Failed to load entity data');
+                    setError(
+                        err?.message ?? 'Failed to load entity data'
+                    );
                 }
             } finally {
                 if (!cancelled) {
@@ -67,17 +86,30 @@ function EntityDataItemIndexInner() {
             cancelled = true;
         };
 
-        // Do NOT include `api` unless useCrudApi() is memoized.
+        // Do not include `api` unless useCrudApi() is memoized.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [authLoading, isAuthenticated, disableAuth, entityName]);
+    }, [
+        authLoading,
+        isAuthenticated,
+        disableAuth,
+        entityName,
+    ]);
 
     return (
         <main className="p-6 max-w-3xl mx-auto space-y-6">
-            <div className="flex items-start justify-between gap-4">
+            <Link
+                href="/entities"
+                className="inline-flex items-center text-sm text-blue-600 hover:underline"
+            >
+                ← Back to Dashboard
+            </Link>
+
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h1 className="text-2xl font-semibold">
                         {entityName} Data
                     </h1>
+
                     <p className="text-sm text-gray-600">
                         Create, edit, and inspect records for this entity.
                     </p>
@@ -93,10 +125,16 @@ function EntityDataItemIndexInner() {
 
             {loading && <p>Loading...</p>}
 
-            {error && <p className="text-red-600">Error: {error}</p>}
+            {error && (
+                <p className="text-red-600">
+                    Error: {error}
+                </p>
+            )}
 
             {!loading && !error && items.length === 0 && (
-                <p className="text-gray-600">No records found.</p>
+                <p className="text-gray-600">
+                    No records found.
+                </p>
             )}
 
             {!loading && !error && items.length > 0 && (
@@ -104,9 +142,11 @@ function EntityDataItemIndexInner() {
                     {items.map((item) => (
                         <li
                             key={item.id}
-                            className="p-4 flex items-center justify-between gap-4"
+                            className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                         >
-                            <span className="font-mono text-sm">{item.id}</span>
+                            <span className="font-mono text-sm break-all">
+                                {item.id}
+                            </span>
 
                             <Link
                                 href={`/crud/${entityName}/${item.id}`}

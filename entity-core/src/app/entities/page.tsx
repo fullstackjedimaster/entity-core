@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { useEntityApi, type EntityInfo } from '@/lib/apiEntity';
+
 import { useAuth } from '@/contexts/AuthContext';
+import { useEntityApi, type EntityInfo } from '@/lib/apiEntity';
 
 export default function EntityIndexPage() {
     const api = useEntityApi();
@@ -11,6 +12,7 @@ export default function EntityIndexPage() {
     const {
         isAuthenticated,
         login,
+        logout,
         loading: authLoading,
         disableAuth,
         getEntitySchema,
@@ -62,28 +64,40 @@ export default function EntityIndexPage() {
             cancelled = true;
         };
 
-        // IMPORTANT:
-        // Do not include `api` here unless useEntityApi() returns a memoized object.
+        // Do not include `api` unless useEntityApi() returns a memoized object.
         // Including it causes this page to reload forever.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [authLoading, isAuthenticated, disableAuth]);
 
     return (
         <main className="p-6 max-w-3xl mx-auto space-y-6">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h1 className="text-2xl font-semibold">Entities</h1>
+
                     <p className="text-sm text-gray-600">
                         Schema: {getEntitySchema() ?? 'unknown'}
                     </p>
                 </div>
 
-                <Link
-                    href="/entities/new"
-                    className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                    Create New Entity
-                </Link>
+                <div className="flex flex-wrap items-center gap-3">
+                    {!disableAuth && (
+                        <button
+                            type="button"
+                            onClick={() => logout()}
+                            className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100"
+                        >
+                            Logout
+                        </button>
+                    )}
+
+                    <Link
+                        href="/entities/new"
+                        className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                        Create New Entity
+                    </Link>
+                </div>
             </div>
 
             {loading && <p>Loading...</p>}
@@ -99,13 +113,13 @@ export default function EntityIndexPage() {
                     {entities.map((ent) => (
                         <li
                             key={ent.entity_name}
-                            className="p-4 flex items-center justify-between gap-4"
+                            className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                         >
                             <span className="font-medium">
                                 {ent.entity_name}
                             </span>
 
-                            <div className="flex gap-4 text-sm">
+                            <div className="flex flex-wrap gap-4 text-sm">
                                 <Link
                                     href={`/entities/${ent.entity_name}`}
                                     className="text-blue-600 hover:underline"
