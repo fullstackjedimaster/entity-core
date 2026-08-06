@@ -11,6 +11,7 @@ from app.core.init import preload_jwks
 from app.core.settings import CORS_ORIGINS, env
 from app.routers import (
     crud as crud_router,
+    demo_reset as demo_reset_router,
     entities as entities_router,
     internal as internal_router,
     login as login_router,
@@ -88,6 +89,7 @@ if cors_origins:
 install_global_error_handlers(app)
 
 app.include_router(login_router.router)
+app.include_router(demo_reset_router.router)
 app.include_router(onboarding_router.router)
 app.include_router(entities_router.router)
 app.include_router(internal_router.router)

@@ -1899,6 +1899,74 @@ GRANT EXECUTE ON FUNCTION ec.provision_tenant(
 
 
 -- =========================================================
+-- PORTFOLIO DEMO RESET
+-- =========================================================
+
+CREATE OR REPLACE FUNCTION ec.reset_demo()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ec, public
+AS $$
+DECLARE
+  v_tenant RECORD;
+  v_schemas JSONB := '[]'::JSONB;
+  v_auth0_users JSONB := '[]'::JSONB;
+  v_count INTEGER := 0;
+BEGIN
+  FOR v_tenant IN
+    SELECT DISTINCT
+      lower(trim(entity_schema)) AS entity_schema,
+      sub
+    FROM ec.tenant
+    ORDER BY lower(trim(entity_schema)), sub
+  LOOP
+    IF v_tenant.entity_schema IS NULL
+       OR v_tenant.entity_schema = ''
+       OR v_tenant.entity_schema IN ('public', 'ec', 'information_schema', 'pg_catalog')
+       OR v_tenant.entity_schema LIKE 'pg\_%' ESCAPE '\'
+    THEN
+      RAISE EXCEPTION 'Refusing to reset protected schema: %', v_tenant.entity_schema;
+    END IF;
+
+    IF v_tenant.entity_schema !~ '^[a-z_][a-z0-9_]*$' THEN
+      RAISE EXCEPTION 'Refusing to reset invalid schema name: %', v_tenant.entity_schema;
+    END IF;
+
+    EXECUTE format('DROP SCHEMA IF EXISTS %I CASCADE', v_tenant.entity_schema);
+
+    -- _ensure_tenant_objects creates a NOLOGIN role matching the schema.
+    -- Remove it as well so every demo run starts from a genuinely clean slate.
+    IF EXISTS (
+      SELECT 1
+      FROM pg_roles
+      WHERE rolname = v_tenant.entity_schema
+    ) THEN
+      EXECUTE format('REVOKE %I FROM ec', v_tenant.entity_schema);
+      EXECUTE format('DROP ROLE %I', v_tenant.entity_schema);
+    END IF;
+
+    v_schemas := v_schemas || jsonb_build_array(v_tenant.entity_schema);
+    v_auth0_users := v_auth0_users || jsonb_build_array(v_tenant.sub);
+    v_count := v_count + 1;
+  END LOOP;
+
+  DELETE FROM ec.entity;
+  DELETE FROM ec.tenant;
+
+  RETURN jsonb_build_object(
+    'tenant_count', v_count,
+    'schemas_dropped', v_schemas,
+    'auth0_users', v_auth0_users
+  );
+END;
+$$;
+
+ALTER FUNCTION ec.reset_demo() OWNER TO ec;
+GRANT EXECUTE ON FUNCTION ec.reset_demo() TO ec_app;
+
+
+-- =========================================================
 -- FINAL LOCKDOWN
 -- =========================================================
 
@@ -1926,3 +1994,4 @@ GRANT EXECUTE ON FUNCTION ec._assign_role(TEXT, UUID, UUID, TEXT) TO ec_app;
 GRANT EXECUTE ON FUNCTION ec._apply_roles_and_permissions(TEXT, UUID, UUID, TEXT[], TEXT[]) TO ec_app;
 GRANT EXECUTE ON FUNCTION ec._upsert_tenant(TEXT, TEXT, UUID, TEXT[], TEXT[], JSONB) TO ec_app;
 GRANT EXECUTE ON FUNCTION ec.provision_tenant(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT[], TEXT[]) TO ec_app;
+GRANT EXECUTE ON FUNCTION ec.reset_demo() TO ec_app;
