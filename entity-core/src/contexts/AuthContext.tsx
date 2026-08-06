@@ -6,6 +6,7 @@ import {
     useAuth0,
     type Auth0ContextInterface,
 } from '@auth0/auth0-react';
+
 import { settings } from '@/lib/settings';
 
 const NS = 'https://fullstackjedi.dev';
@@ -37,15 +38,23 @@ interface AuthContextType {
     loading: boolean;
 }
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export const AuthProvider = ({
+    children,
+}: {
+    children: React.ReactNode;
+}) => {
     return <>{children}</>;
 };
 
-function claimString(claims: Claims | null | undefined, ...keys: string[]): string | null {
+function claimString(
+    claims: Claims | null | undefined,
+    ...keys: string[]
+): string | null {
     if (!claims) return null;
 
     for (const key of keys) {
         const value = claims[key];
+
         if (typeof value === 'string' && value.trim()) {
             return value;
         }
@@ -54,7 +63,10 @@ function claimString(claims: Claims | null | undefined, ...keys: string[]): stri
     return null;
 }
 
-function claimStringArray(claims: Claims | null | undefined, ...keys: string[]): string[] {
+function claimStringArray(
+    claims: Claims | null | undefined,
+    ...keys: string[]
+): string[] {
     if (!claims) return [];
 
     for (const key of keys) {
@@ -72,6 +84,18 @@ function claimStringArray(claims: Claims | null | undefined, ...keys: string[]):
     return [];
 }
 
+function isEmbedded(): boolean {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+
+    try {
+        return window.self !== window.top;
+    } catch {
+        return true;
+    }
+}
+
 export const useAuth = (): AuthContextType => {
     const auth0 = useAuth0<User>();
     const disableAuth = settings.DISABLE_AUTH;
@@ -81,7 +105,8 @@ export const useAuth = (): AuthContextType => {
             disableAuth: true,
             user: null,
             claims: {
-                entity_schema: settings.DEFAULT_ENTITY_SCHEMA ?? 'public',
+                entity_schema:
+                    settings.DEFAULT_ENTITY_SCHEMA ?? 'public',
                 org_id: 'dev',
                 roles: ['admin'],
                 permissions: [
@@ -101,7 +126,8 @@ export const useAuth = (): AuthContextType => {
             },
             getToken: async () => null,
             getIdClaims: async () => null,
-            getEntitySchema: () => settings.DEFAULT_ENTITY_SCHEMA ?? 'public',
+            getEntitySchema: () =>
+                settings.DEFAULT_ENTITY_SCHEMA ?? 'public',
             getOrgId: () => 'dev',
             getRoles: () => ['admin'],
             getPermissions: () => [
@@ -119,6 +145,7 @@ export const useAuth = (): AuthContextType => {
         isAuthenticated,
         isLoading,
         user,
+        loginWithPopup,
         loginWithRedirect,
         logout: auth0Logout,
         getAccessTokenSilently,
@@ -127,72 +154,121 @@ export const useAuth = (): AuthContextType => {
 
     const userClaims = (user ?? null) as UserWithClaims | null;
 
-    const login = useCallback(async () => {
-        await loginWithRedirect({
-            authorizationParams: settings.AUTH0_AUDIENCE
-                ? {
-                      audience: settings.AUTH0_AUDIENCE,
-                      scope: settings.AUTH0_SCOPE,
-                  }
-                : {
-                      scope: settings.AUTH0_SCOPE,
-                  },
+    const authorizationParams = settings.AUTH0_AUDIENCE
+        ? {
+              audience: settings.AUTH0_AUDIENCE,
+              scope: settings.AUTH0_SCOPE,
+          }
+        : {
+              scope: settings.AUTH0_SCOPE,
+          };
+
+    const audience = settings.AUTH0_AUDIENCE;
+const scope = settings.AUTH0_SCOPE;
+
+const login = useCallback(async () => {
+    const authorizationParams = audience
+        ? {
+              audience,
+              scope,
+          }
+        : {
+              scope,
+          };
+
+    if (isEmbedded()) {
+        await loginWithPopup({
+            authorizationParams,
         });
-    }, [loginWithRedirect]);
 
-    const logout = useCallback(() => {
-        if (typeof window !== 'undefined') {
-            localStorage.clear();
-            sessionStorage.clear();
-        }
+        return;
+    }
 
+    await loginWithRedirect({
+        authorizationParams,
+        appState: {
+            returnTo: '/entities',
+        },
+    });
+}, [
+    audience,
+    scope,
+    loginWithPopup,
+    loginWithRedirect,
+]);
+
+const logout = useCallback(() => {
+    if (typeof window !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+    }
+
+    if (isEmbedded()) {
         auth0Logout({
-            logoutParams: {
-                returnTo:
-                    typeof window !== 'undefined'
-                        ? window.location.origin
-                        : undefined,
-            },
+            openUrl: false,
         });
-    }, [auth0Logout]);
 
-    const getToken = useCallback(async (): Promise<string | null> => {
-        try {
-            const token = await getAccessTokenSilently({
-                authorizationParams: settings.AUTH0_AUDIENCE
-                    ? {
-                          audience: settings.AUTH0_AUDIENCE,
-                          scope: settings.AUTH0_SCOPE,
-                      }
-                    : {
-                          scope: settings.AUTH0_SCOPE,
-                      },
-            });
+        return;
+    }
 
-            return token ?? null;
-        } catch (err: any) {
-            console.warn('[Auth] token error:', err?.error || err);
+    auth0Logout({
+        logoutParams: {
+            returnTo:
+                typeof window !== 'undefined'
+                    ? window.location.origin
+                    : undefined,
+        },
+    });
+}, [auth0Logout]);
 
-            if (
-                err?.error === 'login_required' ||
-                err?.error === 'consent_required'
-            ) {
-                await login();
+const getToken = useCallback(async (): Promise<string | null> => {
+    try {
+        const authorizationParams = audience
+            ? {
+                  audience,
+                  scope,
+              }
+            : {
+                  scope,
+              };
+
+        const token = await getAccessTokenSilently({
+            authorizationParams,
+        });
+
+        return token ?? null;
+            } catch (err: any) {
+                console.warn('[Auth] token error:', err?.error || err);
+
+                if (
+                    err?.error === 'login_required' ||
+                    err?.error === 'consent_required'
+                ) {
+                    await login();
+                }
+
+                return null;
             }
+        }, [
+            audience,
+            scope,
+            getAccessTokenSilently,
+            login,
+        ]);
 
-            return null;
-        }
-    }, [getAccessTokenSilently, login]);
+    const getIdClaims = useCallback(
+        async (): Promise<Claims | null> => {
+            try {
+                const claims = await getIdTokenClaims();
 
-    const getIdClaims = useCallback(async (): Promise<Claims | null> => {
-        try {
-            const claims = await getIdTokenClaims();
-            return (claims as unknown as Claims) ?? null;
-        } catch (err) {
-            console.warn('[Auth] getIdClaims error:', err);
-            return null;
-        }
-    }, [getIdTokenClaims]);
+                return (claims as unknown as Claims) ?? null;
+            } catch (err) {
+                console.warn('[Auth] getIdClaims error:', err);
+                return null;
+            }
+        },
+        [getIdTokenClaims]
+    );
 
     const getEntitySchema = useCallback((): string | null => {
         return claimString(
@@ -204,11 +280,19 @@ export const useAuth = (): AuthContextType => {
     }, [userClaims]);
 
     const getOrgId = useCallback((): string | null => {
-        return claimString(userClaims, CLAIMS.orgId, 'org_id');
+        return claimString(
+            userClaims,
+            CLAIMS.orgId,
+            'org_id'
+        );
     }, [userClaims]);
 
     const getRoles = useCallback((): string[] => {
-        return claimStringArray(userClaims, CLAIMS.roles, 'roles');
+        return claimStringArray(
+            userClaims,
+            CLAIMS.roles,
+            'roles'
+        );
     }, [userClaims]);
 
     const getPermissions = useCallback((): string[] => {
