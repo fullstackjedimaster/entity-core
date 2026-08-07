@@ -74,6 +74,11 @@ main() {
     [[ -f "$example" ]] || err "Missing example file: $example"
     copy_example "$example" "$target"
   done
+  
+  SHARED_PORTFOLIO_ENV_DIR="/opt/stacks/portfolio/deploy/shared/env"
+  local example="${SHARED_PORTFOLIO_ENV_DIR}/shared.env"
+  local target="${ENV_DIR}/shared.env"
+  copy_example "$example" "$target"
 
   local pg_file="${ENV_DIR}/postgres.env"
   local entity_core_api_file="${ENV_DIR}/entity-core-api.env"
